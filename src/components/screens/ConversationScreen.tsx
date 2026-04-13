@@ -51,13 +51,16 @@ const FloatingText = memo(function FloatingText({
 
   return (
     <p
-      className="text-center max-w-2xl px-6 gpu-accelerated"
+      className="text-center gpu-accelerated"
       style={{
         fontFamily: 'var(--font-display)',
-        fontSize: 'var(--text-xl)',
+        fontSize: 'clamp(1rem, 4vw, 1.25rem)',
         fontWeight: 'var(--font-light)',
         lineHeight: 'var(--leading-relaxed)',
         letterSpacing: 'var(--tracking-wide)',
+        padding: '0 24px',
+        maxWidth: '640px',
+        margin: '0 auto',
       }}
       aria-live="polite"
     >
@@ -67,10 +70,10 @@ const FloatingText = memo(function FloatingText({
           className="inline-block gpu-accelerated-opacity"
           style={{
             opacity: index < visibleWords ? 1 : 0,
-            transform: index < visibleWords ? 'translateY(0)' : 'translateY(10px)',
+            transform: index < visibleWords ? 'translateY(0)' : 'translateY(8px)',
             color: color,
-            textShadow: `0 0 50px ${color}35, 0 0 100px ${color}18`,
-            marginRight: '0.32em',
+            textShadow: `0 0 40px ${color}30`,
+            marginRight: '0.3em',
             transition: `all var(--duration-slow) var(--ease-out-expo)`,
             transitionDelay: `${index * 20}ms`,
           }}
@@ -82,7 +85,7 @@ const FloatingText = memo(function FloatingText({
   );
 });
 
-// Pulsing mic button with ring animations — hero interaction
+// Pulsing mic button with ring animations — hero interaction (64px on mobile)
 const MicButton = memo(function MicButton({
   isListening,
   isSpeaking,
@@ -110,11 +113,12 @@ const MicButton = memo(function MicButton({
         transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
       }}
     >
-      {/* Outer glow halo */}
+      {/* Outer glow ring */}
       <div
-        className="absolute -inset-10 rounded-full"
+        className="absolute rounded-full"
         style={{
-          background: `radial-gradient(circle, ${themeColor}${isListening ? '35' : '12'} 0%, transparent 70%)`,
+          inset: '-20px',
+          background: `radial-gradient(circle, ${themeColor}${isListening ? '30' : '10'} 0%, transparent 70%)`,
           transition: 'all var(--duration-slower) var(--ease-out-expo)',
         }}
         aria-hidden="true"
@@ -123,11 +127,12 @@ const MicButton = memo(function MicButton({
       {/* Ripple animations when listening */}
       {isListening && (
         <>
-          {[0, 0.5, 1].map((delay) => (
+          {[0, 0.6, 1.2].map((delay) => (
             <div
               key={delay}
-              className="absolute inset-0 rounded-full"
+              className="absolute rounded-full"
               style={{
+                inset: 0,
                 border: `1.5px solid ${themeColor}`,
                 animation: `ripple 2s var(--ease-out-quart) infinite ${delay}s`,
               }}
@@ -137,25 +142,25 @@ const MicButton = memo(function MicButton({
         </>
       )}
 
-      {/* Button circle */}
+      {/* Button circle — 64px explicit */}
       <div
         className="relative flex items-center justify-center"
         style={{
-          width: 'var(--btn-height-hero)',
-          height: 'var(--btn-height-hero)',
-          borderRadius: 'var(--radius-full)',
+          width: '64px',
+          height: '64px',
+          borderRadius: '50%',
           background: isListening ? themeColor : 'var(--color-surface-elevated)',
           border: `1.5px solid ${isListening ? themeColor : 'var(--color-border-medium)'}`,
           boxShadow: isListening
-            ? `0 0 60px ${themeColor}60, 0 0 120px ${themeColor}30, inset 0 0 30px ${themeColor}25`
-            : 'var(--shadow-lg)',
-          transform: isListening ? 'scale(1.06)' : 'scale(1)',
+            ? `0 0 50px ${themeColor}50, 0 0 100px ${themeColor}25`
+            : '0 4px 20px rgba(0,0,0,0.3)',
+          transform: isListening ? 'scale(1.05)' : 'scale(1)',
           transition: 'all var(--duration-normal) var(--ease-out-expo)',
         }}
       >
         <svg
-          width="28"
-          height="28"
+          width="26"
+          height="26"
           viewBox="0 0 24 24"
           fill="none"
           stroke={isListening ? 'rgba(0,0,0,0.9)' : 'var(--color-text-secondary)'}
@@ -174,12 +179,15 @@ const MicButton = memo(function MicButton({
 
       {/* Status label */}
       <span
-        className="absolute -bottom-9 left-1/2 whitespace-nowrap text-caps"
+        className="absolute left-1/2 whitespace-nowrap text-caps"
         style={{
-          transform: `translateX(-50%) translateY(${isListening ? 0 : -4}px)`,
+          bottom: '-28px',
+          transform: `translateX(-50%)`,
           opacity: isListening ? 1 : 0,
           color: themeColor,
-          transition: 'all var(--duration-normal) var(--ease-out-expo)',
+          fontSize: '0.65rem',
+          letterSpacing: '0.15em',
+          transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
         }}
         aria-hidden="true"
       >
@@ -189,7 +197,7 @@ const MicButton = memo(function MicButton({
   );
 });
 
-// Free message counter
+// Free message counter (compact for mobile)
 const MessageCounter = memo(function MessageCounter({
   remaining,
   themeColor,
@@ -201,9 +209,9 @@ const MessageCounter = memo(function MessageCounter({
 
   return (
     <div
-      className="text-center mb-4"
+      className="text-center"
       style={{
-        fontSize: 'var(--text-xs)',
+        fontSize: '0.7rem',
         color: remaining <= 1 ? '#ef4444' : 'var(--color-text-muted)',
       }}
     >
@@ -418,8 +426,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
 
   return (
     <div
-      className="relative w-full h-screen overflow-hidden"
-      style={{ background: 'var(--color-void)' }}
+      className="relative w-full overflow-hidden"
+      style={{
+        background: 'var(--color-void)',
+        height: '100dvh', // Use dynamic viewport height for mobile
+        minHeight: '-webkit-fill-available',
+      }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
     >
@@ -429,42 +441,33 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
       {/* Strong vignette for cinematic focus */}
       <div className="vignette vignette-strong" aria-hidden="true" />
 
-      {/* Particle face — code-split loaded */}
+      {/* UI Layer — explicit vertical layout for mobile */}
       <div
-        className="absolute top-0 left-0 right-0 gpu-accelerated-opacity"
+        className="relative z-10 flex flex-col"
         style={{
-          height: '48%',
-          opacity: isVisible ? 1 : 0,
-          transition: `opacity var(--duration-cinematic) var(--ease-out-expo)`,
+          height: '100%',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 20px))',
         }}
-        aria-hidden="true"
       >
-        <LazyAvatarScene
-          themeColor={belief.themeColor}
-          particleColor={belief.particleColor}
-          audioLevel={audioLevel}
-        />
-      </div>
-
-      {/* UI Layer */}
-      <div className="relative z-10 flex flex-col h-full">
-        {/* Header */}
+        {/* Back button row */}
         <header
-          className="flex items-center justify-between px-6 md:px-8 py-5 gpu-accelerated"
+          className="flex items-center justify-between shrink-0 gpu-accelerated"
           style={{
+            padding: '16px 24px',
             opacity: isVisible ? 1 : 0,
-            transform: isVisible ? 'translateY(0)' : 'translateY(-20px)',
+            transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
             transition: `all var(--duration-slower) var(--ease-out-expo)`,
           }}
         >
           <button
             onClick={onBack}
             aria-label="Go back to belief selection"
-            className="group flex items-center gap-3 py-2 px-3 -ml-3 rounded-lg btn-ghost"
+            className="group flex items-center gap-2 py-2 px-3 -ml-3 rounded-lg btn-ghost"
           >
             <svg
-              width="18"
-              height="18"
+              width="16"
+              height="16"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -478,11 +481,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             <span
-              className="text-display group-hover:text-white/60"
+              className="text-display hidden sm:inline"
               style={{
                 fontSize: 'var(--text-sm)',
                 color: 'var(--color-text-muted)',
-                transition: 'color var(--duration-fast)',
               }}
             >
               Back
@@ -492,25 +494,53 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
           {/* Belief name indicator */}
           <span
             className="text-caps"
-            style={{ color: 'var(--color-text-subtle)' }}
+            style={{
+              fontSize: '0.6rem',
+              letterSpacing: '0.15em',
+              color: 'var(--color-text-subtle)',
+            }}
           >
             {belief.name}
           </span>
 
           {/* Spacer for balance */}
-          <div className="w-20" aria-hidden="true" />
+          <div style={{ width: '60px' }} aria-hidden="true" />
         </header>
 
-        {/* Spacer */}
-        <div className="flex-1 min-h-[18%]" aria-hidden="true" />
+        {/* 20px gap after back button */}
+        <div style={{ height: '20px' }} aria-hidden="true" />
 
-        {/* Caption area — floating divine text */}
+        {/* Particle face — 35-40% viewport height */}
         <div
-          className="flex items-center justify-center px-4 py-10 min-h-[140px] gpu-accelerated-opacity"
+          className="shrink-0 gpu-accelerated-opacity"
           style={{
+            height: '35vh',
+            minHeight: '200px',
+            maxHeight: '280px',
+            opacity: isVisible ? 1 : 0,
+            transition: `opacity var(--duration-cinematic) var(--ease-out-expo)`,
+            transitionDelay: '200ms',
+          }}
+          aria-hidden="true"
+        >
+          <LazyAvatarScene
+            themeColor={belief.themeColor}
+            particleColor={belief.particleColor}
+            audioLevel={audioLevel}
+          />
+        </div>
+
+        {/* 24px gap after particle face */}
+        <div style={{ height: '24px' }} aria-hidden="true" />
+
+        {/* Caption area — God's response text (takes remaining space) */}
+        <div
+          className="flex-1 flex items-start justify-center overflow-y-auto gpu-accelerated-opacity"
+          style={{
+            minHeight: '80px',
             opacity: isVisible ? 1 : 0,
             transition: `opacity var(--duration-slower) var(--ease-out-expo)`,
-            transitionDelay: '600ms',
+            transitionDelay: '400ms',
           }}
         >
           <FloatingText
@@ -520,86 +550,117 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
           />
         </div>
 
-        {/* Input section */}
+        {/* 16px gap before message counter */}
+        <div style={{ height: '16px' }} aria-hidden="true" />
+
+        {/* Message counter */}
+        <div className="shrink-0">
+          {!user.isPremium && (
+            <MessageCounter remaining={remainingMessages} themeColor={belief.themeColor} />
+          )}
+        </div>
+
+        {/* 12px gap before text input */}
+        <div style={{ height: '12px' }} aria-hidden="true" />
+
+        {/* Text input row — 48px height */}
         <div
-          className="px-6 md:px-8 pb-12 md:pb-16 gpu-accelerated"
+          className="shrink-0 gpu-accelerated"
           style={{
+            padding: '0 24px',
             opacity: isVisible ? 1 : 0,
-            transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+            transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
             transition: `all var(--duration-slower) var(--ease-out-expo)`,
-            transitionDelay: '700ms',
+            transitionDelay: '500ms',
           }}
         >
-          <div className="max-w-xl mx-auto input-container">
-            {/* Free message counter */}
-            {!user.isPremium && (
-              <MessageCounter remaining={remainingMessages} themeColor={belief.themeColor} />
-            )}
+          <div className="flex items-center gap-3 max-w-md mx-auto">
+            <label htmlFor="message-input" className="sr-only">
+              Type your message
+            </label>
+            <input
+              ref={inputRef}
+              id="message-input"
+              type="text"
+              value={isListening ? interimTranscript || inputText : inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isListening ? 'Listening...' : 'Speak your truth...'}
+              disabled={isSpeaking || isProcessing}
+              maxLength={500}
+              style={{
+                flex: 1,
+                height: '48px',
+                padding: '0 16px',
+                fontSize: '15px',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 'var(--font-light)',
+                color: 'var(--color-text-primary)',
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '12px',
+                outline: 'none',
+                opacity: isSpeaking || isProcessing ? 0.35 : 1,
+                transition: 'all var(--duration-normal) var(--ease-out-expo)',
+              }}
+            />
 
-            {/* Text input row */}
-            <div className="flex items-center gap-4 mb-14 input-row">
-              <label htmlFor="message-input" className="sr-only">
-                Type your message
-              </label>
-              <input
-                ref={inputRef}
-                id="message-input"
-                type="text"
-                value={isListening ? interimTranscript || inputText : inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isListening ? 'Listening...' : 'Speak your truth...'}
-                disabled={isSpeaking || isProcessing}
-                className="flex-1 input input-field"
-                maxLength={500}
-                style={{
-                  opacity: isSpeaking || isProcessing ? 0.35 : 1,
-                  transition: 'all var(--duration-normal) var(--ease-out-expo)',
-                }}
-              />
-
-              {/* Send button */}
-              <button
-                onClick={handleSend}
-                disabled={!inputText.trim() || isSpeaking || isProcessing}
-                aria-label="Send message"
-                className="btn-icon hover-scale"
-                style={{
-                  width: 'var(--btn-height-lg)',
-                  height: 'var(--btn-height-lg)',
-                  background: inputText.trim() ? `${belief.themeColor}18` : 'var(--color-surface-elevated)',
-                  borderColor: inputText.trim() ? `${belief.themeColor}55` : 'var(--color-border-light)',
-                  opacity: inputText.trim() && !isSpeaking && !isProcessing ? 1 : 0.35,
-                  boxShadow: inputText.trim() ? `0 0 30px ${belief.themeColor}22` : 'none',
-                }}
+            {/* Send button — 48px */}
+            <button
+              onClick={handleSend}
+              disabled={!inputText.trim() || isSpeaking || isProcessing}
+              aria-label="Send message"
+              style={{
+                width: '48px',
+                height: '48px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '12px',
+                background: inputText.trim() ? `${belief.themeColor}18` : 'rgba(255, 255, 255, 0.04)',
+                border: `1px solid ${inputText.trim() ? `${belief.themeColor}55` : 'rgba(255, 255, 255, 0.1)'}`,
+                opacity: inputText.trim() && !isSpeaking && !isProcessing ? 1 : 0.35,
+                cursor: inputText.trim() && !isSpeaking && !isProcessing ? 'pointer' : 'default',
+                transition: 'all var(--duration-normal) var(--ease-out-expo)',
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={inputText.trim() ? belief.themeColor : 'var(--color-text-muted)'}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
               >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={inputText.trim() ? belief.themeColor : 'var(--color-text-muted)'}
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Mic button — hero of the section */}
-            <div className="flex flex-col items-center">
-              <MicButton
-                isListening={isListening}
-                isSpeaking={isSpeaking}
-                isDisabled={isProcessing || (hasReachedFreeLimit() && !user.isPremium)}
-                themeColor={belief.themeColor}
-                onToggle={handleMicToggle}
-              />
-            </div>
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
+        </div>
+
+        {/* 12px gap before mic button */}
+        <div style={{ height: '12px' }} aria-hidden="true" />
+
+        {/* Mic button — 64px, centered */}
+        <div
+          className="shrink-0 flex justify-center gpu-accelerated"
+          style={{
+            opacity: isVisible ? 1 : 0,
+            transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+            transition: `all var(--duration-slower) var(--ease-out-expo)`,
+            transitionDelay: '600ms',
+          }}
+        >
+          <MicButton
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            isDisabled={isProcessing || (hasReachedFreeLimit() && !user.isPremium)}
+            themeColor={belief.themeColor}
+            onToggle={handleMicToggle}
+          />
         </div>
       </div>
     </div>

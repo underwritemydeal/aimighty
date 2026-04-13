@@ -12,7 +12,7 @@ interface LazyAvatarSceneProps {
   className?: string;
 }
 
-// Loading placeholder with breathing animation
+// Loading placeholder with breathing animation — more visible
 const AvatarPlaceholder = memo(function AvatarPlaceholder() {
   return (
     <div
@@ -20,12 +20,13 @@ const AvatarPlaceholder = memo(function AvatarPlaceholder() {
       aria-hidden="true"
     >
       <div
-        className="rounded-full animate-breathe"
+        className="animate-breathe"
         style={{
-          width: '120px',
-          height: '120px',
-          background: 'radial-gradient(circle, rgba(212,175,55,0.15) 0%, transparent 70%)',
-          boxShadow: '0 0 60px rgba(212,175,55,0.1)',
+          width: '160px',
+          height: '200px',
+          borderRadius: '50% 50% 45% 45%',
+          background: 'radial-gradient(ellipse at 50% 40%, rgba(212,175,55,0.35) 0%, rgba(212,175,55,0.15) 40%, transparent 70%)',
+          boxShadow: '0 0 80px rgba(212,175,55,0.25), 0 0 160px rgba(212,175,55,0.1)',
         }}
       />
     </div>

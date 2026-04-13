@@ -138,7 +138,7 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center h-full px-6">
-        {/* Logo */}
+        {/* Logo with divine glow */}
         <div
           className="gpu-accelerated"
           style={{
@@ -151,7 +151,7 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
             id="welcome-heading"
             className="flex items-baseline justify-center select-none"
           >
-            {/* AI — Gold, weighted */}
+            {/* AI — Gold with strong glow */}
             <span
               className="text-gold animate-text-glow"
               style={{
@@ -159,11 +159,12 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
                 fontSize: 'var(--text-hero)',
                 fontWeight: 'var(--font-medium)',
                 letterSpacing: 'var(--tracking-wide)',
+                textShadow: '0 0 20px rgba(212, 175, 55, 0.8), 0 0 40px rgba(212, 175, 55, 0.6), 0 0 80px rgba(212, 175, 55, 0.4), 0 0 120px rgba(212, 175, 55, 0.2)',
               }}
             >
               AI
             </span>
-            {/* mighty — White, ethereal */}
+            {/* mighty — White with golden glow halo */}
             <span
               style={{
                 fontFamily: 'var(--font-display)',
@@ -171,6 +172,7 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
                 fontWeight: 'var(--font-thin)',
                 letterSpacing: '0.1em',
                 color: 'var(--color-text-primary)',
+                textShadow: '0 0 20px rgba(212, 175, 55, 0.5), 0 0 40px rgba(212, 175, 55, 0.3), 0 0 80px rgba(212, 175, 55, 0.2)',
               }}
             >
               mighty

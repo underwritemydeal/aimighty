@@ -30,11 +30,11 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue }:
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
-    // Cinematic reveal sequence
+    // Cinematic reveal sequence — 2-3 second pause
     const timers = [
       setTimeout(() => setPhase(1), 300),    // Background appears
-      setTimeout(() => setPhase(2), 1000),   // Message fades in
-      setTimeout(() => setPhase(3), 4500),   // Auto-continue after pause
+      setTimeout(() => setPhase(2), 800),    // Message fades in
+      setTimeout(() => setPhase(3), 3500),   // Auto-continue after 2.7s pause
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -50,8 +50,12 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue }:
 
   return (
     <div
-      className="relative w-full h-screen overflow-hidden"
-      style={{ background: 'var(--color-void)' }}
+      className="relative w-full overflow-hidden"
+      style={{
+        background: 'var(--color-void)',
+        height: '100dvh',
+        minHeight: '-webkit-fill-available',
+      }}
       role="main"
       aria-label="Welcome message"
     >
@@ -63,62 +67,72 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue }:
 
       {/* Glow orb in center */}
       <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2"
+        className="absolute left-1/2"
         style={{
-          width: '300px',
-          height: '300px',
-          background: `radial-gradient(circle, ${belief.themeColor}25 0%, ${belief.themeColor}08 40%, transparent 70%)`,
+          top: '35%',
+          width: '280px',
+          height: '280px',
+          background: `radial-gradient(circle, ${belief.themeColor}30 0%, ${belief.themeColor}10 40%, transparent 70%)`,
           opacity: phase >= 1 ? 1 : 0,
           transform: `translateX(-50%) translateY(-50%) scale(${phase >= 1 ? 1 : 0.5})`,
           transition: 'all 2s var(--ease-out-expo)',
-          filter: 'blur(40px)',
+          filter: 'blur(50px)',
         }}
         aria-hidden="true"
       />
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-8">
-        {/* Welcome message */}
+      {/* Content — centered with generous padding */}
+      <div
+        className="relative z-10 flex flex-col items-center justify-center h-full"
+        style={{
+          padding: '32px',
+          paddingTop: 'env(safe-area-inset-top, 32px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 32px)',
+        }}
+      >
+        {/* Welcome message — centered, belief accent color */}
         <blockquote
-          className="text-center max-w-2xl gpu-accelerated"
+          className="text-center gpu-accelerated"
           style={{
+            maxWidth: '540px',
             opacity: phase >= 2 ? 1 : 0,
-            transform: phase >= 2 ? 'translateY(0)' : 'translateY(30px)',
-            transition: 'all 1.5s var(--ease-out-expo)',
+            transform: phase >= 2 ? 'translateY(0)' : 'translateY(24px)',
+            transition: 'all 1.2s var(--ease-out-expo)',
           }}
         >
           <p
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-2xl)',
+              fontSize: 'clamp(1.25rem, 5vw, 1.75rem)',
               fontWeight: 'var(--font-light)',
-              lineHeight: 'var(--leading-relaxed)',
+              lineHeight: '1.6',
               letterSpacing: 'var(--tracking-wide)',
               color: belief.themeColor,
-              textShadow: `0 0 60px ${belief.themeColor}40, 0 0 120px ${belief.themeColor}20`,
+              textShadow: `0 0 40px ${belief.themeColor}35, 0 0 80px ${belief.themeColor}20`,
             }}
           >
             {message}
           </p>
         </blockquote>
 
-        {/* Subtle indicator */}
-        <div
-          className="absolute bottom-20 left-1/2 -translate-x-1/2"
+        {/* Tap to skip hint */}
+        <p
+          className="absolute text-center"
           style={{
-            opacity: phase >= 2 ? 0.4 : 0,
+            bottom: 'calc(80px + env(safe-area-inset-bottom, 20px))',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            opacity: phase >= 2 ? 0.35 : 0,
             transition: 'opacity 1s var(--ease-out-expo)',
-            transitionDelay: '1s',
+            transitionDelay: '0.8s',
+            fontSize: '0.7rem',
+            letterSpacing: '0.1em',
+            color: 'var(--color-text-muted)',
+            textTransform: 'uppercase',
           }}
         >
-          <div
-            className="w-6 h-6 rounded-full animate-pulse-gentle"
-            style={{
-              background: `radial-gradient(circle, ${belief.themeColor}40 0%, transparent 70%)`,
-            }}
-            aria-hidden="true"
-          />
-        </div>
+          Tap to continue
+        </p>
 
         {/* Skip button (tap anywhere) */}
         <button

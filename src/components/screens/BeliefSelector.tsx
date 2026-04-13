@@ -8,7 +8,7 @@ interface BeliefSelectorProps {
   onBack: () => void;
 }
 
-// Compact belief card for the grid
+// Belief card with glass morphism effect
 const BeliefCard = memo(function BeliefCard({
   belief,
   index,
@@ -35,68 +35,93 @@ const BeliefCard = memo(function BeliefCard({
       className="w-full text-left gpu-accelerated"
       style={{
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
         transition: `all var(--duration-slow) var(--ease-out-expo)`,
-        transitionDelay: `${200 + index * 60}ms`,
+        transitionDelay: `${150 + index * 40}ms`,
       }}
     >
       <div
-        className="relative text-center py-6 px-5 rounded-xl"
+        className="relative"
         style={{
-          background: isActive ? 'var(--glass-bg-hover)' : 'var(--glass-bg)',
-          backdropFilter: `blur(var(--glass-blur))`,
-          WebkitBackdropFilter: `blur(var(--glass-blur))`,
-          border: `1px solid ${isActive ? `${belief.themeColor}50` : 'var(--glass-border)'}`,
+          padding: '20px',
+          borderRadius: '16px',
+          background: isActive ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.02)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: `1px solid ${isActive ? `${belief.themeColor}60` : 'rgba(255, 255, 255, 0.08)'}`,
           boxShadow: isActive
-            ? `0 0 40px ${belief.themeColor}18, inset 0 1px 0 rgba(255,255,255,0.04)`
-            : 'var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.02)',
-          transform: isActive ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
+            ? `0 0 30px ${belief.themeColor}15, inset 0 1px 0 rgba(255,255,255,0.05)`
+            : 'inset 0 1px 0 rgba(255,255,255,0.03)',
+          transform: isActive ? 'translateY(-2px)' : 'translateY(0)',
           transition: 'all var(--duration-normal) var(--ease-out-expo)',
         }}
       >
-        {/* Top glow line */}
+        {/* Top glow line on active */}
         <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 h-[1px]"
           style={{
-            width: isActive ? '60%' : '0%',
+            position: 'absolute',
+            top: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: isActive ? '50%' : '0%',
+            height: '1px',
             background: `linear-gradient(90deg, transparent, ${belief.themeColor}, transparent)`,
-            boxShadow: isActive ? `0 0 15px ${belief.themeColor}60` : 'none',
+            boxShadow: isActive ? `0 0 10px ${belief.themeColor}` : 'none',
             transition: 'all var(--duration-normal) var(--ease-out-expo)',
           }}
           aria-hidden="true"
         />
 
-        {/* Title */}
-        <h3
-          className="mb-1 text-display"
-          style={{
-            fontSize: 'var(--text-base)',
-            fontWeight: 'var(--font-normal)',
-            color: isActive ? 'var(--color-text-primary)' : 'rgba(255,255,255,0.88)',
-            letterSpacing: 'var(--tracking-wide)',
-            transition: 'color var(--duration-fast)',
-          }}
-        >
-          {belief.name}
-        </h3>
+        {/* Title and subtitle row */}
+        <div className="flex items-baseline justify-between gap-3">
+          <h3
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'var(--text-base)',
+              fontWeight: 'var(--font-normal)',
+              color: isActive ? 'var(--color-text-primary)' : 'rgba(255,255,255,0.85)',
+              letterSpacing: 'var(--tracking-wide)',
+              transition: 'color var(--duration-fast)',
+            }}
+          >
+            {belief.name}
+          </h3>
+          <span
+            className="text-caps shrink-0"
+            style={{
+              fontSize: '0.6rem',
+              color: isActive ? belief.themeColor : 'var(--color-text-muted)',
+              transition: 'color var(--duration-fast)',
+            }}
+          >
+            {belief.subtitle}
+          </span>
+        </div>
 
-        {/* Subtitle */}
+        {/* Description */}
         <p
-          className="text-caps"
           style={{
-            fontSize: '0.6rem',
-            color: isActive ? belief.themeColor : 'var(--color-text-muted)',
-            transition: 'color var(--duration-fast)',
+            marginTop: '8px',
+            fontFamily: 'var(--font-display)',
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--font-light)',
+            color: 'var(--color-text-secondary)',
+            lineHeight: 'var(--leading-relaxed)',
           }}
         >
-          {belief.subtitle}
+          {belief.description}
         </p>
 
         {/* Focus indicator */}
         <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[2px] rounded-full"
           style={{
-            width: isFocused ? '40%' : '0%',
+            position: 'absolute',
+            bottom: 0,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: isFocused ? '30%' : '0%',
+            height: '2px',
+            borderRadius: '2px',
             background: belief.themeColor,
             transition: 'all var(--duration-fast) var(--ease-out-expo)',
           }}
@@ -107,21 +132,25 @@ const BeliefCard = memo(function BeliefCard({
   );
 });
 
-// Category section header
+// Category section header - subtle divider style
 const CategoryHeader = memo(function CategoryHeader({
   category,
   isVisible,
   delay,
+  isFirst,
 }: {
   category: BeliefCategory;
   isVisible: boolean;
   delay: number;
+  isFirst: boolean;
 }) {
   return (
     <div
-      className="mb-4 gpu-accelerated-opacity"
+      className="gpu-accelerated-opacity"
       style={{
-        opacity: isVisible ? 0.6 : 0,
+        marginTop: isFirst ? '0' : '32px',
+        marginBottom: '16px',
+        opacity: isVisible ? 0.5 : 0,
         transition: `opacity var(--duration-slow) var(--ease-out-expo)`,
         transitionDelay: `${delay}ms`,
       }}
@@ -129,9 +158,9 @@ const CategoryHeader = memo(function CategoryHeader({
       <h2
         className="text-caps text-center"
         style={{
-          fontSize: 'var(--text-xs)',
+          fontSize: '0.65rem',
           color: 'var(--color-text-muted)',
-          letterSpacing: '0.25em',
+          letterSpacing: '0.2em',
         }}
       >
         {categoryLabels[category]}
@@ -165,8 +194,14 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
 
       {/* Scrollable content */}
       <div className="relative z-10 min-h-screen overflow-y-auto">
-        <div className="flex flex-col items-center px-4 md:px-6 py-12 md:py-16">
-          {/* Back button */}
+        <div
+          style={{
+            maxWidth: '640px',
+            margin: '0 auto',
+            padding: '80px 24px 120px 24px',
+          }}
+        >
+          {/* Back button - fixed */}
           <nav
             className="fixed top-4 left-4 z-20 gpu-accelerated"
             style={{
@@ -196,11 +231,10 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
                 <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
               <span
-                className="text-display group-hover:text-white/60 hidden sm:inline"
+                className="text-display hidden sm:inline"
                 style={{
                   fontSize: 'var(--text-sm)',
                   color: 'var(--color-text-muted)',
-                  transition: 'color var(--duration-fast)',
                 }}
               >
                 Back
@@ -210,23 +244,24 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
 
           {/* Header */}
           <header
-            className="text-center mb-4 mt-8 gpu-accelerated"
+            className="text-center gpu-accelerated"
             style={{
+              marginBottom: '12px',
               opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateY(0)' : 'translateY(24px)',
+              transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
               transition: `all var(--duration-slower) var(--ease-out-expo)`,
             }}
           >
             <h1
               id="belief-heading"
-              className="flex flex-wrap items-baseline justify-center gap-3 text-display"
+              className="text-display"
               style={{
-                fontSize: 'var(--text-3xl)',
+                fontSize: 'clamp(1.5rem, 5vw, 2rem)',
                 fontWeight: 'var(--font-light)',
                 letterSpacing: 'var(--tracking-wide)',
               }}
             >
-              <span style={{ color: 'var(--color-text-primary)' }}>Choose Your</span>
+              <span style={{ color: 'var(--color-text-primary)' }}>Choose Your </span>
               <span className="text-gold" style={{ fontWeight: 'var(--font-normal)' }}>
                 Path
               </span>
@@ -235,24 +270,30 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
 
           {/* Tagline */}
           <p
-            className="text-center mb-8 text-caps gpu-accelerated-opacity"
+            className="text-center text-caps gpu-accelerated-opacity"
             style={{
-              opacity: isVisible ? 0.5 : 0,
-              fontSize: 'var(--text-xs)',
+              marginBottom: '32px',
+              opacity: isVisible ? 0.4 : 0,
+              fontSize: '0.65rem',
               color: 'var(--color-text-muted)',
               transition: `opacity var(--duration-slower) var(--ease-out-expo)`,
-              transitionDelay: '150ms',
+              transitionDelay: '100ms',
             }}
           >
             Select the tradition that speaks to your soul
           </p>
 
-          {/* Cards container */}
-          <div className="w-full max-w-5xl">
+          {/* Cards - single column on mobile, grid on tablet+ */}
+          <div>
             {/* Religious Traditions */}
-            <section className="mb-10" role="region" aria-label="Religious Traditions">
-              <CategoryHeader category="religious" isVisible={isVisible} delay={200} />
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+            <section role="region" aria-label="Religious Traditions">
+              <CategoryHeader category="religious" isVisible={isVisible} delay={150} isFirst={true} />
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                }}
+              >
                 {religious.map((belief, index) => (
                   <BeliefCard
                     key={belief.id}
@@ -266,9 +307,14 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
             </section>
 
             {/* Spiritual Paths */}
-            <section className="mb-10" role="region" aria-label="Spiritual Paths">
-              <CategoryHeader category="spiritual" isVisible={isVisible} delay={500} />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 max-w-2xl mx-auto">
+            <section role="region" aria-label="Spiritual Paths">
+              <CategoryHeader category="spiritual" isVisible={isVisible} delay={400} isFirst={false} />
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                }}
+              >
                 {spiritual.map((belief, index) => (
                   <BeliefCard
                     key={belief.id}
@@ -282,9 +328,14 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
             </section>
 
             {/* Philosophical Frameworks */}
-            <section className="mb-8" role="region" aria-label="Philosophical Frameworks">
-              <CategoryHeader category="philosophical" isVisible={isVisible} delay={700} />
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4 max-w-2xl mx-auto">
+            <section role="region" aria-label="Philosophical Frameworks">
+              <CategoryHeader category="philosophical" isVisible={isVisible} delay={550} isFirst={false} />
+              <div
+                className="grid gap-3"
+                style={{
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                }}
+              >
                 {philosophical.map((belief, index) => (
                   <BeliefCard
                     key={belief.id}
@@ -300,17 +351,17 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
 
           {/* Footer text */}
           <p
-            className="text-center mt-8 max-w-md gpu-accelerated-opacity"
+            className="text-center gpu-accelerated-opacity"
             style={{
-              opacity: isVisible ? 0.35 : 0,
+              marginTop: '32px',
+              opacity: isVisible ? 0.3 : 0,
               transition: `opacity var(--duration-slower) var(--ease-out-expo)`,
-              transitionDelay: '1000ms',
+              transitionDelay: '800ms',
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-xs)',
               fontWeight: 'var(--font-light)',
               color: 'var(--color-text-muted)',
               lineHeight: 'var(--leading-relaxed)',
-              letterSpacing: 'var(--tracking-wide)',
             }}
           >
             Trained on every sacred text, scripture, and tradition — available whenever you need guidance.

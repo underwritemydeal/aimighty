@@ -21,9 +21,9 @@ const SocialButton = memo(function SocialButton({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center justify-center gap-3 py-4 sm:py-3.5 px-4 rounded-xl glass glass-interactive hover-lift"
+      className="w-full flex items-center justify-center gap-3 rounded-xl glass glass-interactive hover-lift"
       style={{
-        minHeight: '52px',
+        height: '52px',
         transition: 'all var(--duration-normal) var(--ease-out-expo)',
       }}
       aria-label={`Sign in with ${provider}`}
@@ -46,7 +46,7 @@ const SocialButton = memo(function SocialButton({
 // Divider with text
 const Divider = memo(function Divider({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-4 my-8 sm:my-6">
+    <div className="flex items-center gap-4">
       <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       <span
         className="text-caps"
@@ -161,18 +161,24 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
         </button>
       </nav>
 
-      {/* Content */}
-      <div className="relative z-10 min-h-screen flex items-end sm:items-center justify-center px-0 sm:px-4 py-0 sm:py-12">
+      {/* Content - centered on desktop, bottom sheet on mobile */}
+      <div
+        className="relative z-10 min-h-screen flex flex-col sm:justify-center"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
+        {/* Spacer on mobile to push content down */}
+        <div className="flex-1 sm:hidden" />
+
         <div
-          className="w-full sm:max-w-sm gpu-accelerated"
+          className="w-full sm:max-w-sm sm:mx-auto gpu-accelerated"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
             transition: `all var(--duration-slower) var(--ease-out-expo)`,
           }}
         >
-          {/* Logo */}
-          <div className="text-center mb-6 sm:mb-8 pt-8 sm:pt-0">
+          {/* Logo - hidden on mobile in bottom sheet mode, shown on desktop */}
+          <div className="hidden sm:block text-center mb-8">
             <h1 className="flex items-baseline justify-center select-none">
               <span
                 className="text-gold"
@@ -197,17 +203,26 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
             </h1>
           </div>
 
-          {/* Auth card */}
+          {/* Auth card - full width on mobile, floating on desktop */}
           <div
-            className="glass rounded-t-3xl sm:rounded-2xl px-6 sm:px-6 py-8 sm:py-6"
-            style={{ boxShadow: 'var(--glass-shadow)' }}
+            className="rounded-t-3xl sm:rounded-2xl"
+            style={{
+              padding: '32px 24px 40px 24px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderBottom: 'none',
+              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.3)',
+            }}
           >
             <h2
               id="auth-heading"
-              className="text-center mb-6"
+              className="text-center"
               style={{
+                marginBottom: '28px',
                 fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-lg)',
+                fontSize: 'var(--text-xl)',
                 fontWeight: 'var(--font-normal)',
                 color: 'var(--color-text-primary)',
               }}
@@ -221,8 +236,8 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
 
             {mode !== 'verify-email' && (
               <>
-                {/* Social sign-in buttons */}
-                <div className="space-y-4 mb-2">
+                {/* Social sign-in buttons with 14px gap */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                   <SocialButton
                     provider="Google"
                     onClick={() => handleSocialSignIn('Google')}
@@ -246,16 +261,19 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                   />
                 </div>
 
-                <Divider text="or" />
+                {/* Divider with vertical spacing */}
+                <div style={{ marginTop: '24px', marginBottom: '24px' }}>
+                  <Divider text="or" />
+                </div>
               </>
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-4">
+            <form onSubmit={handleSubmit}>
               {mode === 'verify-email' ? (
-                <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <p
-                    className="text-center mb-4"
+                    className="text-center"
                     style={{
                       fontSize: 'var(--text-sm)',
                       color: 'var(--color-text-secondary)',
@@ -279,7 +297,7 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                       placeholder="Enter 6-digit code"
                       className="input text-center"
                       style={{
-                        minHeight: '60px',
+                        height: '60px',
                         fontSize: 'var(--text-xl)',
                         letterSpacing: '0.3em',
                         fontWeight: 'var(--font-medium)',
@@ -288,9 +306,10 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                       required
                     />
                   </div>
-                </>
+                </div>
               ) : (
-                <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Email field */}
                   <div>
                     <label htmlFor="email" className="sr-only">
                       Email address
@@ -304,17 +323,22 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                       className="input"
                       autoComplete="email"
                       required
-                      style={{ minHeight: '52px' }}
+                      style={{ height: '52px' }}
                     />
                     {emailError && (
                       <p
-                        className="mt-1.5 text-sm"
-                        style={{ color: '#ef4444', fontSize: 'var(--text-xs)' }}
+                        style={{
+                          marginTop: '8px',
+                          color: '#ef4444',
+                          fontSize: 'var(--text-xs)',
+                        }}
                       >
                         {emailError}
                       </p>
                     )}
                   </div>
+
+                  {/* Password field */}
                   <div>
                     <label htmlFor="password" className="sr-only">
                       Password
@@ -329,12 +353,12 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                       autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                       minLength={8}
                       required
-                      style={{ minHeight: '52px' }}
+                      style={{ height: '52px' }}
                     />
                     {mode === 'signup' && (
                       <p
-                        className="mt-2.5 sm:mt-1.5"
                         style={{
+                          marginTop: '12px',
                           fontSize: 'var(--text-xs)',
                           color: 'var(--color-text-muted)',
                           lineHeight: 'var(--leading-relaxed)',
@@ -344,14 +368,17 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                       </p>
                     )}
                   </div>
-                </>
+                </div>
               )}
 
               {/* Error message */}
               {error && (
                 <div
-                  className="p-3 rounded-lg text-center"
                   style={{
+                    marginTop: '16px',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    textAlign: 'center',
                     background: 'rgba(239, 68, 68, 0.1)',
                     border: '1px solid rgba(239, 68, 68, 0.2)',
                   }}
@@ -366,9 +393,10 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
               <button
                 type="submit"
                 disabled={isLoading || !!emailError}
-                className="w-full py-4 sm:py-3.5 rounded-xl hover-scale press-scale mt-2"
+                className="w-full rounded-xl hover-scale press-scale"
                 style={{
-                  minHeight: '56px',
+                  marginTop: '20px',
+                  height: '56px',
                   background: 'var(--color-gold)',
                   color: 'var(--color-void)',
                   fontFamily: 'var(--font-display)',
@@ -392,8 +420,9 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
             {/* Mode toggle */}
             {mode !== 'verify-email' && (
               <p
-                className="text-center mt-8 sm:mt-6"
+                className="text-center"
                 style={{
+                  marginTop: '24px',
                   fontSize: 'var(--text-sm)',
                   color: 'var(--color-text-secondary)',
                 }}
@@ -417,8 +446,9 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
               <button
                 type="button"
                 onClick={() => setMode('signup')}
-                className="w-full mt-4 text-center"
+                className="w-full text-center"
                 style={{
+                  marginTop: '16px',
                   fontSize: 'var(--text-sm)',
                   color: 'var(--color-text-muted)',
                 }}
@@ -426,26 +456,27 @@ export function AuthScreen({ onAuthSuccess, onBack }: AuthScreenProps) {
                 Use a different email
               </button>
             )}
-          </div>
 
-          {/* Terms notice */}
-          <p
-            className="text-center mt-6 mb-8 sm:mb-0 px-6 sm:px-0"
-            style={{
-              fontSize: 'var(--text-xs)',
-              color: 'var(--color-text-muted)',
-              lineHeight: 'var(--leading-relaxed)',
-            }}
-          >
-            By continuing, you agree to our{' '}
-            <a href="/terms" className="text-gold hover:underline">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="/privacy" className="text-gold hover:underline">
-              Privacy Policy
-            </a>
-          </p>
+            {/* Terms notice */}
+            <p
+              className="text-center"
+              style={{
+                marginTop: '24px',
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-text-muted)',
+                lineHeight: 'var(--leading-relaxed)',
+              }}
+            >
+              By continuing, you agree to our{' '}
+              <a href="/terms" className="text-gold hover:underline">
+                Terms of Service
+              </a>{' '}
+              and{' '}
+              <a href="/privacy" className="text-gold hover:underline">
+                Privacy Policy
+              </a>
+            </p>
+          </div>
         </div>
       </div>
     </div>

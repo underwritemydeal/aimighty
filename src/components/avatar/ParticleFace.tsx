@@ -222,15 +222,15 @@ export function ParticleFace({
             float dist = length(gl_PointCoord - vec2(0.5));
             if (dist > 0.5) discard;
 
-            // Soft circular particle with glow
-            float core = smoothstep(0.5, 0.1, dist);
-            float glow = smoothstep(0.5, 0.0, dist) * 0.5;
+            // Brighter particles for mobile visibility
+            float core = smoothstep(0.5, 0.05, dist);
+            float glow = smoothstep(0.5, 0.0, dist) * 0.6;
             float alpha = (core + glow) * vAlpha;
 
-            // Subtle color variation
-            vec3 col = uColor * (0.9 + 0.1 * core);
+            // Brighter color with core highlight
+            vec3 col = uColor * (1.0 + 0.3 * core);
 
-            gl_FragColor = vec4(col, alpha * 0.6);
+            gl_FragColor = vec4(col, alpha * 0.85);
           }
         `}
       />
