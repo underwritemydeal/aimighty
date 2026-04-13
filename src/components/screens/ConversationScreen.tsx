@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
 import { LazyAvatarScene } from '../avatar/LazyAvatarScene';
 import { sendMessage, type Message } from '../../services/claudeApi';
@@ -52,7 +52,7 @@ interface ConversationScreenProps {
   language: LanguageCode;
 }
 
-// Floating text for streaming responses — handles text appending smoothly
+// Floating text for streaming responses — simple fade-in approach, no disappearing
 const FloatingText = memo(function FloatingText({
   text,
   color,
@@ -62,64 +62,32 @@ const FloatingText = memo(function FloatingText({
   color: string;
   isVisible: boolean;
 }) {
-  const words = useMemo(() => text.split(' ').filter(w => w.length > 0), [text]);
-  const prevWordCountRef = useRef(0);
-  const [animatedUpTo, setAnimatedUpTo] = useState(0);
+  const [displayedText, setDisplayedText] = useState('');
+  const prevTextRef = useRef('');
 
   useEffect(() => {
-    if (!isVisible || !text) {
-      prevWordCountRef.current = 0;
-      setAnimatedUpTo(0);
+    if (!isVisible) {
+      setDisplayedText('');
+      prevTextRef.current = '';
       return;
     }
 
-    const currentWordCount = words.length;
-    const prevCount = prevWordCountRef.current;
-
-    // If text is completely new (reset), start animation from 0
-    if (currentWordCount < prevCount) {
-      prevWordCountRef.current = 0;
-      setAnimatedUpTo(0);
-      // Start animating all words
-      let count = 0;
-      const interval = setInterval(() => {
-        count++;
-        setAnimatedUpTo(count);
-        if (count >= currentWordCount) {
-          clearInterval(interval);
-        }
-      }, 60);
-      return () => clearInterval(interval);
+    // Only update if new text is longer (streaming in) or completely different (new response)
+    if (text.length > prevTextRef.current.length && text.startsWith(prevTextRef.current)) {
+      // Streaming: text is growing, just append
+      setDisplayedText(text);
+    } else if (text !== prevTextRef.current) {
+      // New response or reset
+      setDisplayedText(text);
     }
+    prevTextRef.current = text;
+  }, [text, isVisible]);
 
-    // For streaming: immediately show all previously visible words,
-    // only animate the new ones
-    if (currentWordCount > prevCount) {
-      // Keep previously visible words visible
-      setAnimatedUpTo(prev => Math.max(prev, prevCount));
-
-      // Animate new words quickly
-      let count = Math.max(animatedUpTo, prevCount);
-      const interval = setInterval(() => {
-        count++;
-        setAnimatedUpTo(count);
-        if (count >= currentWordCount) {
-          clearInterval(interval);
-        }
-      }, 40); // Faster animation for streaming
-
-      prevWordCountRef.current = currentWordCount;
-      return () => clearInterval(interval);
-    }
-
-    prevWordCountRef.current = currentWordCount;
-  }, [text, isVisible, words.length, animatedUpTo]);
-
-  if (!text) return null;
+  if (!displayedText) return null;
 
   return (
     <p
-      className="text-center gpu-accelerated"
+      className="text-center gpu-accelerated-opacity"
       style={{
         fontFamily: 'var(--font-display)',
         fontSize: 'clamp(1rem, 4vw, 1.25rem)',
@@ -129,31 +97,21 @@ const FloatingText = memo(function FloatingText({
         padding: '0 24px',
         maxWidth: '640px',
         margin: '0 auto',
+        color: color,
+        // Golden glow for God's words - divine luminous effect
+        textShadow: `0 0 20px ${color}35, 0 0 40px ${color}20, 0 0 60px ${color}10`,
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 300ms var(--ease-out-expo)',
       }}
       aria-live="polite"
     >
-      {words.map((word, index) => (
-        <span
-          key={`${word}-${index}`}
-          className="inline-block gpu-accelerated-opacity"
-          style={{
-            opacity: index < animatedUpTo ? 1 : 0,
-            transform: index < animatedUpTo ? 'translateY(0)' : 'translateY(8px)',
-            color: color,
-            // Golden glow for God's words - divine luminous effect
-            textShadow: `0 0 20px ${color}35, 0 0 40px ${color}20, 0 0 60px ${color}10`,
-            marginRight: '0.3em',
-            transition: `all 200ms var(--ease-out-expo)`,
-          }}
-        >
-          {word}
-        </span>
-      ))}
+      {displayedText}
     </p>
   );
 });
 
 // Pulsing mic button with ring animations — hero interaction (64px on mobile)
+// Manual stop mode: tap to start, tap again to stop
 const MicButton = memo(function MicButton({
   isListening,
   isSpeaking,
@@ -179,14 +137,14 @@ const MicButton = memo(function MicButton({
 
   // Determine what status to show
   const showStatus = isListening || isProcessing || errorMessage;
-  const statusText = errorMessage || (isProcessing ? processingLabel : listeningLabel);
-  const statusColor = errorMessage ? '#ef4444' : themeColor;
+  const statusText = errorMessage || (isProcessing ? processingLabel : isListening ? listeningLabel : '');
+  const statusColor = errorMessage ? '#ef4444' : isListening ? '#ef4444' : themeColor;
 
   return (
     <button
       onClick={() => !disabled && onToggle()}
       disabled={disabled}
-      aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+      aria-label={isListening ? 'Stop listening and use transcript' : 'Start voice input'}
       aria-pressed={isListening}
       className="relative gpu-accelerated press-scale"
       style={{
@@ -194,33 +152,30 @@ const MicButton = memo(function MicButton({
         transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
       }}
     >
-      {/* Outer glow ring */}
+      {/* Outer glow ring - RED when listening */}
       <div
         className="absolute rounded-full"
         style={{
           inset: '-20px',
-          background: `radial-gradient(circle, ${themeColor}${isListening ? '30' : '10'} 0%, transparent 70%)`,
+          background: isListening
+            ? 'radial-gradient(circle, rgba(239, 68, 68, 0.3) 0%, transparent 70%)'
+            : `radial-gradient(circle, ${themeColor}10 0%, transparent 70%)`,
           transition: 'all var(--duration-slower) var(--ease-out-expo)',
         }}
         aria-hidden="true"
       />
 
-      {/* Ripple animations when listening */}
+      {/* Pulsing red ring when listening */}
       {isListening && (
-        <>
-          {[0, 0.6, 1.2].map((delay) => (
-            <div
-              key={delay}
-              className="absolute rounded-full"
-              style={{
-                inset: 0,
-                border: `1.5px solid ${themeColor}`,
-                animation: `ripple 2s var(--ease-out-quart) infinite ${delay}s`,
-              }}
-              aria-hidden="true"
-            />
-          ))}
-        </>
+        <div
+          className="absolute rounded-full"
+          style={{
+            inset: '-4px',
+            border: '2px solid #ef4444',
+            animation: 'pulse 1s ease-in-out infinite',
+          }}
+          aria-hidden="true"
+        />
       )}
 
       {/* Processing pulse animation */}
@@ -243,10 +198,10 @@ const MicButton = memo(function MicButton({
           width: '64px',
           height: '64px',
           borderRadius: '50%',
-          background: isListening ? themeColor : isProcessing ? `${themeColor}20` : 'var(--color-surface-elevated)',
-          border: `1.5px solid ${isListening || isProcessing ? themeColor : 'var(--color-border-medium)'}`,
+          background: isListening ? '#ef4444' : isProcessing ? `${themeColor}20` : 'var(--color-surface-elevated)',
+          border: `1.5px solid ${isListening ? '#ef4444' : isProcessing ? themeColor : 'var(--color-border-medium)'}`,
           boxShadow: isListening
-            ? `0 0 50px ${themeColor}50, 0 0 100px ${themeColor}25`
+            ? '0 0 50px rgba(239, 68, 68, 0.5), 0 0 100px rgba(239, 68, 68, 0.25)'
             : isProcessing
             ? `0 0 30px ${themeColor}30`
             : '0 4px 20px rgba(0,0,0,0.3)',
@@ -254,23 +209,53 @@ const MicButton = memo(function MicButton({
           transition: 'all var(--duration-normal) var(--ease-out-expo)',
         }}
       >
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={isListening ? 'rgba(0,0,0,0.9)' : 'var(--color-text-secondary)'}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          style={{ transition: 'stroke var(--duration-normal)' }}
-        >
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-          <line x1="12" y1="19" x2="12" y2="23" />
-          <line x1="8" y1="23" x2="16" y2="23" />
-        </svg>
+        {/* Show stop icon when listening, mic icon otherwise */}
+        {isListening ? (
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="white"
+            aria-hidden="true"
+          >
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+        ) : (
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--color-text-secondary)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ transition: 'stroke var(--duration-normal)' }}
+          >
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        )}
+
+        {/* Pulsing red dot indicator when listening */}
+        {isListening && (
+          <div
+            className="absolute"
+            style={{
+              top: '4px',
+              right: '4px',
+              width: '12px',
+              height: '12px',
+              borderRadius: '50%',
+              background: 'white',
+              animation: 'pulse 1s ease-in-out infinite',
+            }}
+            aria-hidden="true"
+          />
+        )}
       </div>
 
       {/* Status label - shows for listening, processing, or errors */}
@@ -290,7 +275,7 @@ const MicButton = memo(function MicButton({
         }}
         aria-hidden="true"
       >
-        {statusText}
+        {isListening ? 'TAP TO STOP' : statusText}
       </span>
     </button>
   );

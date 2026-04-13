@@ -11,6 +11,7 @@ let isAudioUnlocked = false;
 let currentOnEndCallback: (() => void) | null = null;
 let speechTimeoutId: number | null = null;
 let voiceEnabled = true;
+let hasTestedTTS = false;
 
 // Always log for debugging TTS issues
 function log(...args: unknown[]) {
@@ -25,12 +26,67 @@ const VOICE_SETTINGS = {
 };
 
 /**
+ * Run TTS diagnostics on module load
+ */
+function runTTSDiagnostics() {
+  if (typeof window === 'undefined' || hasTestedTTS) return;
+  hasTestedTTS = true;
+
+  log('=== TTS DIAGNOSTICS ===');
+  log('speechSynthesis available:', 'speechSynthesis' in window);
+
+  if ('speechSynthesis' in window) {
+    const voices = speechSynthesis.getVoices();
+    log('Initial voices count:', voices.length);
+
+    if (voices.length === 0) {
+      log('No voices yet, waiting for voiceschanged event...');
+      // Set up voiceschanged listener
+      const handleVoicesChanged = () => {
+        const loadedVoices = speechSynthesis.getVoices();
+        log('voiceschanged fired, voices count:', loadedVoices.length);
+        if (loadedVoices.length > 0) {
+          log('Sample voices:', loadedVoices.slice(0, 3).map(v => `${v.name} (${v.lang})`));
+          voicesLoaded = true;
+        }
+      };
+      speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
+
+      // Also try polling as backup
+      let pollCount = 0;
+      const pollForVoices = () => {
+        pollCount++;
+        const polledVoices = speechSynthesis.getVoices();
+        if (polledVoices.length > 0) {
+          log('Voices loaded via polling (attempt', pollCount, '):', polledVoices.length);
+          voicesLoaded = true;
+        } else if (pollCount < 10) {
+          setTimeout(pollForVoices, 200);
+        }
+      };
+      setTimeout(pollForVoices, 100);
+    } else {
+      log('Voices already loaded:', voices.slice(0, 3).map(v => `${v.name} (${v.lang})`));
+      voicesLoaded = true;
+    }
+  }
+}
+
+// Run diagnostics when module loads
+if (typeof window !== 'undefined') {
+  // Use setTimeout to ensure DOM is ready
+  setTimeout(runTTSDiagnostics, 100);
+}
+
+/**
  * Initialize audio context (must be called on user interaction)
  * This is critical for iOS which requires user gesture to start audio
+ * Call this on EVERY user tap (send button, mic button) to ensure unlock
  */
 export function initAudio(): void {
   log('initAudio() called, isAudioUnlocked:', isAudioUnlocked);
 
+  // Create AudioContext if needed
   if (!audioContext) {
     try {
       const AudioContextClass = window.AudioContext ||
@@ -47,7 +103,7 @@ export function initAudio(): void {
   // Resume audio context if suspended (iOS requirement)
   if (audioContext && audioContext.state === 'suspended') {
     audioContext.resume().then(() => {
-      log('Audio context resumed');
+      log('Audio context resumed successfully');
       isAudioUnlocked = true;
     }).catch(err => {
       log('Failed to resume audio context:', err);
@@ -56,23 +112,32 @@ export function initAudio(): void {
     isAudioUnlocked = true;
   }
 
-  // Also unlock SpeechSynthesis on iOS by speaking empty text
+  // ALWAYS try to unlock SpeechSynthesis on user gesture (iOS/Safari requirement)
+  // This must happen in direct response to user interaction
   if ('speechSynthesis' in window) {
-    // Always try to unlock - some browsers need this on each page load
     try {
-      const utterance = new SpeechSynthesisUtterance('');
-      utterance.volume = 0;
-      speechSynthesis.speak(utterance);
+      // Cancel any pending speech first
+      speechSynthesis.cancel();
+
+      // Speak silent utterance to unlock
+      const unlockUtterance = new SpeechSynthesisUtterance(' ');
+      unlockUtterance.volume = 0.01; // Nearly silent but not zero (some browsers ignore 0)
+      unlockUtterance.rate = 10; // Fast to minimize any audible sound
+      speechSynthesis.speak(unlockUtterance);
+
       isAudioUnlocked = true;
       log('SpeechSynthesis unlock attempted via silent utterance');
     } catch (e) {
       log('Failed to unlock SpeechSynthesis:', e);
     }
 
-    // Pre-load voices
-    waitForVoices().then(() => {
-      log('Voices pre-loaded during initAudio');
-    });
+    // Ensure voices are loaded
+    const voices = speechSynthesis.getVoices();
+    if (voices.length === 0 && !voicesLoaded) {
+      log('No voices during initAudio, triggering voice load...');
+      // Some browsers need this to trigger voice loading
+      speechSynthesis.getVoices();
+    }
   }
 }
 

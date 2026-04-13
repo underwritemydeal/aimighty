@@ -762,6 +762,43 @@ button:disabled {
 }
 
 /* ============================================
+   MOBILE UI POLISH (375px width)
+   ============================================ */
+@media (max-width: 414px) {
+  /* Ensure minimum 20px padding on all edges */
+  .mobile-safe-padding {
+    padding-left: max(20px, env(safe-area-inset-left, 20px));
+    padding-right: max(20px, env(safe-area-inset-right, 20px));
+  }
+
+  /* Ensure all text is readable (minimum 0.6 opacity) */
+  .text-muted {
+    color: rgba(255, 255, 255, 0.55);
+  }
+
+  /* Minimum tap target size of 44px */
+  button:not(.btn-icon):not([class*="rounded-full"]) {
+    min-height: 44px;
+  }
+
+  /* Input fields minimum 48px height */
+  .input {
+    height: 48px;
+    min-height: 48px;
+  }
+
+  /* Better touch spacing */
+  .touch-spacing {
+    padding: 12px 16px;
+  }
+
+  /* Ensure adequate line height for readability */
+  p, span, div {
+    line-height: 1.5;
+  }
+}
+
+/* ============================================
    PERFORMANCE: GPU Acceleration hints
    ============================================ */
 .gpu-accelerated {
