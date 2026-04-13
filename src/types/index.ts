@@ -7,6 +7,7 @@ export interface BeliefSystem {
   themeColor: string;
   particleColor: string;
   backgroundGradient: [string, string];
+  category?: 'religious' | 'spiritual' | 'philosophical';
 }
 
 export interface Message {
@@ -23,4 +24,25 @@ export interface ConversationState {
   isListening: boolean;
 }
 
-export type Screen = 'welcome' | 'belief-selector' | 'conversation';
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  createdAt: number;
+  emailVerified: boolean;
+  messageCount: number;
+  isPremium: boolean;
+}
+
+export type Screen =
+  | 'welcome'
+  | 'auth'
+  | 'belief-selector'
+  | 'belief-welcome'
+  | 'conversation'
+  | 'about'
+  | 'privacy'
+  | 'terms'
+  | 'paywall';
+
+export type AuthMode = 'login' | 'signup' | 'verify-email';

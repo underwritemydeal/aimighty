@@ -1,18 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WelcomeScreen } from './components/screens/WelcomeScreen';
+import { AuthScreen } from './components/screens/AuthScreen';
 import { BeliefSelector } from './components/screens/BeliefSelector';
+import { BeliefWelcomeScreen } from './components/screens/BeliefWelcomeScreen';
 import { ConversationScreen } from './components/screens/ConversationScreen';
-import type { Screen, BeliefSystem } from './types';
+import { PaywallScreen } from './components/screens/PaywallScreen';
+import { AboutScreen } from './components/screens/AboutScreen';
+import { PrivacyScreen } from './components/screens/PrivacyScreen';
+import { TermsScreen } from './components/screens/TermsScreen';
+import { getCurrentUser } from './services/auth';
+import type { Screen, BeliefSystem, User } from './types';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [selectedBelief, setSelectedBelief] = useState<BeliefSystem | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Check for existing user session on mount
+  useEffect(() => {
+    const existingUser = getCurrentUser();
+    if (existingUser && existingUser.emailVerified) {
+      setUser(existingUser);
+    }
+  }, []);
 
   const transitionTo = (screen: Screen) => {
     setIsTransitioning(true);
-
-    // Cinematic crossfade: fade out → switch → fade in
     setTimeout(() => {
       setCurrentScreen(screen);
       setTimeout(() => {
@@ -22,12 +36,31 @@ function App() {
   };
 
   const handleBegin = () => {
+    // If user is already logged in, go to belief selector
+    if (user) {
+      transitionTo('belief-selector');
+    } else {
+      // Otherwise, show auth screen
+      transitionTo('auth');
+    }
+  };
+
+  const handleAuthSuccess = (authenticatedUser: User) => {
+    setUser(authenticatedUser);
     transitionTo('belief-selector');
   };
 
   const handleSelectBelief = (belief: BeliefSystem) => {
     setSelectedBelief(belief);
+    transitionTo('belief-welcome');
+  };
+
+  const handleBeliefWelcomeComplete = () => {
     transitionTo('conversation');
+  };
+
+  const handleShowPaywall = () => {
+    transitionTo('paywall');
   };
 
   const handleBackToWelcome = () => {
@@ -36,6 +69,15 @@ function App() {
 
   const handleBackToBeliefSelector = () => {
     transitionTo('belief-selector');
+  };
+
+  const handleBackToConversation = () => {
+    transitionTo('conversation');
+  };
+
+  // Handle navigation to static pages
+  const handleNavigate = (screen: Screen) => {
+    transitionTo(screen);
   };
 
   return (
@@ -48,7 +90,7 @@ function App() {
         Skip to main content
       </a>
 
-      {/* Transition overlay — cinematic crossfade */}
+      {/* Transition overlay */}
       <div
         className="fixed inset-0 pointer-events-none gpu-accelerated-opacity"
         style={{
@@ -73,6 +115,13 @@ function App() {
           <WelcomeScreen onBegin={handleBegin} />
         )}
 
+        {currentScreen === 'auth' && (
+          <AuthScreen
+            onAuthSuccess={handleAuthSuccess}
+            onBack={handleBackToWelcome}
+          />
+        )}
+
         {currentScreen === 'belief-selector' && (
           <BeliefSelector
             onSelect={handleSelectBelief}
@@ -80,11 +129,39 @@ function App() {
           />
         )}
 
-        {currentScreen === 'conversation' && selectedBelief && (
+        {currentScreen === 'belief-welcome' && selectedBelief && (
+          <BeliefWelcomeScreen
+            belief={selectedBelief}
+            userName={user?.name}
+            onContinue={handleBeliefWelcomeComplete}
+          />
+        )}
+
+        {currentScreen === 'conversation' && selectedBelief && user && (
           <ConversationScreen
             belief={selectedBelief}
+            user={user}
             onBack={handleBackToBeliefSelector}
+            onPaywall={handleShowPaywall}
           />
+        )}
+
+        {currentScreen === 'paywall' && (
+          <PaywallScreen
+            onBack={handleBackToConversation}
+          />
+        )}
+
+        {currentScreen === 'about' && (
+          <AboutScreen onBack={() => handleNavigate('welcome')} />
+        )}
+
+        {currentScreen === 'privacy' && (
+          <PrivacyScreen onBack={() => handleNavigate('welcome')} />
+        )}
+
+        {currentScreen === 'terms' && (
+          <TermsScreen onBack={() => handleNavigate('welcome')} />
         )}
       </div>
     </div>
