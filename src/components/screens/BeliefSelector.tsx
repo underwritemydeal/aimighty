@@ -156,7 +156,7 @@ const CategoryHeader = memo(function CategoryHeader({
       style={{
         marginTop: isFirst ? '0' : '32px',
         marginBottom: '16px',
-        opacity: isVisible ? 0.5 : 0,
+        opacity: isVisible ? 0.7 : 0,
         transition: `opacity var(--duration-slow) var(--ease-out-expo)`,
         transitionDelay: `${delay}ms`,
       }}
@@ -165,7 +165,7 @@ const CategoryHeader = memo(function CategoryHeader({
         className="text-caps text-center"
         style={{
           fontSize: '0.65rem',
-          color: 'var(--color-text-muted)',
+          color: 'rgba(255, 255, 255, 0.6)',
           letterSpacing: '0.2em',
         }}
       >
@@ -304,7 +304,13 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
               }}
             >
               <span style={{ color: 'var(--color-text-primary)' }}>{t('beliefs.chooseYour', language)} </span>
-              <span className="text-gold" style={{ fontWeight: 'var(--font-normal)' }}>
+              <span
+                className="text-gold"
+                style={{
+                  fontWeight: 'var(--font-normal)',
+                  textShadow: '0 0 30px rgba(212,175,55,0.25), 0 0 60px rgba(212,175,55,0.1)',
+                }}
+              >
                 {t('beliefs.path', language)}
               </span>
             </h1>
@@ -315,7 +321,7 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
             className="text-center text-caps gpu-accelerated-opacity"
             style={{
               marginBottom: '32px',
-              opacity: isVisible ? 0.4 : 0,
+              opacity: isVisible ? 0.65 : 0,
               fontSize: '0.65rem',
               color: 'var(--color-text-muted)',
               transition: `opacity var(--duration-slower) var(--ease-out-expo)`,

@@ -57,10 +57,9 @@ declare global {
 let recognition: SpeechRecognition | null = null;
 let isListening = false;
 
-// Debug logging
-const DEBUG = import.meta.env.DEV;
+// Always log for debugging voice issues
 function log(...args: unknown[]) {
-  if (DEBUG) console.log('[SpeechInput]', ...args);
+  console.log('[SpeechInput]', ...args);
 }
 
 export interface SpeechInputCallbacks {

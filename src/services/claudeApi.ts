@@ -3,21 +3,13 @@
  * Handles streaming communication with the Cloudflare Worker
  */
 
-// Worker URL - reads from environment variable, falls back to deployed worker
-// The worker was deployed via `wrangler deploy` - check your Cloudflare dashboard for the exact URL
-const ENV_WORKER_URL = import.meta.env.VITE_WORKER_URL;
+// HARDCODED worker URL - this is the deployed Cloudflare Worker
+// Using hardcoded URL because VITE env vars may not be available at build time
+const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 
-// IMPORTANT: Replace this with your actual deployed worker URL from Cloudflare
-// Format: https://aimighty-api.{your-subdomain}.workers.dev
-const FALLBACK_WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
-
-const WORKER_URL = ENV_WORKER_URL || FALLBACK_WORKER_URL;
-
-// Debug logging in development
-if (import.meta.env.DEV) {
-  console.log('[AImighty] Worker URL:', WORKER_URL);
-  console.log('[AImighty] ENV value:', ENV_WORKER_URL || '(not set, using fallback)');
-}
+// Log the worker URL on module load (always, not just in dev)
+console.log('[AImighty] Claude API Service initialized');
+console.log('[AImighty] Worker URL:', WORKER_URL);
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -41,35 +33,42 @@ export async function sendMessage(
   callbacks: StreamCallbacks,
   language: string = 'en'
 ): Promise<void> {
-  // Log the request in development
-  if (import.meta.env.DEV) {
-    console.log('[ClaudeAPI] Sending message to:', WORKER_URL);
-    console.log('[ClaudeAPI] Belief system:', beliefSystem);
-    console.log('[ClaudeAPI] Language:', language);
-    console.log('[ClaudeAPI] Messages count:', messages.length);
-  }
+  // Always log for debugging
+  console.log('=== CLAUDE API REQUEST ===');
+  console.log('[ClaudeAPI] URL:', WORKER_URL);
+  console.log('[ClaudeAPI] Belief system:', beliefSystem);
+  console.log('[ClaudeAPI] Language:', language);
+  console.log('[ClaudeAPI] User ID:', userId);
+  console.log('[ClaudeAPI] Messages count:', messages.length);
+  console.log('[ClaudeAPI] Last message:', messages[messages.length - 1]);
+
+  const requestBody = {
+    messages,
+    beliefSystem,
+    userId,
+    language,
+  };
+  console.log('[ClaudeAPI] Request body:', JSON.stringify(requestBody, null, 2));
 
   try {
+    console.log('[ClaudeAPI] Sending fetch request...');
     const response = await fetch(WORKER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': userId,
       },
-      body: JSON.stringify({
-        messages,
-        beliefSystem,
-        userId,
-        language,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
-    if (import.meta.env.DEV) {
-      console.log('[ClaudeAPI] Response status:', response.status);
-    }
+    console.log('=== CLAUDE API RESPONSE ===');
+    console.log('[ClaudeAPI] Response status:', response.status);
+    console.log('[ClaudeAPI] Response statusText:', response.statusText);
+    console.log('[ClaudeAPI] Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('[ClaudeAPI] Error response body:', errorText);
       let errorMessage = `HTTP ${response.status}`;
       try {
         const errorData = JSON.parse(errorText);
@@ -77,13 +76,16 @@ export async function sendMessage(
       } catch {
         errorMessage = errorText || errorMessage;
       }
-      console.error('[ClaudeAPI] Error response:', errorMessage);
+      console.error('[ClaudeAPI] Parsed error:', errorMessage);
       throw new Error(errorMessage);
     }
 
     if (!response.body) {
+      console.error('[ClaudeAPI] No response body!');
       throw new Error('No response body');
     }
+
+    console.log('[ClaudeAPI] Starting to read SSE stream...');
 
     // Read the SSE stream
     const reader = response.body.getReader();
@@ -91,12 +93,22 @@ export async function sendMessage(
     let fullText = '';
     let currentSentence = '';
     let buffer = '';
+    let chunkCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log('[ClaudeAPI] Stream ended (done=true)');
+        break;
+      }
 
-      buffer += decoder.decode(value, { stream: true });
+      chunkCount++;
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+
+      if (chunkCount <= 3) {
+        console.log(`[ClaudeAPI] Chunk ${chunkCount}:`, chunk.substring(0, 200));
+      }
 
       // Process SSE events
       const lines = buffer.split('\n');
@@ -107,7 +119,7 @@ export async function sendMessage(
           const data = line.slice(6);
 
           if (data === '[DONE]') {
-            // Stream complete
+            console.log('[ClaudeAPI] Received [DONE] marker');
             if (currentSentence.trim()) {
               callbacks.onSentence(currentSentence.trim());
             }
@@ -139,25 +151,40 @@ export async function sendMessage(
 
             // Handle message_stop event
             if (parsed.type === 'message_stop') {
+              console.log('[ClaudeAPI] Received message_stop');
               if (currentSentence.trim()) {
                 callbacks.onSentence(currentSentence.trim());
               }
               callbacks.onComplete(fullText);
               return;
             }
+
+            // Log errors from Claude API
+            if (parsed.type === 'error') {
+              console.error('[ClaudeAPI] Error event from Claude:', parsed);
+            }
           } catch {
-            // Ignore JSON parse errors for malformed events
+            // Log malformed JSON for debugging
+            if (data.length > 0 && data !== '[DONE]') {
+              console.warn('[ClaudeAPI] Could not parse SSE data:', data.substring(0, 100));
+            }
           }
         }
       }
     }
 
     // Handle any remaining text
+    console.log('[ClaudeAPI] Stream processing complete. Total chunks:', chunkCount);
+    console.log('[ClaudeAPI] Full response length:', fullText.length);
     if (currentSentence.trim()) {
       callbacks.onSentence(currentSentence.trim());
     }
     callbacks.onComplete(fullText);
   } catch (error) {
+    console.error('=== CLAUDE API ERROR ===');
+    console.error('[ClaudeAPI] Error:', error);
+    console.error('[ClaudeAPI] Error type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.error('[ClaudeAPI] Error message:', error instanceof Error ? error.message : String(error));
     callbacks.onError(error instanceof Error ? error : new Error(String(error)));
   }
 }
@@ -167,11 +194,15 @@ export async function sendMessage(
  */
 export async function checkApiHealth(): Promise<boolean> {
   try {
+    console.log('[ClaudeAPI] Checking API health at:', WORKER_URL);
     const response = await fetch(WORKER_URL, {
-      method: 'OPTIONS',
+      method: 'GET',
     });
+    const data = await response.json();
+    console.log('[ClaudeAPI] Health check response:', data);
     return response.ok;
-  } catch {
+  } catch (error) {
+    console.error('[ClaudeAPI] Health check failed:', error);
     return false;
   }
 }

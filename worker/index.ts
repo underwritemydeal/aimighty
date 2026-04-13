@@ -22,7 +22,7 @@ const MAX_MESSAGES_IN_VELOCITY_WINDOW = 5;
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
 };
 
@@ -158,12 +158,33 @@ SAFETY: If someone expresses suicidal thoughts, direct them to the 988 Suicide &
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Only allow POST
+    // Health check / test route
+    if (request.method === 'GET') {
+      // Check if API key is configured
+      const hasApiKey = !!env.ANTHROPIC_API_KEY;
+      return new Response(
+        JSON.stringify({
+          status: 'ok',
+          message: 'AImighty Worker is alive',
+          path: url.pathname,
+          hasApiKey,
+          timestamp: new Date().toISOString(),
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Only allow POST for actual API calls
     if (request.method !== 'POST') {
       return new Response('Method not allowed', { status: 405, headers: corsHeaders });
     }

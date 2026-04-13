@@ -74,7 +74,8 @@ const FloatingText = memo(function FloatingText({
             opacity: index < visibleWords ? 1 : 0,
             transform: index < visibleWords ? 'translateY(0)' : 'translateY(8px)',
             color: color,
-            textShadow: `0 0 40px ${color}30`,
+            // Golden glow for God's words - divine luminous effect
+            textShadow: `0 0 20px ${color}35, 0 0 40px ${color}20, 0 0 60px ${color}10`,
             marginRight: '0.3em',
             transition: `all var(--duration-slow) var(--ease-out-expo)`,
             transitionDelay: `${index * 20}ms`,
@@ -91,19 +92,30 @@ const FloatingText = memo(function FloatingText({
 const MicButton = memo(function MicButton({
   isListening,
   isSpeaking,
+  isProcessing,
   isDisabled,
   themeColor,
   onToggle,
   listeningLabel,
+  processingLabel,
+  errorMessage,
 }: {
   isListening: boolean;
   isSpeaking: boolean;
+  isProcessing: boolean;
   isDisabled: boolean;
   themeColor: string;
   onToggle: () => void;
   listeningLabel: string;
+  processingLabel: string;
+  errorMessage: string | null;
 }) {
-  const disabled = isSpeaking || isDisabled;
+  const disabled = isSpeaking || isDisabled || isProcessing;
+
+  // Determine what status to show
+  const showStatus = isListening || isProcessing || errorMessage;
+  const statusText = errorMessage || (isProcessing ? processingLabel : listeningLabel);
+  const statusColor = errorMessage ? '#ef4444' : themeColor;
 
   return (
     <button
@@ -113,7 +125,7 @@ const MicButton = memo(function MicButton({
       aria-pressed={isListening}
       className="relative gpu-accelerated press-scale"
       style={{
-        opacity: disabled ? 0.35 : 1,
+        opacity: disabled && !isProcessing ? 0.35 : 1,
         transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
       }}
     >
@@ -146,6 +158,19 @@ const MicButton = memo(function MicButton({
         </>
       )}
 
+      {/* Processing pulse animation */}
+      {isProcessing && (
+        <div
+          className="absolute rounded-full"
+          style={{
+            inset: '-4px',
+            border: `2px solid ${themeColor}`,
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Button circle — 64px explicit */}
       <div
         className="relative flex items-center justify-center"
@@ -153,10 +178,12 @@ const MicButton = memo(function MicButton({
           width: '64px',
           height: '64px',
           borderRadius: '50%',
-          background: isListening ? themeColor : 'var(--color-surface-elevated)',
-          border: `1.5px solid ${isListening ? themeColor : 'var(--color-border-medium)'}`,
+          background: isListening ? themeColor : isProcessing ? `${themeColor}20` : 'var(--color-surface-elevated)',
+          border: `1.5px solid ${isListening || isProcessing ? themeColor : 'var(--color-border-medium)'}`,
           boxShadow: isListening
             ? `0 0 50px ${themeColor}50, 0 0 100px ${themeColor}25`
+            : isProcessing
+            ? `0 0 30px ${themeColor}30`
             : '0 4px 20px rgba(0,0,0,0.3)',
           transform: isListening ? 'scale(1.05)' : 'scale(1)',
           transition: 'all var(--duration-normal) var(--ease-out-expo)',
@@ -181,21 +208,24 @@ const MicButton = memo(function MicButton({
         </svg>
       </div>
 
-      {/* Status label */}
+      {/* Status label - shows for listening, processing, or errors */}
       <span
         className="absolute left-1/2 whitespace-nowrap text-caps"
         style={{
           bottom: '-28px',
           transform: `translateX(-50%)`,
-          opacity: isListening ? 1 : 0,
-          color: themeColor,
+          opacity: showStatus ? 1 : 0,
+          color: statusColor,
           fontSize: '0.65rem',
           letterSpacing: '0.15em',
           transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
+          maxWidth: '200px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
         aria-hidden="true"
       >
-        {listeningLabel}
+        {statusText}
       </span>
     </button>
   );
@@ -245,6 +275,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
   const [audioLevel, setAudioLevel] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const hasGreeted = useRef(false);
 
@@ -379,6 +410,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
 
   // Voice input handling
   const handleMicToggle = useCallback(() => {
+    // Clear any previous error
+    setSpeechError(null);
+
     if (isListening) {
       stopListening();
       setIsListening(false);
@@ -389,14 +423,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
       }
     } else {
       if (!isSpeechSupported()) {
-        alert('Speech recognition is not supported in this browser. Please use Chrome or Safari.');
+        setSpeechError('Speech not supported');
+        setTimeout(() => setSpeechError(null), 3000);
         return;
       }
 
+      console.log('[ConversationScreen] Starting speech recognition...');
       startListening({
         language,
-        onStart: () => setIsListening(true),
+        onStart: () => {
+          console.log('[ConversationScreen] Speech recognition started');
+          setIsListening(true);
+          setSpeechError(null);
+        },
         onResult: (transcript, isFinal) => {
+          console.log('[ConversationScreen] Speech result:', transcript, 'isFinal:', isFinal);
           if (isFinal) {
             setInputText(transcript);
             setInterimTranscript('');
@@ -412,13 +453,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           }
         },
         onEnd: () => {
+          console.log('[ConversationScreen] Speech recognition ended');
           setIsListening(false);
           setInterimTranscript('');
         },
         onError: (error) => {
-          console.error('Speech error:', error);
+          console.error('[ConversationScreen] Speech error:', error);
           setIsListening(false);
           setInterimTranscript('');
+          // Show error briefly
+          setSpeechError(error);
+          setTimeout(() => setSpeechError(null), 3000);
         },
       });
     }
@@ -672,10 +717,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           <MicButton
             isListening={isListening}
             isSpeaking={isSpeaking}
-            isDisabled={isProcessing || (hasReachedFreeLimit() && !user.isPremium)}
+            isProcessing={isProcessing}
+            isDisabled={hasReachedFreeLimit() && !user.isPremium}
             themeColor={belief.themeColor}
             onToggle={handleMicToggle}
             listeningLabel={t('conversation.listening', language)}
+            processingLabel="Processing..."
+            errorMessage={speechError}
           />
         </div>
       </div>
