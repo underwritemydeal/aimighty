@@ -1,6 +1,7 @@
 /**
  * Speech Input Service
  * Uses Web Speech API for voice recognition
+ * Supports both standard SpeechRecognition and Safari's webkitSpeechRecognition
  */
 
 // TypeScript declarations for Web Speech API
@@ -35,6 +36,7 @@ interface SpeechRecognition extends EventTarget {
   onend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
   onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => unknown) | null;
   onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => unknown) | null;
+  onspeechend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -55,6 +57,12 @@ declare global {
 let recognition: SpeechRecognition | null = null;
 let isListening = false;
 
+// Debug logging
+const DEBUG = import.meta.env.DEV;
+function log(...args: unknown[]) {
+  if (DEBUG) console.log('[SpeechInput]', ...args);
+}
+
 export interface SpeechInputCallbacks {
   onStart?: () => void;
   onResult?: (transcript: string, isFinal: boolean) => void;
@@ -64,42 +72,63 @@ export interface SpeechInputCallbacks {
 
 /**
  * Check if speech recognition is supported
+ * Works with both standard API and Safari's webkit prefix
  */
 export function isSupported(): boolean {
-  return 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window;
+  const supported = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  log('Speech recognition supported:', supported);
+  return supported;
 }
 
 /**
  * Initialize speech recognition
+ * Handles both standard and webkit-prefixed APIs (for Safari)
  */
 function getRecognition(): SpeechRecognition | null {
-  if (!isSupported()) return null;
+  if (!isSupported()) {
+    log('Speech recognition not supported');
+    return null;
+  }
 
-  const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const instance = new SpeechRecognitionClass();
+  try {
+    // Safari uses webkitSpeechRecognition, Chrome/Edge use SpeechRecognition
+    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const instance = new SpeechRecognitionClass();
 
-  instance.continuous = false; // Stop after each utterance
-  instance.interimResults = true; // Get partial results
-  instance.lang = 'en-US';
+    instance.continuous = false; // Stop after each utterance
+    instance.interimResults = true; // Get partial results for real-time feedback
+    instance.lang = 'en-US';
 
-  return instance;
+    log('Speech recognition initialized');
+    return instance;
+  } catch (error) {
+    log('Failed to initialize speech recognition:', error);
+    return null;
+  }
 }
 
 /**
  * Start listening for speech
+ * Handles microphone permissions and browser compatibility
  */
 export function startListening(callbacks: SpeechInputCallbacks): boolean {
+  log('startListening called, isListening:', isListening);
+
   if (isListening) {
+    log('Already listening, returning false');
     return false;
   }
 
   recognition = getRecognition();
   if (!recognition) {
+    log('No recognition instance available');
     callbacks.onError?.('Speech recognition not supported in this browser');
     return false;
   }
 
   recognition.onstart = () => {
+    log('Recognition started');
     isListening = true;
     callbacks.onStart?.();
   };
@@ -111,17 +140,25 @@ export function startListening(callbacks: SpeechInputCallbacks): boolean {
     if (lastResult) {
       const transcript = lastResult[0].transcript;
       const isFinal = lastResult.isFinal;
+      log('Result:', transcript, 'isFinal:', isFinal);
       callbacks.onResult?.(transcript, isFinal);
     }
   };
 
+  // Handle when user stops speaking (Safari specific)
+  recognition.onspeechend = () => {
+    log('Speech ended');
+  };
+
   recognition.onend = () => {
+    log('Recognition ended');
     isListening = false;
     callbacks.onEnd?.();
     recognition = null;
   };
 
   recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+    log('Recognition error:', event.error);
     isListening = false;
 
     // Map error codes to user-friendly messages
@@ -130,6 +167,7 @@ export function startListening(callbacks: SpeechInputCallbacks): boolean {
       'audio-capture': 'Microphone not found. Please check your device.',
       'not-allowed': 'Microphone access denied. Please enable microphone permissions.',
       'network': 'Network error. Please check your connection.',
+      'service-not-allowed': 'Speech service not allowed. Please use HTTPS.',
       'aborted': '', // User cancelled, no message needed
     };
 
@@ -142,10 +180,12 @@ export function startListening(callbacks: SpeechInputCallbacks): boolean {
   };
 
   try {
+    log('Calling recognition.start()');
     recognition.start();
     return true;
   } catch (error) {
-    callbacks.onError?.('Failed to start speech recognition');
+    log('Failed to start recognition:', error);
+    callbacks.onError?.('Failed to start speech recognition. Please try again.');
     return false;
   }
 }

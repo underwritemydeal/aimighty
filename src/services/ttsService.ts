@@ -1,11 +1,19 @@
 /**
  * Text-to-Speech Service
  * Uses browser SpeechSynthesis API with divine voice settings
+ * Handles iOS audio context requirements
  */
 
 let audioContext: AudioContext | null = null;
 let analyserNode: AnalyserNode | null = null;
 let onAudioLevelCallback: ((level: number) => void) | null = null;
+let isAudioUnlocked = false;
+
+// Debug logging
+const DEBUG = import.meta.env.DEV;
+function log(...args: unknown[]) {
+  if (DEBUG) console.log('[TTS]', ...args);
+}
 
 // Voice settings for divine presence
 const VOICE_SETTINGS = {
@@ -16,12 +24,41 @@ const VOICE_SETTINGS = {
 
 /**
  * Initialize audio context (must be called on user interaction)
+ * This is critical for iOS which requires user gesture to start audio
  */
 export function initAudio(): void {
   if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    analyserNode = audioContext.createAnalyser();
-    analyserNode.fftSize = 256;
+    try {
+      const AudioContextClass = window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      audioContext = new AudioContextClass();
+      analyserNode = audioContext.createAnalyser();
+      analyserNode.fftSize = 256;
+      log('Audio context created, state:', audioContext.state);
+    } catch (error) {
+      log('Failed to create audio context:', error);
+    }
+  }
+
+  // Resume audio context if suspended (iOS requirement)
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume().then(() => {
+      log('Audio context resumed');
+      isAudioUnlocked = true;
+    }).catch(err => {
+      log('Failed to resume audio context:', err);
+    });
+  } else if (audioContext) {
+    isAudioUnlocked = true;
+  }
+
+  // Also unlock SpeechSynthesis on iOS by speaking empty text
+  if (!isAudioUnlocked && 'speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance('');
+    utterance.volume = 0;
+    speechSynthesis.speak(utterance);
+    isAudioUnlocked = true;
+    log('SpeechSynthesis unlocked via silent utterance');
   }
 }
 
@@ -54,6 +91,7 @@ function getBestVoice(): SpeechSynthesisVoice | null {
 
 /**
  * Speak text with divine voice
+ * Handles iOS audio requirements and provides fallback for errors
  */
 export function speak(
   text: string,
@@ -61,10 +99,20 @@ export function speak(
   onEnd?: () => void,
   onAudioLevel?: (level: number) => void
 ): void {
+  log('speak() called with text length:', text.length);
+
   // Cancel any current speech
   stop();
 
   if (!text.trim()) {
+    log('Empty text, calling onEnd');
+    onEnd?.();
+    return;
+  }
+
+  // Check if SpeechSynthesis is available
+  if (!('speechSynthesis' in window)) {
+    log('SpeechSynthesis not available');
     onEnd?.();
     return;
   }
@@ -85,34 +133,72 @@ export function speak(
     const voice = getBestVoice();
     if (voice) {
       utterance.voice = voice;
+      log('Voice set to:', voice.name);
+    } else {
+      log('No preferred voice found, using default');
     }
   };
 
-  if (speechSynthesis.getVoices().length > 0) {
+  // Voices may already be loaded or may load asynchronously
+  const voices = speechSynthesis.getVoices();
+  if (voices.length > 0) {
     setVoice();
   } else {
-    speechSynthesis.onvoiceschanged = setVoice;
+    // Wait for voices to load (needed on some browsers)
+    speechSynthesis.onvoiceschanged = () => {
+      setVoice();
+    };
   }
 
   // Handle events
   utterance.onstart = () => {
+    log('Speech started');
     onStart?.();
     startAudioLevelSimulation();
   };
 
   utterance.onend = () => {
+    log('Speech ended');
     stopAudioLevelSimulation();
     onEnd?.();
   };
 
   utterance.onerror = (event) => {
-    console.error('Speech synthesis error:', event.error);
+    log('Speech synthesis error:', event.error);
+
+    // Common iOS errors - fail silently and just show text
+    if (event.error === 'not-allowed' || event.error === 'interrupted') {
+      log('Audio not allowed or interrupted - showing text only');
+    }
+
     stopAudioLevelSimulation();
     onEnd?.();
   };
 
-  // Speak
-  speechSynthesis.speak(utterance);
+  // iOS Safari fix: Resume speechSynthesis if it gets stuck
+  // This can happen if the page was backgrounded
+  if (speechSynthesis.paused) {
+    log('SpeechSynthesis was paused, resuming');
+    speechSynthesis.resume();
+  }
+
+  try {
+    log('Calling speechSynthesis.speak()');
+    speechSynthesis.speak(utterance);
+
+    // iOS fix: speechSynthesis can get stuck, check after a delay
+    setTimeout(() => {
+      if (speechSynthesis.speaking === false && speechSynthesis.pending === false) {
+        log('Speech may have failed silently, triggering onEnd');
+        // Speech may have failed silently on iOS
+        stopAudioLevelSimulation();
+        // Don't call onEnd here as it may have already been called
+      }
+    }, 500);
+  } catch (error) {
+    log('Exception in speak():', error);
+    onEnd?.();
+  }
 }
 
 /**

@@ -17,8 +17,9 @@ const DRIFT_Y_INTENSITY = 0.006;
 const DRIFT_Z_INTENSITY = 0.008;
 const ROTATION_SPEED = 0.1;
 const ROTATION_AMPLITUDE = 0.03;
-const PARTICLE_SIZE_MIN = 0.008;
-const PARTICLE_SIZE_RANGE = 0.008;
+// Particle size increased by 40% for better visibility
+const PARTICLE_SIZE_MIN = 0.012;
+const PARTICLE_SIZE_RANGE = 0.012;
 
 // Generate head-shaped point cloud using Fibonacci sphere
 function generateHeadPoints(count: number): Float32Array {
@@ -204,11 +205,12 @@ export function ParticleFace({
 
           void main() {
             vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = size * (250.0 / -mvPosition.z);
+            // Increased point size multiplier for larger, more visible particles
+            gl_PointSize = size * (380.0 / -mvPosition.z);
             gl_Position = projectionMatrix * mvPosition;
 
-            // Depth-based alpha for atmospheric depth
-            vAlpha = smoothstep(-4.0, -1.5, mvPosition.z) * 0.7;
+            // Depth-based alpha - brighter overall
+            vAlpha = smoothstep(-4.0, -1.2, mvPosition.z) * 0.85;
             vSize = size;
           }
         `}
@@ -219,18 +221,30 @@ export function ParticleFace({
           varying float vSize;
 
           void main() {
-            float dist = length(gl_PointCoord - vec2(0.5));
+            // Distance from center for circular particles
+            vec2 center = gl_PointCoord - vec2(0.5);
+            float dist = length(center);
+
+            // Discard pixels outside the circle for perfectly round particles
             if (dist > 0.5) discard;
 
-            // Brighter particles for mobile visibility
-            float core = smoothstep(0.5, 0.05, dist);
-            float glow = smoothstep(0.5, 0.0, dist) * 0.6;
-            float alpha = (core + glow) * vAlpha;
+            // Multi-layer glow for luminous orb effect
+            // Inner bright core
+            float core = smoothstep(0.5, 0.0, dist);
+            // Middle glow layer
+            float midGlow = smoothstep(0.5, 0.15, dist) * 0.8;
+            // Outer soft halo
+            float outerGlow = smoothstep(0.5, 0.0, dist) * 0.4;
 
-            // Brighter color with core highlight
-            vec3 col = uColor * (1.0 + 0.3 * core);
+            // Combine for rich, glowing appearance
+            float brightness = core * 1.2 + midGlow + outerGlow;
+            float alpha = brightness * vAlpha;
 
-            gl_FragColor = vec4(col, alpha * 0.85);
+            // Color with bright core highlight (white-ish center)
+            vec3 coreColor = mix(uColor, vec3(1.0), core * 0.5);
+            vec3 finalColor = coreColor * (1.0 + brightness * 0.3);
+
+            gl_FragColor = vec4(finalColor, alpha);
           }
         `}
       />

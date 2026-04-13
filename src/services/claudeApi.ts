@@ -3,8 +3,21 @@
  * Handles streaming communication with the Cloudflare Worker
  */
 
-// Worker URL - update this after deploying the worker
-const WORKER_URL = import.meta.env.VITE_WORKER_URL || 'https://aimighty-api.YOUR_SUBDOMAIN.workers.dev';
+// Worker URL - reads from environment variable, falls back to deployed worker
+// The worker was deployed via `wrangler deploy` - check your Cloudflare dashboard for the exact URL
+const ENV_WORKER_URL = import.meta.env.VITE_WORKER_URL;
+
+// IMPORTANT: Replace this with your actual deployed worker URL from Cloudflare
+// Format: https://aimighty-api.{your-subdomain}.workers.dev
+const FALLBACK_WORKER_URL = 'https://aimighty-api.robby-codes.workers.dev';
+
+const WORKER_URL = ENV_WORKER_URL || FALLBACK_WORKER_URL;
+
+// Debug logging in development
+if (import.meta.env.DEV) {
+  console.log('[AImighty] Worker URL:', WORKER_URL);
+  console.log('[AImighty] ENV value:', ENV_WORKER_URL || '(not set, using fallback)');
+}
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -27,6 +40,13 @@ export async function sendMessage(
   userId: string,
   callbacks: StreamCallbacks
 ): Promise<void> {
+  // Log the request in development
+  if (import.meta.env.DEV) {
+    console.log('[ClaudeAPI] Sending message to:', WORKER_URL);
+    console.log('[ClaudeAPI] Belief system:', beliefSystem);
+    console.log('[ClaudeAPI] Messages count:', messages.length);
+  }
+
   try {
     const response = await fetch(WORKER_URL, {
       method: 'POST',
@@ -41,9 +61,21 @@ export async function sendMessage(
       }),
     });
 
+    if (import.meta.env.DEV) {
+      console.log('[ClaudeAPI] Response status:', response.status);
+    }
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      const errorText = await response.text();
+      let errorMessage = `HTTP ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      console.error('[ClaudeAPI] Error response:', errorMessage);
+      throw new Error(errorMessage);
     }
 
     if (!response.body) {
