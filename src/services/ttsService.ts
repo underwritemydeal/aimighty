@@ -8,11 +8,13 @@ let audioContext: AudioContext | null = null;
 let analyserNode: AnalyserNode | null = null;
 let onAudioLevelCallback: ((level: number) => void) | null = null;
 let isAudioUnlocked = false;
+let currentOnEndCallback: (() => void) | null = null;
+let speechTimeoutId: number | null = null;
+let voiceEnabled = true;
 
-// Debug logging
-const DEBUG = import.meta.env.DEV;
+// Always log for debugging TTS issues
 function log(...args: unknown[]) {
-  if (DEBUG) console.log('[TTS]', ...args);
+  console.log('[TTS]', ...args);
 }
 
 // Voice settings for divine presence
@@ -141,26 +143,74 @@ export function speak(
   onEnd?: () => void,
   onAudioLevel?: (level: number) => void
 ): void {
-  log('speak() called with text length:', text.length, 'language:', language);
+  log('speak() called with text length:', text.length, 'language:', language, 'voiceEnabled:', voiceEnabled);
+
+  // Clear any previous timeout
+  if (speechTimeoutId) {
+    clearTimeout(speechTimeoutId);
+    speechTimeoutId = null;
+  }
 
   // Cancel any current speech
   stop();
 
+  // Store the onEnd callback so we can ensure it's called
+  currentOnEndCallback = onEnd || null;
+
+  // Helper to safely call onEnd only once
+  let hasCalledOnEnd = false;
+  const safeOnEnd = () => {
+    if (hasCalledOnEnd) {
+      log('onEnd already called, skipping');
+      return;
+    }
+    hasCalledOnEnd = true;
+    log('Calling onEnd callback');
+    stopAudioLevelSimulation();
+    if (speechTimeoutId) {
+      clearTimeout(speechTimeoutId);
+      speechTimeoutId = null;
+    }
+    currentOnEndCallback?.();
+    currentOnEndCallback = null;
+  };
+
   if (!text.trim()) {
     log('Empty text, calling onEnd');
-    onEnd?.();
+    safeOnEnd();
+    return;
+  }
+
+  // If voice is disabled, just call onEnd immediately
+  if (!voiceEnabled) {
+    log('Voice disabled, skipping TTS');
+    safeOnEnd();
     return;
   }
 
   // Check if SpeechSynthesis is available
   if (!('speechSynthesis' in window)) {
     log('SpeechSynthesis not available');
-    onEnd?.();
+    safeOnEnd();
     return;
   }
 
   // Store callback for audio level updates
   onAudioLevelCallback = onAudioLevel || null;
+
+  // Try to unlock audio if not already done
+  if (!isAudioUnlocked) {
+    log('Audio not unlocked, attempting unlock...');
+    try {
+      const unlock = new SpeechSynthesisUtterance('');
+      unlock.volume = 0;
+      speechSynthesis.speak(unlock);
+      isAudioUnlocked = true;
+      log('Audio unlocked via silent utterance');
+    } catch (e) {
+      log('Failed to unlock audio:', e);
+    }
+  }
 
   // Create utterance
   const utterance = new SpeechSynthesisUtterance(text);
@@ -202,21 +252,13 @@ export function speak(
   };
 
   utterance.onend = () => {
-    log('Speech ended');
-    stopAudioLevelSimulation();
-    onEnd?.();
+    log('Speech ended naturally');
+    safeOnEnd();
   };
 
   utterance.onerror = (event) => {
     log('Speech synthesis error:', event.error);
-
-    // Common iOS errors - fail silently and just show text
-    if (event.error === 'not-allowed' || event.error === 'interrupted') {
-      log('Audio not allowed or interrupted - showing text only');
-    }
-
-    stopAudioLevelSimulation();
-    onEnd?.();
+    safeOnEnd();
   };
 
   // iOS Safari fix: Resume speechSynthesis if it gets stuck
@@ -230,18 +272,27 @@ export function speak(
     log('Calling speechSynthesis.speak()');
     speechSynthesis.speak(utterance);
 
-    // iOS fix: speechSynthesis can get stuck, check after a delay
+    // SAFETY TIMEOUT: Force onEnd after 30 seconds max (or text length * 80ms, whichever is less)
+    // This prevents the input from being stuck disabled forever
+    const maxDuration = Math.min(30000, Math.max(5000, text.length * 80));
+    log('Setting safety timeout for', maxDuration, 'ms');
+    speechTimeoutId = window.setTimeout(() => {
+      log('Safety timeout reached, forcing onEnd');
+      speechSynthesis.cancel();
+      safeOnEnd();
+    }, maxDuration);
+
+    // Also check for silent failure after 1 second
     setTimeout(() => {
-      if (speechSynthesis.speaking === false && speechSynthesis.pending === false) {
-        log('Speech may have failed silently, triggering onEnd');
-        // Speech may have failed silently on iOS
-        stopAudioLevelSimulation();
-        // Don't call onEnd here as it may have already been called
+      if (!hasCalledOnEnd && !speechSynthesis.speaking && !speechSynthesis.pending) {
+        log('Speech may have failed silently after 1s, forcing onEnd');
+        safeOnEnd();
       }
-    }, 500);
+    }, 1000);
+
   } catch (error) {
     log('Exception in speak():', error);
-    onEnd?.();
+    safeOnEnd();
   }
 }
 
@@ -249,15 +300,47 @@ export function speak(
  * Stop current speech
  */
 export function stop(): void {
-  speechSynthesis.cancel();
+  if ('speechSynthesis' in window) {
+    speechSynthesis.cancel();
+  }
   stopAudioLevelSimulation();
+  // Clear safety timeout
+  if (speechTimeoutId) {
+    clearTimeout(speechTimeoutId);
+    speechTimeoutId = null;
+  }
+  // Call any pending onEnd callback
+  if (currentOnEndCallback) {
+    log('stop() called, triggering pending onEnd');
+    const callback = currentOnEndCallback;
+    currentOnEndCallback = null;
+    callback();
+  }
 }
 
 /**
  * Check if currently speaking
  */
 export function isSpeaking(): boolean {
-  return speechSynthesis.speaking;
+  return 'speechSynthesis' in window && speechSynthesis.speaking;
+}
+
+/**
+ * Enable or disable voice output
+ */
+export function setVoiceEnabled(enabled: boolean): void {
+  log('setVoiceEnabled:', enabled);
+  voiceEnabled = enabled;
+  if (!enabled) {
+    stop();
+  }
+}
+
+/**
+ * Check if voice is enabled
+ */
+export function isVoiceEnabled(): boolean {
+  return voiceEnabled;
 }
 
 // Audio level simulation (since we can't get real audio data from SpeechSynthesis)

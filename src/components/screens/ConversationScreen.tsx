@@ -2,11 +2,47 @@ import { useState, useEffect, useRef, memo, useMemo, useCallback } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
 import { LazyAvatarScene } from '../avatar/LazyAvatarScene';
 import { sendMessage, type Message } from '../../services/claudeApi';
-import { speak, stop as stopSpeaking, initAudio } from '../../services/ttsService';
+import { speak, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled } from '../../services/ttsService';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem, User } from '../../types';
+
+// Voice toggle button component
+const VoiceToggle = memo(function VoiceToggle({
+  enabled,
+  onToggle,
+  themeColor,
+}: {
+  enabled: boolean;
+  onToggle: () => void;
+  themeColor: string;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={enabled ? 'Mute voice' : 'Enable voice'}
+      aria-pressed={enabled}
+      className="p-2 rounded-lg transition-all duration-200 hover:bg-white/10"
+      style={{
+        color: enabled ? themeColor : 'var(--color-text-muted)',
+      }}
+    >
+      {enabled ? (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+      ) : (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <line x1="23" y1="9" x2="17" y2="15" />
+          <line x1="17" y1="9" x2="23" y2="15" />
+        </svg>
+      )}
+    </button>
+  );
+});
 
 interface ConversationScreenProps {
   belief: BeliefSystem;
@@ -276,8 +312,47 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
   const [messages, setMessages] = useState<Message[]>([]);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [voiceEnabled, setVoiceEnabledState] = useState(isVoiceEnabled());
   const inputRef = useRef<HTMLInputElement>(null);
   const hasGreeted = useRef(false);
+  const safetyTimeoutRef = useRef<number | null>(null);
+
+  // Log input disabled state changes
+  const isInputDisabled = isSpeaking || isProcessing;
+  useEffect(() => {
+    console.log('[ConversationScreen] Input disabled:', isInputDisabled, '(isSpeaking:', isSpeaking, 'isProcessing:', isProcessing, ')');
+  }, [isInputDisabled, isSpeaking, isProcessing]);
+
+  // Safety timeout: force re-enable input if stuck for more than 15 seconds
+  useEffect(() => {
+    if (isInputDisabled) {
+      console.log('[ConversationScreen] Starting safety timeout (15s)');
+      safetyTimeoutRef.current = window.setTimeout(() => {
+        console.log('[ConversationScreen] SAFETY TIMEOUT: Forcing input re-enable');
+        setIsSpeaking(false);
+        setIsProcessing(false);
+      }, 15000);
+    } else {
+      if (safetyTimeoutRef.current) {
+        console.log('[ConversationScreen] Clearing safety timeout');
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+    };
+  }, [isInputDisabled]);
+
+  // Handle voice toggle
+  const handleVoiceToggle = useCallback(() => {
+    const newEnabled = !voiceEnabled;
+    setVoiceEnabledState(newEnabled);
+    setVoiceEnabled(newEnabled);
+    console.log('[ConversationScreen] Voice toggled:', newEnabled);
+  }, [voiceEnabled]);
 
   // Initialize audio context on first interaction
   useEffect(() => {
@@ -301,11 +376,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
 
   // Speak the response with TTS
   const speakResponse = useCallback((text: string) => {
+    console.log('[ConversationScreen] speakResponse called, text length:', text.length);
     setIsSpeaking(true);
     speak(
       text,
       language,
       () => {
+        console.log('[ConversationScreen] TTS onEnd callback fired');
         setIsSpeaking(false);
         setAudioLevel(0);
       },
@@ -318,10 +395,15 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     if (hasGreeted.current) return;
     hasGreeted.current = true;
 
+    console.log('[ConversationScreen] Setting up greeting timer');
     const greetingTimer = setTimeout(() => {
       const greeting = getGreeting(belief.id);
+      console.log('[ConversationScreen] Displaying greeting:', greeting.substring(0, 50) + '...');
       setCurrentCaption(greeting);
       setCaptionVisible(true);
+
+      // Initialize audio before speaking (in case user hasn't interacted yet)
+      initAudio();
       speakResponse(greeting);
     }, 2400);
 
@@ -330,11 +412,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
 
   // Send message to Claude API
   const sendToAI = useCallback(async (userMessage: string) => {
+    console.log('[ConversationScreen] sendToAI called with:', userMessage.substring(0, 50));
+
     // Check free message limit before sending
     if (hasReachedFreeLimit() && !user.isPremium) {
       onPaywall();
       return;
     }
+
+    // Initialize audio on user interaction
+    initAudio();
 
     setIsProcessing(true);
     setCaptionVisible(false);
@@ -348,6 +435,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     incrementMessageCount();
 
     let fullResponse = '';
+    let hasSentFirstSentence = false;
 
     await sendMessage(
       newMessages,
@@ -360,15 +448,24 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           if (!captionVisible) setCaptionVisible(true);
         },
         onSentence: (sentence) => {
-          // Start TTS for this sentence
-          if (!isSpeaking) {
+          console.log('[ConversationScreen] onSentence:', sentence.substring(0, 30) + '...');
+          // Start TTS for first sentence only (to avoid overlapping speech)
+          if (!hasSentFirstSentence) {
+            hasSentFirstSentence = true;
             speakResponse(sentence);
           }
         },
         onComplete: (text) => {
+          console.log('[ConversationScreen] onComplete, response length:', text.length);
           setIsProcessing(false);
           // Add assistant message to history
           setMessages([...newMessages, { role: 'assistant', content: text }]);
+
+          // If we haven't started speaking yet, speak the full response
+          if (!hasSentFirstSentence) {
+            console.log('[ConversationScreen] No sentence spoken yet, speaking full response');
+            speakResponse(text);
+          }
 
           // Check if user hit the limit after this message
           if (hasReachedFreeLimit() && !user.isPremium) {
@@ -381,8 +478,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           }
         },
         onError: (error) => {
-          console.error('AI error:', error);
+          console.error('[ConversationScreen] AI error:', error);
           setIsProcessing(false);
+          setIsSpeaking(false); // Make sure to reset speaking state on error
           const errorMessage = "I am still here. Please try speaking to me again.";
           setCurrentCaption(errorMessage);
           setCaptionVisible(true);
@@ -558,8 +656,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
             {belief.name}
           </span>
 
-          {/* Spacer for balance */}
-          <div style={{ width: '60px' }} aria-hidden="true" />
+          {/* Voice toggle */}
+          <VoiceToggle
+            enabled={voiceEnabled}
+            onToggle={handleVoiceToggle}
+            themeColor={belief.themeColor}
+          />
         </header>
 
         {/* 20px gap after back button */}
