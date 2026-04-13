@@ -9,7 +9,7 @@ AImighty is a PWA where users select their belief system and have a real-time vo
 
 **Brand:** AImighty
 **Domain:** aimighty.me
-**Tagline:** "Every faith. One voice."
+**Tagline:** "Every belief. One voice."
 **Instagram:** @aimightyapp
 
 ---
