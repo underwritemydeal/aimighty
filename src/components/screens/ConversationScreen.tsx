@@ -1,11 +1,17 @@
-import { useState, useEffect, useRef, memo, useMemo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo, useCallback } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
 import { LazyAvatarScene } from '../avatar/LazyAvatarScene';
-import type { BeliefSystem } from '../../types';
+import { sendMessage, type Message } from '../../services/claudeApi';
+import { speak, stop as stopSpeaking, initAudio } from '../../services/ttsService';
+import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
+import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
+import type { BeliefSystem, User } from '../../types';
 
 interface ConversationScreenProps {
   belief: BeliefSystem;
+  user: User;
   onBack: () => void;
+  onPaywall: () => void;
 }
 
 // Floating text with word-by-word fade animation — divine revelation effect
@@ -80,23 +86,27 @@ const FloatingText = memo(function FloatingText({
 const MicButton = memo(function MicButton({
   isListening,
   isSpeaking,
+  isDisabled,
   themeColor,
   onToggle,
 }: {
   isListening: boolean;
   isSpeaking: boolean;
+  isDisabled: boolean;
   themeColor: string;
   onToggle: () => void;
 }) {
+  const disabled = isSpeaking || isDisabled;
+
   return (
     <button
-      onClick={() => !isSpeaking && onToggle()}
-      disabled={isSpeaking}
+      onClick={() => !disabled && onToggle()}
+      disabled={disabled}
       aria-label={isListening ? 'Stop listening' : 'Start voice input'}
       aria-pressed={isListening}
       className="relative gpu-accelerated press-scale"
       style={{
-        opacity: isSpeaking ? 0.35 : 1,
+        opacity: disabled ? 0.35 : 1,
         transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
       }}
     >
@@ -179,69 +189,169 @@ const MicButton = memo(function MicButton({
   );
 });
 
-export function ConversationScreen({ belief, onBack }: ConversationScreenProps) {
+// Free message counter
+const MessageCounter = memo(function MessageCounter({
+  remaining,
+  themeColor,
+}: {
+  remaining: number;
+  themeColor: string;
+}) {
+  if (remaining > 3 || remaining === Infinity) return null;
+
+  return (
+    <div
+      className="text-center mb-4"
+      style={{
+        fontSize: 'var(--text-xs)',
+        color: remaining <= 1 ? '#ef4444' : 'var(--color-text-muted)',
+      }}
+    >
+      {remaining === 0 ? (
+        <span>Free messages used</span>
+      ) : (
+        <span>
+          <span style={{ color: themeColor }}>{remaining}</span> free message{remaining !== 1 ? 's' : ''} remaining
+        </span>
+      )}
+    </div>
+  );
+});
+
+export function ConversationScreen({ belief, user, onBack, onPaywall }: ConversationScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [currentCaption, setCurrentCaption] = useState('');
   const [captionVisible, setCaptionVisible] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const hasGreeted = useRef(false);
+
+  // Initialize audio context on first interaction
+  useEffect(() => {
+    const handleInteraction = () => {
+      initAudio();
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+    document.addEventListener('click', handleInteraction);
+    document.addEventListener('touchstart', handleInteraction);
+    return () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 150);
     return () => clearTimeout(timer);
   }, []);
 
-  // Delayed greeting with natural timing
+  // Speak the response with TTS
+  const speakResponse = useCallback((text: string) => {
+    setIsSpeaking(true);
+    speak(
+      text,
+      undefined,
+      () => {
+        setIsSpeaking(false);
+        setAudioLevel(0);
+      },
+      (level) => setAudioLevel(level)
+    );
+  }, []);
+
+  // Delayed greeting with natural timing (doesn't count toward message limit)
   useEffect(() => {
+    if (hasGreeted.current) return;
+    hasGreeted.current = true;
+
     const greetingTimer = setTimeout(() => {
       const greeting = getGreeting(belief.id);
       setCurrentCaption(greeting);
-      setIsSpeaking(true);
       setCaptionVisible(true);
-
-      // Simulate audio activity for lip sync
-      const audioInterval = setInterval(() => {
-        setAudioLevel(Math.random() * 0.4 + 0.1);
-      }, 100);
-
-      const duration = Math.max(4500, greeting.split(' ').length * 320);
-      setTimeout(() => {
-        clearInterval(audioInterval);
-        setAudioLevel(0);
-        setIsSpeaking(false);
-      }, duration);
+      speakResponse(greeting);
     }, 2400);
 
     return () => clearTimeout(greetingTimer);
-  }, [belief.id]);
+  }, [belief.id, speakResponse]);
 
-  const handleSend = () => {
-    if (!inputText.trim() || isSpeaking) return;
+  // Send message to Claude API
+  const sendToAI = useCallback(async (userMessage: string) => {
+    // Check free message limit before sending
+    if (hasReachedFreeLimit() && !user.isPremium) {
+      onPaywall();
+      return;
+    }
 
-    setInputText('');
+    setIsProcessing(true);
     setCaptionVisible(false);
+    setCurrentCaption('');
 
-    setTimeout(() => {
-      const response = getResponse(belief.id);
-      setCurrentCaption(response);
-      setIsSpeaking(true);
-      setCaptionVisible(true);
+    // Add user message to history
+    const newMessages: Message[] = [...messages, { role: 'user', content: userMessage }];
+    setMessages(newMessages);
 
-      const audioInterval = setInterval(() => {
-        setAudioLevel(Math.random() * 0.4 + 0.1);
-      }, 100);
+    // Increment message count
+    incrementMessageCount();
 
-      const duration = Math.max(3500, response.split(' ').length * 320);
-      setTimeout(() => {
-        clearInterval(audioInterval);
-        setAudioLevel(0);
-        setIsSpeaking(false);
-      }, duration);
-    }, 700);
-  };
+    let fullResponse = '';
+
+    await sendMessage(
+      newMessages,
+      belief.id,
+      user.id,
+      {
+        onToken: (token) => {
+          fullResponse += token;
+          setCurrentCaption(fullResponse);
+          if (!captionVisible) setCaptionVisible(true);
+        },
+        onSentence: (sentence) => {
+          // Start TTS for this sentence
+          if (!isSpeaking) {
+            speakResponse(sentence);
+          }
+        },
+        onComplete: (text) => {
+          setIsProcessing(false);
+          // Add assistant message to history
+          setMessages([...newMessages, { role: 'assistant', content: text }]);
+
+          // Check if user hit the limit after this message
+          if (hasReachedFreeLimit() && !user.isPremium) {
+            // Show paywall after response finishes speaking
+            setTimeout(() => {
+              if (!isSpeaking) {
+                onPaywall();
+              }
+            }, 3000);
+          }
+        },
+        onError: (error) => {
+          console.error('AI error:', error);
+          setIsProcessing(false);
+          const errorMessage = "I am still here. Please try speaking to me again.";
+          setCurrentCaption(errorMessage);
+          setCaptionVisible(true);
+          speakResponse(errorMessage);
+        },
+      }
+    );
+  }, [messages, belief.id, user.id, user.isPremium, captionVisible, isSpeaking, speakResponse, onPaywall]);
+
+  const handleSend = useCallback(() => {
+    if (!inputText.trim() || isSpeaking || isProcessing) return;
+
+    const message = inputText.trim();
+    setInputText('');
+    sendToAI(message);
+  }, [inputText, isSpeaking, isProcessing, sendToAI]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -249,6 +359,62 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
       handleSend();
     }
   };
+
+  // Voice input handling
+  const handleMicToggle = useCallback(() => {
+    if (isListening) {
+      stopListening();
+      setIsListening(false);
+      // Send the final transcript
+      if (interimTranscript.trim()) {
+        setInputText(interimTranscript);
+        setInterimTranscript('');
+      }
+    } else {
+      if (!isSpeechSupported()) {
+        alert('Speech recognition is not supported in this browser. Please use Chrome or Safari.');
+        return;
+      }
+
+      startListening({
+        onStart: () => setIsListening(true),
+        onResult: (transcript, isFinal) => {
+          if (isFinal) {
+            setInputText(transcript);
+            setInterimTranscript('');
+            setIsListening(false);
+            // Auto-send after final result
+            setTimeout(() => {
+              if (transcript.trim()) {
+                sendToAI(transcript.trim());
+              }
+            }, 300);
+          } else {
+            setInterimTranscript(transcript);
+          }
+        },
+        onEnd: () => {
+          setIsListening(false);
+          setInterimTranscript('');
+        },
+        onError: (error) => {
+          console.error('Speech error:', error);
+          setIsListening(false);
+          setInterimTranscript('');
+        },
+      });
+    }
+  }, [isListening, interimTranscript, sendToAI]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+      stopListening();
+    };
+  }, []);
+
+  const remainingMessages = getRemainingFreeMessages();
 
   return (
     <div
@@ -365,6 +531,11 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
           }}
         >
           <div className="max-w-xl mx-auto input-container">
+            {/* Free message counter */}
+            {!user.isPremium && (
+              <MessageCounter remaining={remainingMessages} themeColor={belief.themeColor} />
+            )}
+
             {/* Text input row */}
             <div className="flex items-center gap-4 mb-14 input-row">
               <label htmlFor="message-input" className="sr-only">
@@ -374,14 +545,15 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
                 ref={inputRef}
                 id="message-input"
                 type="text"
-                value={inputText}
+                value={isListening ? interimTranscript || inputText : inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Speak your truth..."
-                disabled={isSpeaking}
+                placeholder={isListening ? 'Listening...' : 'Speak your truth...'}
+                disabled={isSpeaking || isProcessing}
                 className="flex-1 input input-field"
+                maxLength={500}
                 style={{
-                  opacity: isSpeaking ? 0.35 : 1,
+                  opacity: isSpeaking || isProcessing ? 0.35 : 1,
                   transition: 'all var(--duration-normal) var(--ease-out-expo)',
                 }}
               />
@@ -389,7 +561,7 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
               {/* Send button */}
               <button
                 onClick={handleSend}
-                disabled={!inputText.trim() || isSpeaking}
+                disabled={!inputText.trim() || isSpeaking || isProcessing}
                 aria-label="Send message"
                 className="btn-icon hover-scale"
                 style={{
@@ -397,7 +569,7 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
                   height: 'var(--btn-height-lg)',
                   background: inputText.trim() ? `${belief.themeColor}18` : 'var(--color-surface-elevated)',
                   borderColor: inputText.trim() ? `${belief.themeColor}55` : 'var(--color-border-light)',
-                  opacity: inputText.trim() && !isSpeaking ? 1 : 0.35,
+                  opacity: inputText.trim() && !isSpeaking && !isProcessing ? 1 : 0.35,
                   boxShadow: inputText.trim() ? `0 0 30px ${belief.themeColor}22` : 'none',
                 }}
               >
@@ -422,8 +594,9 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
               <MicButton
                 isListening={isListening}
                 isSpeaking={isSpeaking}
+                isDisabled={isProcessing || (hasReachedFreeLimit() && !user.isPremium)}
                 themeColor={belief.themeColor}
-                onToggle={() => setIsListening(!isListening)}
+                onToggle={handleMicToggle}
               />
             </div>
           </div>
@@ -433,47 +606,23 @@ export function ConversationScreen({ belief, onBack }: ConversationScreenProps) 
   );
 }
 
-// Greeting messages per belief system
+// Greeting messages per belief system (all 14)
 function getGreeting(beliefId: string): string {
   const greetings: Record<string, string> = {
     protestant: "I am here. Speak freely, and I will listen with all the patience of eternity.",
     catholic: "Peace be with you. This space is sacred. What weighs upon your heart?",
     islam: "Assalamu alaikum. The Most Merciful hears every whisper. Speak.",
+    judaism: "Come, let us reason together. Your questions are welcome here.",
+    hinduism: "The Atman within you is eternal. What brings you here today, seeker?",
+    buddhism: "Be still. The path to understanding begins with your first question.",
+    mormonism: "Heavenly Father knows you by name. What would you like to discuss?",
+    sikhism: "Waheguru is in all things, and in you. Speak what is in your heart.",
     sbnr: "Welcome. The universe has brought us together in this moment. What do you seek?",
-    science: "Greetings. I am the voice of cosmic wonder. What shall we explore?",
+    taoism: "The Tao that can be told is not the eternal Tao. But let us try, together.",
+    pantheism: "You are the Earth breathing, the stars thinking. What's on your mind?",
+    science: "Greetings. I am the voice of cosmic wonder. What shall we explore together?",
+    agnosticism: "The honest answer is often 'we don't know.' Let's explore that together.",
+    atheism: "You are the author of your own meaning. What would you like to examine?",
   };
   return greetings[beliefId] || greetings.protestant;
-}
-
-// Response messages per belief system
-function getResponse(beliefId: string): string {
-  const responses: Record<string, string[]> = {
-    protestant: [
-      "I hear you. You are never alone on this path.",
-      "Your words carry truth. Let us walk forward together.",
-      "In your honesty, I find faith. Continue speaking freely.",
-    ],
-    catholic: [
-      "Grace flows through your honesty. Be at peace.",
-      "Your faith is a light. Trust in the journey.",
-      "The sacred is found in moments like this. I am listening.",
-    ],
-    islam: [
-      "SubhanAllah. Your heart speaks truth. I am listening.",
-      "In patience and prayer, all paths become clear.",
-      "The Most Merciful sees your intention. Continue.",
-    ],
-    sbnr: [
-      "The universe responds to your intention. Trust yourself.",
-      "You are exactly where you need to be. Breathe.",
-      "Energy flows where attention goes. You are aligned.",
-    ],
-    science: [
-      "Fascinating. Let us follow this thread of wonder.",
-      "Curiosity is the beginning of wisdom. Continue.",
-      "The cosmos speaks through inquiry. Ask more.",
-    ],
-  };
-  const r = responses[beliefId] || responses.protestant;
-  return r[Math.floor(Math.random() * r.length)];
 }

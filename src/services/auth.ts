@@ -164,7 +164,7 @@ export async function verifyEmail(code: string): Promise<{ success: boolean; err
 }
 
 // Sign in with email and password
-export async function signIn(email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> {
+export async function signIn(email: string, _password: string): Promise<{ success: boolean; error?: string; user?: User }> {
   // Validate email
   if (!isValidEmail(email)) {
     return { success: false, error: 'Please enter a valid email address' };

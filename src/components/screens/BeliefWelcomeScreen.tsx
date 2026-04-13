@@ -26,7 +26,7 @@ const welcomeMessages: Record<string, string> = {
   atheism: "You are the author of your own meaning. What would you like to examine?",
 };
 
-export function BeliefWelcomeScreen({ belief, userName, onContinue }: BeliefWelcomeScreenProps) {
+export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue }: BeliefWelcomeScreenProps) {
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
