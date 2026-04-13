@@ -116,7 +116,7 @@ function getRecognition(language: string = 'en'): SpeechRecognition | null {
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     const instance = new SpeechRecognitionClass();
 
-    instance.continuous = false; // Stop after each utterance
+    instance.continuous = true; // Keep listening until user stops
     instance.interimResults = true; // Get partial results for real-time feedback
 
     // Set language based on user's selected language
@@ -158,15 +158,29 @@ export function startListening(callbacks: SpeechInputCallbacks): boolean {
   };
 
   recognition.onresult = (event: SpeechRecognitionEvent) => {
-    const results = event.results;
-    const lastResult = results[results.length - 1];
+    // In continuous mode, we need to accumulate ALL results
+    let finalTranscript = '';
+    let interimTranscript = '';
 
-    if (lastResult) {
-      const transcript = lastResult[0].transcript;
-      const isFinal = lastResult.isFinal;
-      log('Result:', transcript, 'isFinal:', isFinal);
-      callbacks.onResult?.(transcript, isFinal);
+    for (let i = 0; i < event.results.length; i++) {
+      const result = event.results[i];
+      const transcript = result[0].transcript;
+      if (result.isFinal) {
+        finalTranscript += transcript + ' ';
+      } else {
+        interimTranscript += transcript;
+      }
     }
+
+    // Combine final and interim for display
+    const fullTranscript = (finalTranscript + interimTranscript).trim();
+    const hasFinal = finalTranscript.length > 0;
+
+    log('Result - final:', finalTranscript.trim(), 'interim:', interimTranscript, 'full:', fullTranscript);
+
+    // Always send the full accumulated transcript
+    // isFinal=true only when there's finalized text (but we're still listening in continuous mode)
+    callbacks.onResult?.(fullTranscript, hasFinal);
   };
 
   // Handle when user stops speaking (Safari specific)

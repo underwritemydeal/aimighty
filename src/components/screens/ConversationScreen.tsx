@@ -52,7 +52,7 @@ interface ConversationScreenProps {
   language: LanguageCode;
 }
 
-// Floating text with word-by-word fade animation — divine revelation effect
+// Floating text for streaming responses — handles text appending smoothly
 const FloatingText = memo(function FloatingText({
   text,
   color,
@@ -62,28 +62,58 @@ const FloatingText = memo(function FloatingText({
   color: string;
   isVisible: boolean;
 }) {
-  const words = useMemo(() => text.split(' '), [text]);
-  const [visibleWords, setVisibleWords] = useState(0);
+  const words = useMemo(() => text.split(' ').filter(w => w.length > 0), [text]);
+  const prevWordCountRef = useRef(0);
+  const [animatedUpTo, setAnimatedUpTo] = useState(0);
 
   useEffect(() => {
     if (!isVisible || !text) {
-      setVisibleWords(0);
+      prevWordCountRef.current = 0;
+      setAnimatedUpTo(0);
       return;
     }
 
-    // Stagger word appearance for divine revelation effect
-    const wordDelay = 90;
-    let currentWord = 0;
-    const interval = setInterval(() => {
-      currentWord++;
-      setVisibleWords(currentWord);
-      if (currentWord >= words.length) {
-        clearInterval(interval);
-      }
-    }, wordDelay);
+    const currentWordCount = words.length;
+    const prevCount = prevWordCountRef.current;
 
-    return () => clearInterval(interval);
-  }, [text, isVisible, words.length]);
+    // If text is completely new (reset), start animation from 0
+    if (currentWordCount < prevCount) {
+      prevWordCountRef.current = 0;
+      setAnimatedUpTo(0);
+      // Start animating all words
+      let count = 0;
+      const interval = setInterval(() => {
+        count++;
+        setAnimatedUpTo(count);
+        if (count >= currentWordCount) {
+          clearInterval(interval);
+        }
+      }, 60);
+      return () => clearInterval(interval);
+    }
+
+    // For streaming: immediately show all previously visible words,
+    // only animate the new ones
+    if (currentWordCount > prevCount) {
+      // Keep previously visible words visible
+      setAnimatedUpTo(prev => Math.max(prev, prevCount));
+
+      // Animate new words quickly
+      let count = Math.max(animatedUpTo, prevCount);
+      const interval = setInterval(() => {
+        count++;
+        setAnimatedUpTo(count);
+        if (count >= currentWordCount) {
+          clearInterval(interval);
+        }
+      }, 40); // Faster animation for streaming
+
+      prevWordCountRef.current = currentWordCount;
+      return () => clearInterval(interval);
+    }
+
+    prevWordCountRef.current = currentWordCount;
+  }, [text, isVisible, words.length, animatedUpTo]);
 
   if (!text) return null;
 
@@ -107,14 +137,13 @@ const FloatingText = memo(function FloatingText({
           key={`${word}-${index}`}
           className="inline-block gpu-accelerated-opacity"
           style={{
-            opacity: index < visibleWords ? 1 : 0,
-            transform: index < visibleWords ? 'translateY(0)' : 'translateY(8px)',
+            opacity: index < animatedUpTo ? 1 : 0,
+            transform: index < animatedUpTo ? 'translateY(0)' : 'translateY(8px)',
             color: color,
             // Golden glow for God's words - divine luminous effect
             textShadow: `0 0 20px ${color}35, 0 0 40px ${color}20, 0 0 60px ${color}10`,
             marginRight: '0.3em',
-            transition: `all var(--duration-slow) var(--ease-out-expo)`,
-            transitionDelay: `${index * 20}ms`,
+            transition: `all 200ms var(--ease-out-expo)`,
           }}
         >
           {word}
@@ -526,6 +555,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
         return;
       }
 
+      // Unlock audio on mic tap (user gesture required for iOS)
+      initAudio();
+
       console.log('[ConversationScreen] Starting speech recognition...');
       startListening({
         language,
@@ -533,31 +565,31 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           console.log('[ConversationScreen] Speech recognition started');
           setIsListening(true);
           setSpeechError(null);
+          setInputText(''); // Clear input when starting
         },
-        onResult: (transcript, isFinal) => {
-          console.log('[ConversationScreen] Speech result:', transcript, 'isFinal:', isFinal);
-          if (isFinal) {
-            setInputText(transcript);
-            setInterimTranscript('');
-            setIsListening(false);
-            // Auto-send after final result
-            setTimeout(() => {
-              if (transcript.trim()) {
-                sendToAI(transcript.trim());
-              }
-            }, 300);
-          } else {
-            setInterimTranscript(transcript);
-          }
+        onResult: (transcript, _isFinal) => {
+          console.log('[ConversationScreen] Speech result:', transcript);
+          // Always update the input text with accumulated transcript
+          // User must tap send manually - NO auto-send
+          setInputText(transcript);
+          setInterimTranscript(transcript);
         },
         onEnd: () => {
           console.log('[ConversationScreen] Speech recognition ended');
           setIsListening(false);
+          // Keep the transcript in the input field for review
+          if (interimTranscript.trim()) {
+            setInputText(interimTranscript);
+          }
           setInterimTranscript('');
         },
         onError: (error) => {
           console.error('[ConversationScreen] Speech error:', error);
           setIsListening(false);
+          // Keep any captured text
+          if (interimTranscript.trim()) {
+            setInputText(interimTranscript);
+          }
           setInterimTranscript('');
           // Show error briefly
           setSpeechError(error);
@@ -565,7 +597,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
         },
       });
     }
-  }, [isListening, interimTranscript, sendToAI, language]);
+  }, [isListening, interimTranscript, language]);
 
   // Clean up on unmount
   useEffect(() => {

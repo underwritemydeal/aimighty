@@ -29,6 +29,8 @@ const VOICE_SETTINGS = {
  * This is critical for iOS which requires user gesture to start audio
  */
 export function initAudio(): void {
+  log('initAudio() called, isAudioUnlocked:', isAudioUnlocked);
+
   if (!audioContext) {
     try {
       const AudioContextClass = window.AudioContext ||
@@ -55,12 +57,22 @@ export function initAudio(): void {
   }
 
   // Also unlock SpeechSynthesis on iOS by speaking empty text
-  if (!isAudioUnlocked && 'speechSynthesis' in window) {
-    const utterance = new SpeechSynthesisUtterance('');
-    utterance.volume = 0;
-    speechSynthesis.speak(utterance);
-    isAudioUnlocked = true;
-    log('SpeechSynthesis unlocked via silent utterance');
+  if ('speechSynthesis' in window) {
+    // Always try to unlock - some browsers need this on each page load
+    try {
+      const utterance = new SpeechSynthesisUtterance('');
+      utterance.volume = 0;
+      speechSynthesis.speak(utterance);
+      isAudioUnlocked = true;
+      log('SpeechSynthesis unlock attempted via silent utterance');
+    } catch (e) {
+      log('Failed to unlock SpeechSynthesis:', e);
+    }
+
+    // Pre-load voices
+    waitForVoices().then(() => {
+      log('Voices pre-loaded during initAudio');
+    });
   }
 }
 
@@ -104,6 +116,58 @@ const preferredVoicesByLanguage: Record<string, string[]> = {
   it: ['Google italiano', 'Microsoft Cosimo', 'Alice'],
 };
 
+// Track if voices have been loaded
+let voicesLoaded = false;
+let voicesLoadedPromise: Promise<void> | null = null;
+
+/**
+ * Wait for voices to be loaded (needed on some browsers)
+ */
+function waitForVoices(): Promise<void> {
+  if (voicesLoaded) return Promise.resolve();
+  if (voicesLoadedPromise) return voicesLoadedPromise;
+
+  voicesLoadedPromise = new Promise((resolve) => {
+    const voices = speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      voicesLoaded = true;
+      log('Voices already loaded:', voices.length, 'voices available');
+      log('Available voices:', voices.slice(0, 5).map(v => v.name).join(', '), '...');
+      resolve();
+      return;
+    }
+
+    // Wait for voices to load
+    log('Waiting for voices to load...');
+    const onVoicesChanged = () => {
+      const loadedVoices = speechSynthesis.getVoices();
+      if (loadedVoices.length > 0) {
+        voicesLoaded = true;
+        log('Voices loaded:', loadedVoices.length, 'voices available');
+        log('Available voices:', loadedVoices.slice(0, 5).map(v => v.name).join(', '), '...');
+        speechSynthesis.onvoiceschanged = null;
+        resolve();
+      }
+    };
+
+    speechSynthesis.onvoiceschanged = onVoicesChanged;
+
+    // Timeout after 3 seconds
+    setTimeout(() => {
+      const fallbackVoices = speechSynthesis.getVoices();
+      if (fallbackVoices.length > 0) {
+        voicesLoaded = true;
+        log('Voices loaded via timeout:', fallbackVoices.length);
+      } else {
+        log('WARNING: No voices loaded after timeout');
+      }
+      resolve();
+    }, 3000);
+  });
+
+  return voicesLoadedPromise;
+}
+
 /**
  * Get the best available voice for divine speech
  */
@@ -111,14 +175,35 @@ function getBestVoice(language: string = 'en'): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
   const langCode = languageToBCP47[language] || 'en';
 
+  log('getBestVoice called, voices available:', voices.length, 'language:', language);
+
+  if (voices.length === 0) {
+    log('WARNING: No voices available!');
+    return null;
+  }
+
   // Try preferred voices for this language first
   const preferredVoices = preferredVoicesByLanguage[language] || preferredVoicesByLanguage.en;
   for (const name of preferredVoices) {
     const voice = voices.find(v => v.name.includes(name));
     if (voice) {
-      log('Found preferred voice:', voice.name);
+      log('Found preferred voice:', voice.name, 'lang:', voice.lang);
       return voice;
     }
+  }
+
+  // Try to find a male voice for deeper sound
+  const maleVoice = voices.find(v =>
+    v.lang.startsWith(langCode) &&
+    (v.name.toLowerCase().includes('male') ||
+     v.name.includes('Daniel') ||
+     v.name.includes('David') ||
+     v.name.includes('James') ||
+     v.name.includes('Aaron'))
+  );
+  if (maleVoice) {
+    log('Found male voice:', maleVoice.name);
+    return maleVoice;
   }
 
   // Fall back to any voice matching the language
@@ -130,7 +215,32 @@ function getBestVoice(language: string = 'en'): SpeechSynthesisVoice | null {
 
   // Ultimate fallback to any English voice
   const englishVoice = voices.find(v => v.lang.startsWith('en'));
+  log('Falling back to:', englishVoice?.name || 'default voice');
   return englishVoice || voices[0] || null;
+}
+
+/**
+ * Test TTS with a simple message - call this on first user interaction
+ */
+export async function testTTS(): Promise<boolean> {
+  log('testTTS() called');
+
+  if (!('speechSynthesis' in window)) {
+    log('SpeechSynthesis not available in this browser');
+    return false;
+  }
+
+  // Wait for voices
+  await waitForVoices();
+
+  const voices = speechSynthesis.getVoices();
+  if (voices.length === 0) {
+    log('No voices available for TTS');
+    return false;
+  }
+
+  log('TTS appears to be available with', voices.length, 'voices');
+  return true;
 }
 
 /**
@@ -220,29 +330,17 @@ export function speak(
   utterance.pitch = VOICE_SETTINGS.pitch;
   utterance.volume = VOICE_SETTINGS.volume;
 
-  // Set voice (may need to wait for voices to load)
+  // Set voice - try immediately, voices should be loaded
   const lang = language || 'en';
-  const setVoice = () => {
-    const voice = getBestVoice(lang);
-    if (voice) {
-      utterance.voice = voice;
-      // Also set the utterance lang to help browsers pick fallback
-      utterance.lang = voice.lang;
-      log('Voice set to:', voice.name, 'lang:', voice.lang);
-    } else {
-      log('No preferred voice found, using default');
-    }
-  };
-
-  // Voices may already be loaded or may load asynchronously
-  const voices = speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    setVoice();
+  const voice = getBestVoice(lang);
+  if (voice) {
+    utterance.voice = voice;
+    utterance.lang = voice.lang;
+    log('Utterance created - voice:', voice.name, 'rate:', VOICE_SETTINGS.rate, 'pitch:', VOICE_SETTINGS.pitch);
   } else {
-    // Wait for voices to load (needed on some browsers)
-    speechSynthesis.onvoiceschanged = () => {
-      setVoice();
-    };
+    log('WARNING: No voice available, using browser default');
+    // Set language hint at least
+    utterance.lang = languageToBCP47[lang] || 'en-US';
   }
 
   // Handle events
