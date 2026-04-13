@@ -9,7 +9,7 @@ const ENV_WORKER_URL = import.meta.env.VITE_WORKER_URL;
 
 // IMPORTANT: Replace this with your actual deployed worker URL from Cloudflare
 // Format: https://aimighty-api.{your-subdomain}.workers.dev
-const FALLBACK_WORKER_URL = 'https://aimighty-api.robby-codes.workers.dev';
+const FALLBACK_WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 
 const WORKER_URL = ENV_WORKER_URL || FALLBACK_WORKER_URL;
 
