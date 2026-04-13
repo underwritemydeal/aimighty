@@ -38,12 +38,14 @@ export async function sendMessage(
   messages: Message[],
   beliefSystem: string,
   userId: string,
-  callbacks: StreamCallbacks
+  callbacks: StreamCallbacks,
+  language: string = 'en'
 ): Promise<void> {
   // Log the request in development
   if (import.meta.env.DEV) {
     console.log('[ClaudeAPI] Sending message to:', WORKER_URL);
     console.log('[ClaudeAPI] Belief system:', beliefSystem);
+    console.log('[ClaudeAPI] Language:', language);
     console.log('[ClaudeAPI] Messages count:', messages.length);
   }
 
@@ -58,6 +60,7 @@ export async function sendMessage(
         messages,
         beliefSystem,
         userId,
+        language,
       }),
     });
 

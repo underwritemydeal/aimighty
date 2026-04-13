@@ -1,8 +1,11 @@
-import { useEffect, useState, useRef, memo } from 'react';
+import { useEffect, useState, useRef, memo, useCallback } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
+import { languages, t, type LanguageCode, getLanguage } from '../../data/translations';
 
 interface WelcomeScreenProps {
   onBegin: () => void;
+  language: LanguageCode;
+  onLanguageChange: (lang: LanguageCode) => void;
 }
 
 // Cinematic light bloom from bottom — divine presence effect
@@ -86,9 +89,168 @@ const LightBloom = memo(function LightBloom({ isVisible }: { isVisible: boolean 
   );
 });
 
-export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
+// Globe icon SVG
+const GlobeIcon = memo(function GlobeIcon() {
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+});
+
+// Language selector modal
+const LanguageModal = memo(function LanguageModal({
+  isOpen,
+  onClose,
+  currentLanguage,
+  onSelect,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  currentLanguage: LanguageCode;
+  onSelect: (lang: LanguageCode) => void;
+}) {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Close on escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
+  // Close on click outside
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+      style={{
+        background: 'rgba(0, 0, 0, 0.85)',
+        backdropFilter: 'blur(8px)',
+      }}
+      onClick={handleBackdropClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="language-modal-title"
+    >
+      <div
+        ref={modalRef}
+        className="relative w-full max-w-md max-h-[80vh] overflow-hidden rounded-2xl"
+        style={{
+          background: 'linear-gradient(180deg, rgba(30, 30, 50, 0.95) 0%, rgba(20, 20, 35, 0.98) 100%)',
+          border: '1px solid rgba(212, 175, 55, 0.15)',
+          boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(212, 175, 55, 0.08)',
+        }}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-white/5">
+          <h2
+            id="language-modal-title"
+            className="text-center"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-medium)',
+              color: 'var(--color-text-primary)',
+              letterSpacing: 'var(--tracking-wide)',
+            }}
+          >
+            {t('welcome.selectLanguage', currentLanguage)}
+          </h2>
+        </div>
+
+        {/* Language grid */}
+        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+          <div className="grid grid-cols-2 gap-2">
+            {languages.map((lang) => {
+              const isSelected = lang.code === currentLanguage;
+              return (
+                <button
+                  key={lang.code}
+                  onClick={() => {
+                    onSelect(lang.code);
+                    onClose();
+                  }}
+                  className="relative px-4 py-3 rounded-xl text-left transition-all duration-200 hover:bg-white/[0.06] hover:border-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
+                  style={{
+                    background: isSelected
+                      ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.08) 100%)'
+                      : 'rgba(255, 255, 255, 0.03)',
+                    border: isSelected
+                      ? '1px solid rgba(212, 175, 55, 0.5)'
+                      : '1px solid rgba(255, 255, 255, 0.06)',
+                  }}
+                  dir={lang.rtl ? 'rtl' : 'ltr'}
+                >
+                  {/* Native name */}
+                  <span
+                    className="block"
+                    style={{
+                      fontFamily: 'var(--font-body)',
+                      fontSize: 'var(--text-base)',
+                      fontWeight: isSelected ? 'var(--font-medium)' : 'var(--font-normal)',
+                      color: isSelected ? 'var(--color-gold)' : 'var(--color-text-primary)',
+                    }}
+                  >
+                    {lang.nativeName}
+                  </span>
+                  {/* English name below */}
+                  <span
+                    className="block mt-0.5"
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      color: 'var(--color-text-tertiary)',
+                    }}
+                  >
+                    {lang.name}
+                  </span>
+                  {/* Selected checkmark */}
+                  {isSelected && (
+                    <span
+                      className="absolute top-3 right-3"
+                      style={{ color: 'var(--color-gold)' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeScreenProps) {
   const [phase, setPhase] = useState(0);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleOpenLanguageModal = useCallback(() => setShowLanguageModal(true), []);
+  const handleCloseLanguageModal = useCallback(() => setShowLanguageModal(false), []);
 
   useEffect(() => {
     // Cinematic staggered entrance — movie title sequence pacing
@@ -135,6 +297,33 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
 
       {/* Vignette for depth */}
       <div className="vignette" aria-hidden="true" />
+
+      {/* Language selector button — top right */}
+      <button
+        onClick={handleOpenLanguageModal}
+        className="absolute z-20 flex items-center gap-2 px-3 py-2 rounded-full transition-all duration-300 hover:bg-white/10 hover:border-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
+        style={{
+          top: 'max(env(safe-area-inset-top, 16px), 16px)',
+          right: 'max(env(safe-area-inset-right, 16px), 16px)',
+          background: 'rgba(255, 255, 255, 0.05)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          color: 'var(--color-text-secondary)',
+          opacity: phase >= 3 ? 1 : 0,
+          transform: phase >= 3 ? 'translateY(0)' : 'translateY(-10px)',
+        }}
+        aria-label={t('welcome.selectLanguage', language)}
+      >
+        <GlobeIcon />
+        <span
+          style={{
+            fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--font-medium)',
+            letterSpacing: '0.02em',
+          }}
+        >
+          {getLanguage(language).nativeName}
+        </span>
+      </button>
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center h-full px-6">
@@ -191,7 +380,7 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
             color: 'var(--color-text-secondary)',
           }}
         >
-          Every belief. One voice.
+          {t('welcome.tagline', language)}
         </p>
 
         {/* Generous breathing spacer */}
@@ -235,7 +424,7 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
               transition: 'letter-spacing var(--duration-normal) var(--ease-out-expo)',
             }}
           >
-            Begin
+            {t('welcome.begin', language)}
           </span>
 
           {/* Underline accent */}
@@ -276,6 +465,14 @@ export function WelcomeScreen({ onBegin }: WelcomeScreenProps) {
           background: 'linear-gradient(to bottom, rgba(var(--color-void-rgb), 0.75) 0%, transparent 100%)',
         }}
         aria-hidden="true"
+      />
+
+      {/* Language selector modal */}
+      <LanguageModal
+        isOpen={showLanguageModal}
+        onClose={handleCloseLanguageModal}
+        currentLanguage={language}
+        onSelect={onLanguageChange}
       />
     </div>
   );

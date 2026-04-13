@@ -1,11 +1,14 @@
 import { useState, useEffect, memo } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
 import { beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
+import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem } from '../../types';
 
 interface BeliefSelectorProps {
   onSelect: (belief: BeliefSystem) => void;
   onBack: () => void;
+  language: LanguageCode;
+  onSignOut: () => void;
 }
 
 // Belief card with glass morphism effect
@@ -138,12 +141,15 @@ const CategoryHeader = memo(function CategoryHeader({
   isVisible,
   delay,
   isFirst,
+  language,
 }: {
   category: BeliefCategory;
   isVisible: boolean;
   delay: number;
   isFirst: boolean;
+  language: LanguageCode;
 }) {
+  const categoryKey = `beliefs.${category}` as const;
   return (
     <div
       className="gpu-accelerated-opacity"
@@ -163,13 +169,13 @@ const CategoryHeader = memo(function CategoryHeader({
           letterSpacing: '0.2em',
         }}
       >
-        {categoryLabels[category]}
+        {t(categoryKey, language) || categoryLabels[category]}
       </h2>
     </div>
   );
 });
 
-export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
+export function BeliefSelector({ onSelect, onBack, language, onSignOut }: BeliefSelectorProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -212,7 +218,7 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
           >
             <button
               onClick={onBack}
-              aria-label="Go back to welcome screen"
+              aria-label={t('common.back', language)}
               className="group flex items-center gap-2 py-2 px-3 rounded-lg btn-ghost glass"
             >
               <svg
@@ -237,10 +243,46 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
                   color: 'var(--color-text-muted)',
                 }}
               >
-                Back
+                {t('common.back', language)}
               </span>
             </button>
           </nav>
+
+          {/* Sign out button - fixed top right */}
+          <div
+            className="fixed top-4 right-4 z-20 gpu-accelerated"
+            style={{
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
+              transition: `all var(--duration-slow) var(--ease-out-expo)`,
+            }}
+          >
+            <button
+              onClick={onSignOut}
+              aria-label="Sign out"
+              className="py-2 px-3 rounded-lg btn-ghost glass"
+              style={{
+                fontSize: 'var(--text-xs)',
+                color: 'var(--color-text-muted)',
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </div>
 
           {/* Header */}
           <header
@@ -261,9 +303,9 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
                 letterSpacing: 'var(--tracking-wide)',
               }}
             >
-              <span style={{ color: 'var(--color-text-primary)' }}>Choose Your </span>
+              <span style={{ color: 'var(--color-text-primary)' }}>{t('beliefs.chooseYour', language)} </span>
               <span className="text-gold" style={{ fontWeight: 'var(--font-normal)' }}>
-                Path
+                {t('beliefs.path', language)}
               </span>
             </h1>
           </header>
@@ -280,14 +322,14 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
               transitionDelay: '100ms',
             }}
           >
-            Select the tradition that speaks to your soul
+            {t('beliefs.selectTradition', language)}
           </p>
 
           {/* Cards - single column on mobile, grid on tablet+ */}
           <div>
             {/* Religious Traditions */}
-            <section role="region" aria-label="Religious Traditions">
-              <CategoryHeader category="religious" isVisible={isVisible} delay={150} isFirst={true} />
+            <section role="region" aria-label={t('beliefs.religious', language)}>
+              <CategoryHeader category="religious" isVisible={isVisible} delay={150} isFirst={true} language={language} />
               <div
                 className="grid gap-3"
                 style={{
@@ -307,8 +349,8 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
             </section>
 
             {/* Spiritual Paths */}
-            <section role="region" aria-label="Spiritual Paths">
-              <CategoryHeader category="spiritual" isVisible={isVisible} delay={400} isFirst={false} />
+            <section role="region" aria-label={t('beliefs.spiritual', language)}>
+              <CategoryHeader category="spiritual" isVisible={isVisible} delay={400} isFirst={false} language={language} />
               <div
                 className="grid gap-3"
                 style={{
@@ -328,8 +370,8 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
             </section>
 
             {/* Philosophical Frameworks */}
-            <section role="region" aria-label="Philosophical Frameworks">
-              <CategoryHeader category="philosophical" isVisible={isVisible} delay={550} isFirst={false} />
+            <section role="region" aria-label={t('beliefs.philosophical', language)}>
+              <CategoryHeader category="philosophical" isVisible={isVisible} delay={550} isFirst={false} language={language} />
               <div
                 className="grid gap-3"
                 style={{
@@ -364,7 +406,7 @@ export function BeliefSelector({ onSelect, onBack }: BeliefSelectorProps) {
               lineHeight: 'var(--leading-relaxed)',
             }}
           >
-            Trained on every sacred text, scripture, and tradition — available whenever you need guidance.
+            {t('beliefs.trainedOn', language)}
           </p>
         </div>
       </div>

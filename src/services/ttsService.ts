@@ -62,29 +62,71 @@ export function initAudio(): void {
   }
 }
 
+// Language to BCP-47 code mapping for TTS
+const languageToBCP47: Record<string, string> = {
+  en: 'en',
+  es: 'es',
+  ar: 'ar',
+  hi: 'hi',
+  pt: 'pt',
+  fr: 'fr',
+  id: 'id',
+  ur: 'ur',
+  tr: 'tr',
+  de: 'de',
+  sw: 'sw',
+  zh: 'zh',
+  ko: 'ko',
+  ja: 'ja',
+  tl: 'fil',
+  it: 'it',
+};
+
+// Preferred voices for each language (premium/high-quality voices)
+const preferredVoicesByLanguage: Record<string, string[]> = {
+  en: ['Google UK English Male', 'Microsoft David', 'Daniel', 'Google US English', 'Alex', 'Samantha'],
+  es: ['Google español', 'Microsoft Pablo', 'Jorge', 'Paulina'],
+  ar: ['Google العربية', 'Microsoft Naayf', 'Maged'],
+  hi: ['Google हिन्दी', 'Microsoft Hemant', 'Lekha'],
+  pt: ['Google português', 'Microsoft Daniel', 'Luciana'],
+  fr: ['Google français', 'Microsoft Paul', 'Thomas'],
+  id: ['Google Bahasa Indonesia', 'Damayanti'],
+  ur: ['Microsoft Asad', 'Google اردو'],
+  tr: ['Google Türkçe', 'Microsoft Tolga', 'Yelda'],
+  de: ['Google Deutsch', 'Microsoft Stefan', 'Anna'],
+  sw: ['Google Kiswahili'],
+  zh: ['Google 普通话', 'Microsoft Kangkang', 'Tingting'],
+  ko: ['Google 한국의', 'Microsoft Heami', 'Yuna'],
+  ja: ['Google 日本語', 'Microsoft Ichiro', 'Kyoko'],
+  tl: ['Google Filipino'],
+  it: ['Google italiano', 'Microsoft Cosimo', 'Alice'],
+};
+
 /**
  * Get the best available voice for divine speech
  */
-function getBestVoice(): SpeechSynthesisVoice | null {
+function getBestVoice(language: string = 'en'): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices();
+  const langCode = languageToBCP47[language] || 'en';
 
-  // Prefer deep, authoritative voices
-  const preferredVoices = [
-    // English premium voices
-    'Google UK English Male',
-    'Microsoft David',
-    'Daniel',
-    'Google US English',
-    'Alex',
-    'Samantha',
-  ];
-
+  // Try preferred voices for this language first
+  const preferredVoices = preferredVoicesByLanguage[language] || preferredVoicesByLanguage.en;
   for (const name of preferredVoices) {
     const voice = voices.find(v => v.name.includes(name));
-    if (voice) return voice;
+    if (voice) {
+      log('Found preferred voice:', voice.name);
+      return voice;
+    }
   }
 
-  // Fall back to any English voice
+  // Fall back to any voice matching the language
+  const langVoice = voices.find(v => v.lang.startsWith(langCode));
+  if (langVoice) {
+    log('Found language voice:', langVoice.name);
+    return langVoice;
+  }
+
+  // Ultimate fallback to any English voice
   const englishVoice = voices.find(v => v.lang.startsWith('en'));
   return englishVoice || voices[0] || null;
 }
@@ -95,11 +137,11 @@ function getBestVoice(): SpeechSynthesisVoice | null {
  */
 export function speak(
   text: string,
-  onStart?: () => void,
+  language?: string,
   onEnd?: () => void,
   onAudioLevel?: (level: number) => void
 ): void {
-  log('speak() called with text length:', text.length);
+  log('speak() called with text length:', text.length, 'language:', language);
 
   // Cancel any current speech
   stop();
@@ -129,11 +171,14 @@ export function speak(
   utterance.volume = VOICE_SETTINGS.volume;
 
   // Set voice (may need to wait for voices to load)
+  const lang = language || 'en';
   const setVoice = () => {
-    const voice = getBestVoice();
+    const voice = getBestVoice(lang);
     if (voice) {
       utterance.voice = voice;
-      log('Voice set to:', voice.name);
+      // Also set the utterance lang to help browsers pick fallback
+      utterance.lang = voice.lang;
+      log('Voice set to:', voice.name, 'lang:', voice.lang);
     } else {
       log('No preferred voice found, using default');
     }
@@ -153,7 +198,6 @@ export function speak(
   // Handle events
   utterance.onstart = () => {
     log('Speech started');
-    onStart?.();
     startAudioLevelSimulation();
   };
 

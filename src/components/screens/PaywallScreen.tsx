@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
+import { t, type LanguageCode } from '../../data/translations';
 
 interface PaywallScreenProps {
   onBack: () => void;
+  language: LanguageCode;
 }
 
-export function PaywallScreen({ onBack }: PaywallScreenProps) {
+export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -22,6 +24,15 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
     // Non-functional placeholder - will wire Stripe in Phase 2
     alert('Subscription will be available soon. Thank you for your interest!');
   };
+
+  // Get translated features
+  const features = [
+    t('paywall.unlimitedConversations', language),
+    t('paywall.allBeliefs', language),
+    t('paywall.voiceIO', language),
+    t('paywall.history', language),
+    t('paywall.priority', language),
+  ];
 
   return (
     <div
@@ -43,7 +54,7 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
       >
         <button
           onClick={onBack}
-          aria-label="Go back to conversation"
+          aria-label={t('common.back', language)}
           className="group flex items-center gap-2 py-2 px-3 rounded-lg btn-ghost glass"
         >
           <svg
@@ -110,7 +121,7 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
               letterSpacing: 'var(--tracking-wide)',
             }}
           >
-            Your Free Session Has Ended
+            {t('paywall.sessionEnded', language)}
           </h1>
 
           {/* Description */}
@@ -124,7 +135,7 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
               lineHeight: 'var(--leading-relaxed)',
             }}
           >
-            Continue your journey with unlimited conversations. Wisdom awaits.
+            {t('paywall.continueJourney', language)}
           </p>
 
           {/* Pricing card */}
@@ -151,19 +162,13 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
                   color: 'var(--color-text-muted)',
                 }}
               >
-                /month
+                {t('paywall.perMonth', language)}
               </span>
             </div>
 
             {/* Features */}
             <ul className="space-y-3 mb-8 text-left">
-              {[
-                'Unlimited conversations',
-                'All 14 belief systems',
-                'Voice input & output',
-                'Conversation history',
-                'Priority support',
-              ].map((feature) => (
+              {features.map((feature) => (
                 <li key={feature} className="flex items-center gap-3">
                   <svg
                     width="16"
@@ -205,7 +210,7 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
                   transition: 'all var(--duration-normal) var(--ease-out-expo)',
                 }}
               >
-                Start 7-Day Free Trial
+                {t('paywall.startTrial', language)}
               </button>
 
               <button
@@ -219,7 +224,7 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
                   transition: 'all var(--duration-normal) var(--ease-out-expo)',
                 }}
               >
-                Subscribe Now
+                {t('paywall.subscribe', language)}
               </button>
             </div>
           </div>
@@ -231,7 +236,7 @@ export function PaywallScreen({ onBack }: PaywallScreenProps) {
               color: 'var(--color-text-muted)',
             }}
           >
-            Cancel anytime. No questions asked.
+            {t('paywall.cancelAnytime', language)}
           </p>
         </div>
       </div>

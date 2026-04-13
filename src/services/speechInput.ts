@@ -68,7 +68,28 @@ export interface SpeechInputCallbacks {
   onResult?: (transcript: string, isFinal: boolean) => void;
   onEnd?: () => void;
   onError?: (error: string) => void;
+  language?: string;
 }
+
+// BCP-47 language codes for speech recognition
+const languageToBCP47: Record<string, string> = {
+  en: 'en-US',
+  es: 'es-ES',
+  ar: 'ar-SA',
+  hi: 'hi-IN',
+  pt: 'pt-BR',
+  fr: 'fr-FR',
+  id: 'id-ID',
+  ur: 'ur-PK',
+  tr: 'tr-TR',
+  de: 'de-DE',
+  sw: 'sw-KE',
+  zh: 'zh-CN',
+  ko: 'ko-KR',
+  ja: 'ja-JP',
+  tl: 'fil-PH',
+  it: 'it-IT',
+};
 
 /**
  * Check if speech recognition is supported
@@ -85,7 +106,7 @@ export function isSupported(): boolean {
  * Initialize speech recognition
  * Handles both standard and webkit-prefixed APIs (for Safari)
  */
-function getRecognition(): SpeechRecognition | null {
+function getRecognition(language: string = 'en'): SpeechRecognition | null {
   if (!isSupported()) {
     log('Speech recognition not supported');
     return null;
@@ -98,7 +119,11 @@ function getRecognition(): SpeechRecognition | null {
 
     instance.continuous = false; // Stop after each utterance
     instance.interimResults = true; // Get partial results for real-time feedback
-    instance.lang = 'en-US';
+
+    // Set language based on user's selected language
+    const bcp47Code = languageToBCP47[language] || 'en-US';
+    instance.lang = bcp47Code;
+    log('Speech recognition language:', bcp47Code);
 
     log('Speech recognition initialized');
     return instance;
@@ -120,7 +145,7 @@ export function startListening(callbacks: SpeechInputCallbacks): boolean {
     return false;
   }
 
-  recognition = getRecognition();
+  recognition = getRecognition(callbacks.language);
   if (!recognition) {
     log('No recognition instance available');
     callbacks.onError?.('Speech recognition not supported in this browser');

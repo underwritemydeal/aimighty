@@ -184,9 +184,10 @@ export default {
         messages: Array<{ role: string; content: string }>;
         beliefSystem: string;
         userId?: string;
+        language?: string;
       };
 
-      const { messages, beliefSystem, userId } = body;
+      const { messages, beliefSystem, userId, language = 'en' } = body;
 
       // Validate input
       if (!messages || !Array.isArray(messages) || !beliefSystem) {
@@ -222,8 +223,31 @@ export default {
         }
       }
 
-      // Get system prompt
-      const systemPrompt = getSystemPrompt(beliefSystem);
+      // Get system prompt with language instruction
+      let systemPrompt = getSystemPrompt(beliefSystem);
+
+      // Add language instruction for non-English languages
+      if (language && language !== 'en') {
+        const languageNames: Record<string, string> = {
+          es: 'Spanish (Español)',
+          ar: 'Arabic (العربية)',
+          hi: 'Hindi (हिन्दी)',
+          pt: 'Portuguese (Português)',
+          fr: 'French (Français)',
+          id: 'Indonesian (Bahasa Indonesia)',
+          ur: 'Urdu (اردو)',
+          tr: 'Turkish (Türkçe)',
+          de: 'German (Deutsch)',
+          sw: 'Swahili (Kiswahili)',
+          zh: 'Chinese (中文)',
+          ko: 'Korean (한국어)',
+          ja: 'Japanese (日本語)',
+          tl: 'Filipino (Tagalog)',
+          it: 'Italian (Italiano)',
+        };
+        const langName = languageNames[language] || language;
+        systemPrompt += `\n\nIMPORTANT LANGUAGE INSTRUCTION: The user has selected ${langName} as their language. You MUST respond entirely in ${langName}. Use culturally appropriate expressions and idioms for that language. Your entire response should be in ${langName}, not English.`;
+      }
 
       // Call Claude API with streaming
       const response = await fetch('https://api.anthropic.com/v1/messages', {

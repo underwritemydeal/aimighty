@@ -5,6 +5,7 @@ import { sendMessage, type Message } from '../../services/claudeApi';
 import { speak, stop as stopSpeaking, initAudio } from '../../services/ttsService';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
+import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem, User } from '../../types';
 
 interface ConversationScreenProps {
@@ -12,6 +13,7 @@ interface ConversationScreenProps {
   user: User;
   onBack: () => void;
   onPaywall: () => void;
+  language: LanguageCode;
 }
 
 // Floating text with word-by-word fade animation — divine revelation effect
@@ -92,12 +94,14 @@ const MicButton = memo(function MicButton({
   isDisabled,
   themeColor,
   onToggle,
+  listeningLabel,
 }: {
   isListening: boolean;
   isSpeaking: boolean;
   isDisabled: boolean;
   themeColor: string;
   onToggle: () => void;
+  listeningLabel: string;
 }) {
   const disabled = isSpeaking || isDisabled;
 
@@ -191,7 +195,7 @@ const MicButton = memo(function MicButton({
         }}
         aria-hidden="true"
       >
-        Listening
+        {listeningLabel}
       </span>
     </button>
   );
@@ -201,9 +205,13 @@ const MicButton = memo(function MicButton({
 const MessageCounter = memo(function MessageCounter({
   remaining,
   themeColor,
+  freeMessagesLabel,
+  freeMessagesUsedLabel,
 }: {
   remaining: number;
   themeColor: string;
+  freeMessagesLabel: string;
+  freeMessagesUsedLabel: string;
 }) {
   if (remaining > 3 || remaining === Infinity) return null;
 
@@ -216,17 +224,17 @@ const MessageCounter = memo(function MessageCounter({
       }}
     >
       {remaining === 0 ? (
-        <span>Free messages used</span>
+        <span>{freeMessagesUsedLabel}</span>
       ) : (
         <span>
-          <span style={{ color: themeColor }}>{remaining}</span> free message{remaining !== 1 ? 's' : ''} remaining
+          <span style={{ color: themeColor }}>{remaining}</span> {freeMessagesLabel}
         </span>
       )}
     </div>
   );
 });
 
-export function ConversationScreen({ belief, user, onBack, onPaywall }: ConversationScreenProps) {
+export function ConversationScreen({ belief, user, onBack, onPaywall, language }: ConversationScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -265,14 +273,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
     setIsSpeaking(true);
     speak(
       text,
-      undefined,
+      language,
       () => {
         setIsSpeaking(false);
         setAudioLevel(0);
       },
       (level) => setAudioLevel(level)
     );
-  }, []);
+  }, [language]);
 
   // Delayed greeting with natural timing (doesn't count toward message limit)
   useEffect(() => {
@@ -349,9 +357,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
           setCaptionVisible(true);
           speakResponse(errorMessage);
         },
-      }
+      },
+      language
     );
-  }, [messages, belief.id, user.id, user.isPremium, captionVisible, isSpeaking, speakResponse, onPaywall]);
+  }, [messages, belief.id, user.id, user.isPremium, captionVisible, isSpeaking, speakResponse, onPaywall, language]);
 
   const handleSend = useCallback(() => {
     if (!inputText.trim() || isSpeaking || isProcessing) return;
@@ -385,6 +394,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
       }
 
       startListening({
+        language,
         onStart: () => setIsListening(true),
         onResult: (transcript, isFinal) => {
           if (isFinal) {
@@ -412,7 +422,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
         },
       });
     }
-  }, [isListening, interimTranscript, sendToAI]);
+  }, [isListening, interimTranscript, sendToAI, language]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -487,7 +497,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
                 color: 'var(--color-text-muted)',
               }}
             >
-              Back
+              {t('conversation.back', language)}
             </span>
           </button>
 
@@ -556,7 +566,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
         {/* Message counter */}
         <div className="shrink-0">
           {!user.isPremium && (
-            <MessageCounter remaining={remainingMessages} themeColor={belief.themeColor} />
+            <MessageCounter
+              remaining={remainingMessages}
+              themeColor={belief.themeColor}
+              freeMessagesLabel={t('conversation.freeMessages', language)}
+              freeMessagesUsedLabel={t('conversation.freeMessagesUsed', language)}
+            />
           )}
         </div>
 
@@ -585,7 +600,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
               value={isListening ? interimTranscript || inputText : inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isListening ? 'Listening...' : 'Speak your truth...'}
+              placeholder={isListening ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
               disabled={isSpeaking || isProcessing}
               maxLength={500}
               style={{
@@ -660,6 +675,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall }: Conversa
             isDisabled={isProcessing || (hasReachedFreeLimit() && !user.isPremium)}
             themeColor={belief.themeColor}
             onToggle={handleMicToggle}
+            listeningLabel={t('conversation.listening', language)}
           />
         </div>
       </div>

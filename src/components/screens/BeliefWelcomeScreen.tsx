@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { NebulaBackground } from '../shared/NebulaBackground';
+import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem } from '../../types';
 
 interface BeliefWelcomeScreenProps {
   belief: BeliefSystem;
   userName?: string;
   onContinue: () => void;
+  language: LanguageCode;
 }
 
 // Personalized welcome messages per belief system
@@ -26,7 +28,7 @@ const welcomeMessages: Record<string, string> = {
   atheism: "You are the author of your own meaning. What would you like to examine?",
 };
 
-export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue }: BeliefWelcomeScreenProps) {
+export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue, language }: BeliefWelcomeScreenProps) {
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
@@ -131,7 +133,7 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue }:
             textTransform: 'uppercase',
           }}
         >
-          Tap to continue
+          {t('common.continue', language)}
         </p>
 
         {/* Skip button (tap anywhere) */}

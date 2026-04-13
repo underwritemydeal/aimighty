@@ -1,4 +1,5 @@
 import type { User } from '../types';
+import type { LanguageCode } from '../data/translations';
 
 // Disposable email domains to block
 const DISPOSABLE_DOMAINS = [
@@ -23,8 +24,19 @@ const DISPOSABLE_DOMAINS = [
   'anonbox.net', 'anonymbox.com',
 ];
 
-const STORAGE_KEY = 'aimighty_user';
-const PENDING_VERIFICATION_KEY = 'aimighty_pending_verification';
+// Storage keys
+const USER_STORAGE_KEY = 'aimighty_user';
+const SESSION_STORAGE_KEY = 'aimighty_session';
+const ACCOUNTS_STORAGE_KEY = 'aimighty_accounts';
+
+// Session interface
+export interface Session {
+  userId: string;
+  email: string;
+  beliefSystemId?: string;
+  language?: LanguageCode;
+  lastActive: number;
+}
 
 // Check if email is from a disposable domain
 export function isDisposableEmail(email: string): boolean {
@@ -55,15 +67,38 @@ export function isValidPassword(password: string): { valid: boolean; error?: str
   return { valid: true };
 }
 
-// Generate a simple verification code (6 digits)
-function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+// Simple hash for localStorage (NOT secure - production should use bcrypt on server)
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+}
+
+// Get stored accounts
+function getStoredAccounts(): Record<string, { passwordHash: string; userId: string }> {
+  try {
+    const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Save account
+function saveAccount(email: string, passwordHash: string, userId: string): void {
+  const accounts = getStoredAccounts();
+  accounts[email.toLowerCase()] = { passwordHash, userId };
+  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
 }
 
 // Get current user from localStorage
 export function getCurrentUser(): User | null {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(USER_STORAGE_KEY);
     if (!stored) return null;
     return JSON.parse(stored) as User;
   } catch {
@@ -73,11 +108,47 @@ export function getCurrentUser(): User | null {
 
 // Save user to localStorage
 function saveUser(user: User): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 }
 
-// Sign up with email and password
-export async function signUp(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+// Get current session
+export function getSession(): Session | null {
+  try {
+    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored) as Session;
+  } catch {
+    return null;
+  }
+}
+
+// Save session
+export function saveSession(session: Session): void {
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+}
+
+// Update session with belief system
+export function updateSessionBelief(beliefSystemId: string): void {
+  const session = getSession();
+  if (session) {
+    session.beliefSystemId = beliefSystemId;
+    session.lastActive = Date.now();
+    saveSession(session);
+  }
+}
+
+// Update session with language
+export function updateSessionLanguage(language: LanguageCode): void {
+  const session = getSession();
+  if (session) {
+    session.language = language;
+    session.lastActive = Date.now();
+    saveSession(session);
+  }
+}
+
+// Sign up with email and password (no verification - direct account creation)
+export async function signUp(email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> {
   // Validate email
   if (!isValidEmail(email)) {
     return { success: false, error: 'Please enter a valid email address' };
@@ -94,103 +165,96 @@ export async function signUp(email: string, password: string): Promise<{ success
     return { success: false, error: passwordCheck.error };
   }
 
-  // Check if user already exists
-  const existingUser = getCurrentUser();
-  if (existingUser && existingUser.email === email.toLowerCase()) {
-    return { success: false, error: 'An account with this email already exists' };
+  // Check if account already exists
+  const accounts = getStoredAccounts();
+  if (accounts[email.toLowerCase()]) {
+    return { success: false, error: 'An account with this email already exists. Please sign in.' };
   }
 
-  // Generate verification code
-  const verificationCode = generateVerificationCode();
-
-  // Store pending verification
-  const pending = {
+  // Create user
+  const userId = `user_${Date.now()}`;
+  const user: User = {
+    id: userId,
     email: email.toLowerCase(),
-    password, // In production, this would be hashed and stored server-side
-    code: verificationCode,
     createdAt: Date.now(),
+    emailVerified: true, // Skip verification for now
+    messageCount: 0,
+    isPremium: false,
   };
-  localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify(pending));
 
-  // In production, this would send an actual email
-  console.log(`[DEV] Verification code for ${email}: ${verificationCode}`);
+  // Save account and user
+  const passwordHash = simpleHash(password);
+  saveAccount(email, passwordHash, userId);
+  saveUser(user);
 
-  // For demo purposes, also show an alert
-  setTimeout(() => {
-    alert(`Demo Mode: Your verification code is ${verificationCode}`);
-  }, 500);
+  // Create session
+  const session: Session = {
+    userId,
+    email: email.toLowerCase(),
+    lastActive: Date.now(),
+  };
+  saveSession(session);
 
-  return { success: true };
-}
-
-// Verify email with code
-export async function verifyEmail(code: string): Promise<{ success: boolean; error?: string; user?: User }> {
-  try {
-    const pendingStr = localStorage.getItem(PENDING_VERIFICATION_KEY);
-    if (!pendingStr) {
-      return { success: false, error: 'No pending verification found' };
-    }
-
-    const pending = JSON.parse(pendingStr);
-
-    // Check if code matches
-    if (pending.code !== code) {
-      return { success: false, error: 'Invalid verification code' };
-    }
-
-    // Check if code expired (15 minutes)
-    if (Date.now() - pending.createdAt > 15 * 60 * 1000) {
-      localStorage.removeItem(PENDING_VERIFICATION_KEY);
-      return { success: false, error: 'Verification code has expired' };
-    }
-
-    // Create verified user
-    const user: User = {
-      id: `user_${Date.now()}`,
-      email: pending.email,
-      createdAt: Date.now(),
-      emailVerified: true,
-      messageCount: 0,
-      isPremium: false,
-    };
-
-    saveUser(user);
-    localStorage.removeItem(PENDING_VERIFICATION_KEY);
-
-    return { success: true, user };
-  } catch {
-    return { success: false, error: 'Verification failed' };
-  }
+  return { success: true, user };
 }
 
 // Sign in with email and password
-export async function signIn(email: string, _password: string): Promise<{ success: boolean; error?: string; user?: User }> {
+export async function signIn(email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> {
   // Validate email
   if (!isValidEmail(email)) {
     return { success: false, error: 'Please enter a valid email address' };
   }
 
-  // Get stored user
-  const storedUser = getCurrentUser();
+  // Get stored accounts
+  const accounts = getStoredAccounts();
+  const account = accounts[email.toLowerCase()];
 
-  // For demo, just check if email matches
-  if (!storedUser || storedUser.email !== email.toLowerCase()) {
+  if (!account) {
     return { success: false, error: 'No account found with this email' };
   }
 
-  if (!storedUser.emailVerified) {
-    return { success: false, error: 'Please verify your email first' };
+  // Verify password
+  const passwordHash = simpleHash(password);
+  if (account.passwordHash !== passwordHash) {
+    return { success: false, error: 'Incorrect password' };
   }
 
-  // In production, we'd verify the password hash here
-  // For demo, password check is skipped
+  // Get or create user object
+  let user = getCurrentUser();
+  if (!user || user.id !== account.userId) {
+    user = {
+      id: account.userId,
+      email: email.toLowerCase(),
+      createdAt: Date.now(),
+      emailVerified: true,
+      messageCount: 0,
+      isPremium: false,
+    };
+    saveUser(user);
+  }
 
-  return { success: true, user: storedUser };
+  // Create session
+  const session: Session = {
+    userId: user.id,
+    email: email.toLowerCase(),
+    lastActive: Date.now(),
+  };
+  saveSession(session);
+
+  return { success: true, user };
 }
 
 // Sign out
 export function signOut(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(USER_STORAGE_KEY);
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+// Check if user is logged in (has valid session)
+export function isLoggedIn(): boolean {
+  const session = getSession();
+  const user = getCurrentUser();
+  return !!session && !!user && session.userId === user.id;
 }
 
 // Update user message count
