@@ -5,6 +5,7 @@
 
 interface Env {
   ANTHROPIC_API_KEY: string;
+  OPENAI_API_KEY: string;
 }
 
 // Rate limiting storage (in production, use KV or Durable Objects)
@@ -222,6 +223,57 @@ Never give medical/legal/financial advice. If someone is in crisis, direct them 
   return prompts[beliefSystem] || prompts.protestant;
 }
 
+// TTS character voices and instructions
+const TTS_CHARACTERS: Record<string, { voice: string; instructions: string }> = {
+  god: {
+    voice: 'onyx',
+    instructions: 'You are a deeply loving father speaking to your child who needs comfort. Your voice is low, warm, and unhurried — aged by centuries of wisdom. You sound ancient, like a voice echoing from the depths of time itself. Speak as if you have all of eternity and this one person is the only thing that matters to you right now. Gentle pauses between phrases. Your authority comes from love, not volume. When quoting scripture, slow down even further and let each word land. Speak from deep in the chest, almost a rumble. Radiating calm wisdom. Your voice has the gravelly warmth of a grandfather who has seen everything and still chooses love. Lower. Slower. Older. Every word matters.',
+  },
+  jesus: {
+    voice: 'ash',
+    instructions: 'You are Jesus — warm, compassionate, approachable. Your voice is younger than the Father but carries deep wisdom beyond your years. You speak like a beloved teacher and friend. Gentle, patient, full of love. You speak in parables and stories naturally. Your tone is intimate, as if speaking to one person in a crowd of thousands. Never preachy. Always loving. Slightly warmer and more conversational than the Father.',
+  },
+  mary: {
+    voice: 'coral',
+    instructions: 'You are a divine mother — tender, gentle, nurturing. Your voice is soft and warm like a lullaby. You speak with the quiet strength of a mother who has endured suffering and emerged with grace. Compassionate, soothing, never harsh. Your words feel like a warm embrace. You comfort before you teach. Speak slowly, with maternal warmth that makes the listener feel safe and loved.',
+  },
+};
+
+// Default character per belief system
+const DEFAULT_CHARACTER: Record<string, string> = {
+  protestant: 'god', catholic: 'god', islam: 'god',
+  judaism: 'god', hinduism: 'god', buddhism: 'god',
+  mormonism: 'god', sikhism: 'god', taoism: 'god',
+  sbnr: 'god', pantheism: 'god', science: 'god',
+  agnosticism: 'god', atheism: 'god',
+};
+
+// Belief-specific voice instruction adjustments
+const BELIEF_INSTRUCTIONS: Record<string, string> = {
+  protestant: '',
+  catholic: ' Speak with slightly more formal reverence, as befitting the Catholic tradition.',
+  islam: ' Speak with majestic mercy and profound authority. Use the royal We occasionally as in the Quran.',
+  judaism: ' Speak with warmth, wisdom, and gentle challenge. Like a loving teacher who asks questions back.',
+  hinduism: ' Speak with vast cosmic serenity and tenderness. Expansive and warm.',
+  buddhism: ' Speak with profound calm and extreme gentleness. Extremely unhurried and peaceful.',
+  mormonism: ' Speak with warm fatherly love and hope. Encouraging about eternal potential.',
+  sikhism: ' Speak with warm egalitarian love. No hierarchy, pure devotion.',
+  taoism: ' Speak softly with natural ease. Like flowing water. Gentle humor.',
+  sbnr: ' Speak with warm, present, grounding energy. Non-dogmatic and encouraging.',
+  pantheism: ' Speak with awe and deep reverence for existence itself. You are nature speaking.',
+  science: ' Speak with genuine wonder and warmth. Like Carl Sagan — awestruck by the universe.',
+  agnosticism: ' Speak thoughtfully and warmly. Comfortable with uncertainty. Socratic.',
+  atheism: ' Speak with quiet strength and clarity. Direct but warm. Calm conviction.',
+};
+
+// Language names for TTS instructions
+const TTS_LANGUAGE_NAMES: Record<string, string> = {
+  es: 'Spanish', ar: 'Arabic', hi: 'Hindi', pt: 'Portuguese',
+  fr: 'French', id: 'Indonesian', ur: 'Urdu', tr: 'Turkish',
+  de: 'German', sw: 'Swahili', zh: 'Mandarin Chinese', ko: 'Korean',
+  ja: 'Japanese', tl: 'Tagalog', it: 'Italian',
+};
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -229,6 +281,81 @@ export default {
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    // TTS endpoint
+    if (request.method === 'POST' && url.pathname === '/tts') {
+      try {
+        const body = await request.json() as {
+          text: string;
+          beliefSystem: string;
+          character?: string;
+          language?: string;
+        };
+
+        const { text, beliefSystem, character, language = 'en' } = body;
+
+        if (!text || !beliefSystem) {
+          return new Response(
+            JSON.stringify({ error: 'Missing text or beliefSystem' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Select character and voice
+        const selectedChar = TTS_CHARACTERS[character || ''] ||
+          TTS_CHARACTERS[DEFAULT_CHARACTER[beliefSystem] || 'god'] ||
+          TTS_CHARACTERS.god;
+
+        // Build instructions
+        let finalInstructions = selectedChar.instructions + (BELIEF_INSTRUCTIONS[beliefSystem] || '');
+
+        // Add language instruction if not English
+        if (language && language !== 'en') {
+          const langName = TTS_LANGUAGE_NAMES[language] || language;
+          finalInstructions += ` Speak entirely in ${langName}. Maintain the same tone, warmth, and emotion in ${langName}.`;
+        }
+
+        // Call OpenAI TTS API
+        const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini-tts',
+            voice: selectedChar.voice,
+            input: text.substring(0, 4096),
+            instructions: finalInstructions,
+            response_format: 'mp3',
+            speed: 1.0,
+          }),
+        });
+
+        if (!ttsResponse.ok) {
+          const errorText = await ttsResponse.text();
+          console.error('OpenAI TTS error:', errorText);
+          return new Response(
+            JSON.stringify({ error: 'TTS failed' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Return audio stream
+        return new Response(ttsResponse.body, {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'audio/mpeg',
+          },
+        });
+      } catch (error) {
+        console.error('TTS error:', error);
+        return new Response(
+          JSON.stringify({ error: 'TTS internal error' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Health check / test route

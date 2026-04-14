@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { sendMessage, type Message } from '../../services/claudeApi';
-import { speak, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled } from '../../services/ttsService';
+import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
@@ -420,18 +420,28 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     return () => container.removeEventListener('scroll', handleScroll);
   }, [displayMessages.length]);
 
-  // Speak response
+  // Speak response using OpenAI TTS
   const speakResponse = useCallback((text: string) => {
     if (!voiceEnabled) {
       setState('idle');
       return;
     }
     setState('speaking');
-    speak(text, language, () => setState('idle'), () => {});
+
+    // Use OpenAI TTS with belief-specific character
+    speakWithOpenAI(
+      text,
+      belief.id,
+      'god', // Default character
+      language,
+      () => setState('idle')
+    ).catch(() => setState('idle'));
+
+    // Fallback timeout in case TTS hangs
     setTimeout(() => {
       setState((current) => (current === 'speaking' ? 'idle' : current));
-    }, Math.max(2000, text.length * 100));
-  }, [language, voiceEnabled]);
+    }, Math.max(30000, text.length * 150)); // Longer timeout for API-based TTS
+  }, [belief.id, language, voiceEnabled]);
 
   // Greeting on load - TEXT ONLY, no TTS
   useEffect(() => {
@@ -606,6 +616,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           backgroundRepeat: 'no-repeat',
+          filter: 'saturate(0.7) brightness(0.85)',
         }}
         aria-hidden="true"
       />
