@@ -567,19 +567,5 @@ button:disabled {
 
 /* ============================================
    DESKTOP CONVERSATION LAYOUT
+   Note: Most desktop styles handled inline via isMobile check
    ============================================ */
-@media (min-width: 768px) {
-  /* God's messages - centered, larger, more readable */
-  .divine-message {
-    max-width: 65% !important;
-    margin: 0 auto;
-    text-align: center;
-    font-size: clamp(1.3rem, 2.5vw, 1.8rem) !important;
-    line-height: 1.9 !important;
-  }
-
-  /* User messages - centered container, right-aligned text */
-  .user-message-bubble {
-    max-width: 50% !important;
-  }
-}

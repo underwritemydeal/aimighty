@@ -569,6 +569,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   // Show controls (tap anywhere or chevron)
   const showControls = useCallback(() => {
+    // Unlock mobile audio on any tap
+    unlockMobileAudio();
     if (hideControlsTimer.current) {
       clearTimeout(hideControlsTimer.current);
     }
@@ -577,6 +579,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   // Toggle controls visibility
   const toggleControls = useCallback(() => {
+    // Unlock mobile audio on any tap
+    unlockMobileAudio();
     if (controlsHidden) {
       showControls();
     } else {
@@ -790,12 +794,19 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const remainingMessages = getRemainingFreeMessages();
   const actualImagePath = imageError ? fallbackImagePath : imagePath;
 
+  // Handle any tap on the screen to unlock audio
+  const handleScreenTap = useCallback(() => {
+    unlockMobileAudio();
+  }, []);
+
   return (
     <div
       className="relative w-full overflow-hidden"
       style={{ background: '#000', height: '100dvh', minHeight: '-webkit-fill-available' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
+      onClick={handleScreenTap}
+      onTouchStart={handleScreenTap}
     >
       {/* Background image with fallback */}
       <div
