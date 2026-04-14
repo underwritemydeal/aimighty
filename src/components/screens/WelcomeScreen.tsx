@@ -218,13 +218,13 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
         aria-hidden="true"
       />
 
-      {/* Radial gradient overlay for readability */}
+      {/* Gradient overlay - darker at top/bottom for text, clear in middle for divine figure */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
           background: isMobile
-            ? 'radial-gradient(ellipse at center, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.3) 60%, rgba(0,0,0,0.2) 100%)'
-            : 'radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.15) 100%)',
+            ? 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 25%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.2) 75%, rgba(0,0,0,0.7) 100%)'
+            : 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.15) 20%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.15) 80%, rgba(0,0,0,0.6) 100%)',
         }}
         aria-hidden="true"
       />
@@ -251,145 +251,156 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
         </span>
       </button>
 
-      {/* Content container */}
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-6">
-        {/* Decorative line above logo */}
-        <div
-          style={{
-            width: '80px',
-            height: '1px',
-            background: 'rgba(212, 175, 55, 0.3)',
-            marginBottom: '16px',
-            opacity: phase >= 3 ? 1 : 0,
-            transition: 'opacity 0.8s ease-out',
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Logo */}
-        <div
-          style={{
-            opacity: phase >= 3 ? 1 : 0,
-            transform: phase >= 3 ? 'translateY(0)' : 'translateY(20px)',
-            transition: 'all 0.8s ease-out',
-          }}
-        >
-          <h1
-            id="welcome-heading"
-            className="flex items-baseline justify-center select-none"
-            style={{ letterSpacing: '0.08em' }}
-          >
-            {/* AI — Gold with glow */}
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(3rem, 8vw, 5rem)',
-                fontWeight: 700,
-                color: '#d4af37',
-                textShadow: '0 0 30px rgba(212,175,55,0.5), 0 0 60px rgba(212,175,55,0.25), 0 0 100px rgba(212,175,55,0.1)',
-              }}
-            >
-              AI
-            </span>
-            {/* mighty — Warm white */}
-            <span
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(3rem, 8vw, 5rem)',
-                fontWeight: 300,
-                color: 'rgba(255, 248, 240, 0.95)',
-              }}
-            >
-              mighty
-            </span>
-          </h1>
-        </div>
-
-        {/* Tagline */}
-        <p
-          className="mt-4"
-          style={{
-            opacity: phase >= 4 ? 0.7 : 0,
-            transform: phase >= 4 ? 'translateY(0)' : 'translateY(15px)',
-            transition: 'all 0.6s ease-out',
-            fontFamily: 'var(--font-display)',
-            fontSize: '0.9rem',
-            fontWeight: 300,
-            letterSpacing: '0.25em',
-            textTransform: 'uppercase',
-            color: 'rgba(255, 255, 255, 0.7)',
-          }}
-        >
-          {t('welcome.tagline', language)}
-        </p>
-
-        {/* Decorative line below tagline */}
-        <div
-          style={{
-            width: '80px',
-            height: '1px',
-            background: 'rgba(212, 175, 55, 0.3)',
-            marginTop: '16px',
-            opacity: phase >= 4 ? 1 : 0,
-            transition: 'opacity 0.6s ease-out',
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Spacer */}
-        <div className="h-[25vh]" aria-hidden="true" />
-
-        {/* BEGIN button - minimal, just text with underline */}
-        <button
-          onClick={onBegin}
-          onKeyDown={handleKeyDown}
-          aria-label="Begin your spiritual journey"
-          className="group relative"
-          style={{
-            opacity: phase >= 5 ? 1 : 0,
-            transform: phase >= 5 ? 'translateY(0)' : 'translateY(15px)',
-            transition: 'all 0.6s ease-out',
-          }}
-        >
-          {/* Text */}
-          <span
+      {/* Content container - logo at top, BEGIN at bottom, middle clear for divine figure */}
+      <div
+        className="relative z-10 flex flex-col items-center justify-between h-full px-6"
+        style={{
+          paddingTop: 'max(env(safe-area-inset-top, 20px), 20px)',
+          paddingBottom: 'max(env(safe-area-inset-bottom, 20px), 20px)',
+        }}
+      >
+        {/* TOP SECTION: Logo and tagline (top 20%) */}
+        <div className="flex flex-col items-center pt-8">
+          {/* Decorative line above logo */}
+          <div
             style={{
-              display: 'block',
-              fontFamily: 'var(--font-display)',
-              fontSize: '1rem',
-              fontWeight: 400,
-              letterSpacing: '0.3em',
-              textTransform: 'uppercase',
-              color: '#d4af37',
-              transition: 'letter-spacing 0.3s ease',
-            }}
-          >
-            {t('welcome.begin', language)}
-          </span>
-
-          {/* Underline */}
-          <span
-            className="absolute left-1/2 -translate-x-1/2"
-            style={{
-              bottom: '-8px',
-              width: '120px',
+              width: '80px',
               height: '1px',
-              background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.4), transparent)',
-              transition: 'all 0.3s ease',
+              background: 'rgba(212, 175, 55, 0.3)',
+              marginBottom: '16px',
+              opacity: phase >= 3 ? 1 : 0,
+              transition: 'opacity 0.8s ease-out',
             }}
             aria-hidden="true"
           />
 
-          {/* Hover effect via CSS */}
-          <style>{`
-            .group:hover span:first-child {
-              letter-spacing: 0.38em;
-            }
-            .group:hover span:last-child {
-              background: linear-gradient(90deg, transparent, rgba(212,175,55,0.8), transparent);
-            }
-          `}</style>
-        </button>
+          {/* Logo */}
+          <div
+            style={{
+              opacity: phase >= 3 ? 1 : 0,
+              transform: phase >= 3 ? 'translateY(0)' : 'translateY(20px)',
+              transition: 'all 0.8s ease-out',
+            }}
+          >
+            <h1
+              id="welcome-heading"
+              className="flex items-baseline justify-center select-none"
+              style={{ letterSpacing: '0.08em' }}
+            >
+              {/* AI — Gold with glow */}
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
+                  fontWeight: 700,
+                  color: '#d4af37',
+                  textShadow: '0 0 30px rgba(212,175,55,0.5), 0 0 60px rgba(212,175,55,0.25), 0 0 100px rgba(212,175,55,0.1)',
+                }}
+              >
+                AI
+              </span>
+              {/* mighty — Warm white */}
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
+                  fontWeight: 300,
+                  color: 'rgba(255, 248, 240, 0.95)',
+                }}
+              >
+                mighty
+              </span>
+            </h1>
+          </div>
+
+          {/* Tagline */}
+          <p
+            className="mt-3"
+            style={{
+              opacity: phase >= 4 ? 0.7 : 0,
+              transform: phase >= 4 ? 'translateY(0)' : 'translateY(15px)',
+              transition: 'all 0.6s ease-out',
+              fontFamily: 'var(--font-display)',
+              fontSize: '0.8rem',
+              fontWeight: 300,
+              letterSpacing: '0.25em',
+              textTransform: 'uppercase',
+              color: 'rgba(255, 255, 255, 0.7)',
+            }}
+          >
+            {t('welcome.tagline', language)}
+          </p>
+
+          {/* Decorative line below tagline */}
+          <div
+            style={{
+              width: '80px',
+              height: '1px',
+              background: 'rgba(212, 175, 55, 0.3)',
+              marginTop: '12px',
+              opacity: phase >= 4 ? 1 : 0,
+              transition: 'opacity 0.6s ease-out',
+            }}
+            aria-hidden="true"
+          />
+        </div>
+
+        {/* MIDDLE SECTION: Sacred space - divine figure visible (60%) */}
+        <div className="flex-1" aria-hidden="true" />
+
+        {/* BOTTOM SECTION: BEGIN button (bottom 20%) */}
+        <div className="pb-12">
+          <button
+            onClick={onBegin}
+            onKeyDown={handleKeyDown}
+            aria-label="Begin your spiritual journey"
+            className="group relative"
+            style={{
+              opacity: phase >= 5 ? 1 : 0,
+              transform: phase >= 5 ? 'translateY(0)' : 'translateY(15px)',
+              transition: 'all 0.6s ease-out',
+            }}
+          >
+            {/* Text */}
+            <span
+              style={{
+                display: 'block',
+                fontFamily: 'var(--font-display)',
+                fontSize: '1rem',
+                fontWeight: 400,
+                letterSpacing: '0.3em',
+                textTransform: 'uppercase',
+                color: '#d4af37',
+                transition: 'letter-spacing 0.3s ease',
+              }}
+            >
+              {t('welcome.begin', language)}
+            </span>
+
+            {/* Underline */}
+            <span
+              className="absolute left-1/2 -translate-x-1/2"
+              style={{
+                bottom: '-8px',
+                width: '120px',
+                height: '1px',
+                background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.4), transparent)',
+                transition: 'all 0.3s ease',
+              }}
+              aria-hidden="true"
+            />
+
+            {/* Hover effect via CSS */}
+            <style>{`
+              .group:hover span:first-child {
+                letter-spacing: 0.38em;
+              }
+              .group:hover span:last-child {
+                background: linear-gradient(90deg, transparent, rgba(212,175,55,0.8), transparent);
+              }
+            `}</style>
+          </button>
+        </div>
       </div>
 
       {/* Language modal */}
