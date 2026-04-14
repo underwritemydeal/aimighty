@@ -8,6 +8,17 @@ import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } 
 import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem, User } from '../../types';
 
+/**
+ * CONVERSATION STATE MACHINE
+ * Clear, predictable state transitions with no overlap
+ */
+type ConversationState =
+  | 'idle'        // Waiting for user input, input enabled
+  | 'listening'   // Mic is active, recording user speech
+  | 'sending'     // User message sent, waiting for Claude (shows "..." dots)
+  | 'streaming'   // Claude response streaming in, text appearing
+  | 'speaking';   // TTS playing the complete response
+
 // Voice toggle button component
 const VoiceToggle = memo(function VoiceToggle({
   enabled,
@@ -24,9 +35,7 @@ const VoiceToggle = memo(function VoiceToggle({
       aria-label={enabled ? 'Mute voice' : 'Enable voice'}
       aria-pressed={enabled}
       className="p-2 rounded-lg transition-all duration-200 hover:bg-white/10"
-      style={{
-        color: enabled ? themeColor : 'var(--color-text-muted)',
-      }}
+      style={{ color: enabled ? themeColor : 'var(--color-text-muted)' }}
     >
       {enabled ? (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -52,8 +61,27 @@ interface ConversationScreenProps {
   language: LanguageCode;
 }
 
-// Floating text for streaming responses — simple fade-in approach, no disappearing
-const FloatingText = memo(function FloatingText({
+// Thinking dots animation
+const ThinkingDots = memo(function ThinkingDots({ color }: { color: string }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5" aria-label="Thinking">
+      {[0, 1, 2].map(i => (
+        <div
+          key={i}
+          className="w-2 h-2 rounded-full"
+          style={{
+            backgroundColor: color,
+            opacity: 0.6,
+            animation: `pulse 1.4s ease-in-out ${i * 0.2}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+
+// Divine text display with golden glow - smooth fade-in for new content
+const DivineText = memo(function DivineText({
   text,
   color,
   isVisible,
@@ -62,32 +90,11 @@ const FloatingText = memo(function FloatingText({
   color: string;
   isVisible: boolean;
 }) {
-  const [displayedText, setDisplayedText] = useState('');
-  const prevTextRef = useRef('');
-
-  useEffect(() => {
-    if (!isVisible) {
-      setDisplayedText('');
-      prevTextRef.current = '';
-      return;
-    }
-
-    // Only update if new text is longer (streaming in) or completely different (new response)
-    if (text.length > prevTextRef.current.length && text.startsWith(prevTextRef.current)) {
-      // Streaming: text is growing, just append
-      setDisplayedText(text);
-    } else if (text !== prevTextRef.current) {
-      // New response or reset
-      setDisplayedText(text);
-    }
-    prevTextRef.current = text;
-  }, [text, isVisible]);
-
-  if (!displayedText) return null;
+  if (!text || !isVisible) return null;
 
   return (
     <p
-      className="text-center gpu-accelerated-opacity"
+      className="text-center transition-opacity duration-300"
       style={{
         fontFamily: 'var(--font-display)',
         fontSize: 'clamp(1rem, 4vw, 1.25rem)',
@@ -98,61 +105,46 @@ const FloatingText = memo(function FloatingText({
         maxWidth: '640px',
         margin: '0 auto',
         color: color,
-        // Golden glow for God's words - divine luminous effect
         textShadow: `0 0 20px ${color}35, 0 0 40px ${color}20, 0 0 60px ${color}10`,
-        opacity: isVisible ? 1 : 0,
-        transition: 'opacity 300ms var(--ease-out-expo)',
+        opacity: 1,
       }}
       aria-live="polite"
     >
-      {displayedText}
+      {text}
     </p>
   );
 });
 
-// Pulsing mic button with ring animations — hero interaction (64px on mobile)
-// Manual stop mode: tap to start, tap again to stop
+// Mic button with state-aware visuals
 const MicButton = memo(function MicButton({
-  isListening,
-  isSpeaking,
-  isProcessing,
-  isDisabled,
+  state,
   themeColor,
   onToggle,
-  listeningLabel,
-  processingLabel,
+  isDisabled,
   errorMessage,
 }: {
-  isListening: boolean;
-  isSpeaking: boolean;
-  isProcessing: boolean;
-  isDisabled: boolean;
+  state: ConversationState;
   themeColor: string;
   onToggle: () => void;
-  listeningLabel: string;
-  processingLabel: string;
+  isDisabled: boolean;
   errorMessage: string | null;
 }) {
-  const disabled = isSpeaking || isDisabled || isProcessing;
-
-  // Determine what status to show
-  const showStatus = isListening || isProcessing || errorMessage;
-  const statusText = errorMessage || (isProcessing ? processingLabel : isListening ? listeningLabel : '');
-  const statusColor = errorMessage ? '#ef4444' : isListening ? '#ef4444' : themeColor;
+  const isListening = state === 'listening';
+  const isBusy = state !== 'idle' && state !== 'listening';
+  const disabled = isBusy || isDisabled;
 
   return (
     <button
       onClick={() => !disabled && onToggle()}
       disabled={disabled}
-      aria-label={isListening ? 'Stop listening and use transcript' : 'Start voice input'}
-      aria-pressed={isListening}
-      className="relative gpu-accelerated press-scale"
+      aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+      className="relative"
       style={{
-        opacity: disabled && !isProcessing ? 0.35 : 1,
-        transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
+        opacity: disabled ? 0.35 : 1,
+        transition: 'opacity 0.3s ease',
       }}
     >
-      {/* Outer glow ring - RED when listening */}
+      {/* Outer glow */}
       <div
         className="absolute rounded-full"
         style={{
@@ -160,12 +152,10 @@ const MicButton = memo(function MicButton({
           background: isListening
             ? 'radial-gradient(circle, rgba(239, 68, 68, 0.3) 0%, transparent 70%)'
             : `radial-gradient(circle, ${themeColor}10 0%, transparent 70%)`,
-          transition: 'all var(--duration-slower) var(--ease-out-expo)',
         }}
-        aria-hidden="true"
       />
 
-      {/* Pulsing red ring when listening */}
+      {/* Pulsing ring when listening */}
       {isListening && (
         <div
           className="absolute rounded-full"
@@ -174,50 +164,27 @@ const MicButton = memo(function MicButton({
             border: '2px solid #ef4444',
             animation: 'pulse 1s ease-in-out infinite',
           }}
-          aria-hidden="true"
         />
       )}
 
-      {/* Processing pulse animation */}
-      {isProcessing && (
-        <div
-          className="absolute rounded-full"
-          style={{
-            inset: '-4px',
-            border: `2px solid ${themeColor}`,
-            animation: 'pulse 1.5s ease-in-out infinite',
-          }}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Button circle — 64px explicit */}
+      {/* Button circle */}
       <div
         className="relative flex items-center justify-center"
         style={{
           width: '64px',
           height: '64px',
           borderRadius: '50%',
-          background: isListening ? '#ef4444' : isProcessing ? `${themeColor}20` : 'var(--color-surface-elevated)',
-          border: `1.5px solid ${isListening ? '#ef4444' : isProcessing ? themeColor : 'var(--color-border-medium)'}`,
+          background: isListening ? '#ef4444' : 'var(--color-surface-elevated)',
+          border: `1.5px solid ${isListening ? '#ef4444' : 'var(--color-border-medium)'}`,
           boxShadow: isListening
-            ? '0 0 50px rgba(239, 68, 68, 0.5), 0 0 100px rgba(239, 68, 68, 0.25)'
-            : isProcessing
-            ? `0 0 30px ${themeColor}30`
+            ? '0 0 50px rgba(239, 68, 68, 0.5)'
             : '0 4px 20px rgba(0,0,0,0.3)',
           transform: isListening ? 'scale(1.05)' : 'scale(1)',
-          transition: 'all var(--duration-normal) var(--ease-out-expo)',
+          transition: 'all 0.3s ease',
         }}
       >
-        {/* Show stop icon when listening, mic icon otherwise */}
         {isListening ? (
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="white"
-            aria-hidden="true"
-          >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
             <rect x="6" y="6" width="12" height="12" rx="2" />
           </svg>
         ) : (
@@ -230,8 +197,6 @@ const MicButton = memo(function MicButton({
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            aria-hidden="true"
-            style={{ transition: 'stroke var(--duration-normal)' }}
           >
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -239,49 +204,29 @@ const MicButton = memo(function MicButton({
             <line x1="8" y1="23" x2="16" y2="23" />
           </svg>
         )}
-
-        {/* Pulsing red dot indicator when listening */}
-        {isListening && (
-          <div
-            className="absolute"
-            style={{
-              top: '4px',
-              right: '4px',
-              width: '12px',
-              height: '12px',
-              borderRadius: '50%',
-              background: 'white',
-              animation: 'pulse 1s ease-in-out infinite',
-            }}
-            aria-hidden="true"
-          />
-        )}
       </div>
 
-      {/* Status label - shows for listening, processing, or errors */}
+      {/* Status label */}
       <span
-        className="absolute left-1/2 whitespace-nowrap text-caps"
+        className="absolute left-1/2 whitespace-nowrap"
         style={{
           bottom: '-28px',
-          transform: `translateX(-50%)`,
-          opacity: showStatus ? 1 : 0,
-          color: statusColor,
+          transform: 'translateX(-50%)',
+          opacity: isListening || errorMessage ? 1 : 0,
+          color: isListening ? '#ef4444' : '#ef4444',
           fontSize: '0.65rem',
           letterSpacing: '0.15em',
-          transition: 'opacity var(--duration-normal) var(--ease-out-expo)',
-          maxWidth: '200px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          textTransform: 'uppercase',
+          transition: 'opacity 0.3s ease',
         }}
-        aria-hidden="true"
       >
-        {isListening ? 'TAP TO STOP' : statusText}
+        {errorMessage || (isListening ? 'TAP TO STOP' : '')}
       </span>
     </button>
   );
 });
 
-// Free message counter (compact for mobile)
+// Message counter
 const MessageCounter = memo(function MessageCounter({
   remaining,
   themeColor,
@@ -315,60 +260,38 @@ const MessageCounter = memo(function MessageCounter({
 });
 
 export function ConversationScreen({ belief, user, onBack, onPaywall, language }: ConversationScreenProps) {
+  // State machine - single source of truth
+  const [state, setState] = useState<ConversationState>('idle');
+
+  // UI state
   const [isVisible, setIsVisible] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [currentCaption, setCurrentCaption] = useState('');
-  const [captionVisible, setCaptionVisible] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [interimTranscript, setInterimTranscript] = useState('');
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(isVoiceEnabled());
+
   const inputRef = useRef<HTMLInputElement>(null);
   const hasGreeted = useRef(false);
-  const safetyTimeoutRef = useRef<number | null>(null);
+  const fullResponseRef = useRef(''); // Store complete response for TTS
 
-  // Log input disabled state changes
-  const isInputDisabled = isSpeaking || isProcessing;
+  // Logging state changes for debugging
   useEffect(() => {
-    console.log('[ConversationScreen] Input disabled:', isInputDisabled, '(isSpeaking:', isSpeaking, 'isProcessing:', isProcessing, ')');
-  }, [isInputDisabled, isSpeaking, isProcessing]);
+    console.log('[Conversation] State changed to:', state);
+  }, [state]);
 
-  // Safety timeout: force re-enable input if stuck for more than 15 seconds
-  useEffect(() => {
-    if (isInputDisabled) {
-      console.log('[ConversationScreen] Starting safety timeout (15s)');
-      safetyTimeoutRef.current = window.setTimeout(() => {
-        console.log('[ConversationScreen] SAFETY TIMEOUT: Forcing input re-enable');
-        setIsSpeaking(false);
-        setIsProcessing(false);
-      }, 15000);
-    } else {
-      if (safetyTimeoutRef.current) {
-        console.log('[ConversationScreen] Clearing safety timeout');
-        clearTimeout(safetyTimeoutRef.current);
-        safetyTimeoutRef.current = null;
-      }
-    }
-    return () => {
-      if (safetyTimeoutRef.current) {
-        clearTimeout(safetyTimeoutRef.current);
-      }
-    };
-  }, [isInputDisabled]);
+  // Input is only enabled in idle state
+  const isInputEnabled = state === 'idle';
 
   // Handle voice toggle
   const handleVoiceToggle = useCallback(() => {
     const newEnabled = !voiceEnabled;
     setVoiceEnabledState(newEnabled);
     setVoiceEnabled(newEnabled);
-    console.log('[ConversationScreen] Voice toggled:', newEnabled);
   }, [voiceEnabled]);
 
-  // Initialize audio context on first interaction
+  // Initialize audio on first interaction
   useEffect(() => {
     const handleInteraction = () => {
       initAudio();
@@ -383,73 +306,96 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     };
   }, []);
 
+  // Fade in on mount
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 150);
     return () => clearTimeout(timer);
   }, []);
 
-  // Speak the response with TTS
+  /**
+   * SPEAK THE RESPONSE
+   * Called AFTER streaming is complete
+   * Transitions: speaking -> idle
+   */
   const speakResponse = useCallback((text: string) => {
-    console.log('[ConversationScreen] speakResponse called, text length:', text.length);
-    setIsSpeaking(true);
+    console.log('[Conversation] Starting TTS, text length:', text.length);
+    setState('speaking');
+
     speak(
       text,
       language,
       () => {
-        console.log('[ConversationScreen] TTS onEnd callback fired');
-        setIsSpeaking(false);
+        console.log('[Conversation] TTS complete, returning to idle');
         setAudioLevel(0);
+        setState('idle');
       },
       (level) => setAudioLevel(level)
     );
+
+    // Fallback: if TTS fails silently, return to idle after 2 seconds minimum
+    setTimeout(() => {
+      setState(current => {
+        if (current === 'speaking') {
+          console.log('[Conversation] TTS fallback timeout, returning to idle');
+          return 'idle';
+        }
+        return current;
+      });
+    }, Math.max(2000, text.length * 100)); // At least 2s, or text length * 100ms
   }, [language]);
 
-  // Delayed greeting with natural timing (doesn't count toward message limit)
+  /**
+   * GREETING ON LOAD
+   * Shows text FIRST, waits 500ms, THEN speaks
+   */
   useEffect(() => {
     if (hasGreeted.current) return;
     hasGreeted.current = true;
 
-    console.log('[ConversationScreen] Setting up greeting timer');
+    console.log('[Conversation] Setting up greeting');
+
     const greetingTimer = setTimeout(() => {
       const greeting = getGreeting(belief.id);
-      console.log('[ConversationScreen] Displaying greeting:', greeting.substring(0, 50) + '...');
-      setCurrentCaption(greeting);
-      setCaptionVisible(true);
 
-      // Initialize audio before speaking (in case user hasn't interacted yet)
-      initAudio();
-      speakResponse(greeting);
-    }, 2400);
+      // Step 1: Show text immediately
+      console.log('[Conversation] Displaying greeting text');
+      setCurrentCaption(greeting);
+
+      // Step 2: Wait 500ms for text to be visible, then speak
+      setTimeout(() => {
+        console.log('[Conversation] Starting greeting TTS');
+        initAudio();
+        speakResponse(greeting);
+      }, 500);
+    }, 2000); // Initial delay before greeting
 
     return () => clearTimeout(greetingTimer);
   }, [belief.id, speakResponse]);
 
-  // Send message to Claude API
+  /**
+   * SEND MESSAGE TO CLAUDE
+   * Flow: sending -> streaming -> speaking -> idle
+   */
   const sendToAI = useCallback(async (userMessage: string) => {
-    console.log('[ConversationScreen] sendToAI called with:', userMessage.substring(0, 50));
+    console.log('[Conversation] sendToAI:', userMessage.substring(0, 50));
 
-    // Check free message limit before sending
+    // Check free message limit
     if (hasReachedFreeLimit() && !user.isPremium) {
       onPaywall();
       return;
     }
 
-    // Initialize audio on user interaction
     initAudio();
 
-    setIsProcessing(true);
-    setCaptionVisible(false);
+    // Transition to sending state (shows "..." dots)
+    setState('sending');
     setCurrentCaption('');
+    fullResponseRef.current = '';
 
     // Add user message to history
     const newMessages: Message[] = [...messages, { role: 'user', content: userMessage }];
     setMessages(newMessages);
-
-    // Increment message count
     incrementMessageCount();
-
-    let fullResponse = '';
-    let hasSentFirstSentence = false;
 
     await sendMessage(
       newMessages,
@@ -457,62 +403,56 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
       user.id,
       {
         onToken: (token) => {
-          fullResponse += token;
-          setCurrentCaption(fullResponse);
-          if (!captionVisible) setCaptionVisible(true);
-        },
-        onSentence: (sentence) => {
-          console.log('[ConversationScreen] onSentence:', sentence.substring(0, 30) + '...');
-          // Start TTS for first sentence only (to avoid overlapping speech)
-          if (!hasSentFirstSentence) {
-            hasSentFirstSentence = true;
-            speakResponse(sentence);
+          // First token arrives: transition to streaming
+          if (state === 'sending' || fullResponseRef.current === '') {
+            setState('streaming');
           }
+
+          // Append token to response
+          fullResponseRef.current += token;
+          setCurrentCaption(fullResponseRef.current);
+        },
+        onSentence: () => {
+          // We no longer use this for TTS - we wait for complete response
         },
         onComplete: (text) => {
-          console.log('[ConversationScreen] onComplete, response length:', text.length);
-          setIsProcessing(false);
-          // Add assistant message to history
+          console.log('[Conversation] Streaming complete, length:', text.length);
+
+          // Store full response
+          fullResponseRef.current = text;
+          setCurrentCaption(text);
+
+          // Add to message history
           setMessages([...newMessages, { role: 'assistant', content: text }]);
 
-          // If we haven't started speaking yet, speak the full response
-          if (!hasSentFirstSentence) {
-            console.log('[ConversationScreen] No sentence spoken yet, speaking full response');
-            speakResponse(text);
-          }
+          // NOW start TTS with the complete response
+          speakResponse(text);
 
-          // Check if user hit the limit after this message
+          // Check paywall after speaking
           if (hasReachedFreeLimit() && !user.isPremium) {
-            // Show paywall after response finishes speaking
-            setTimeout(() => {
-              if (!isSpeaking) {
-                onPaywall();
-              }
-            }, 3000);
+            setTimeout(onPaywall, 3000);
           }
         },
         onError: (error) => {
-          console.error('[ConversationScreen] AI error:', error);
-          setIsProcessing(false);
-          setIsSpeaking(false); // Make sure to reset speaking state on error
+          console.error('[Conversation] Error:', error);
           const errorMessage = "I am still here. Please try speaking to me again.";
           setCurrentCaption(errorMessage);
-          setCaptionVisible(true);
           speakResponse(errorMessage);
         },
       },
       language
     );
-  }, [messages, belief.id, user.id, user.isPremium, captionVisible, isSpeaking, speakResponse, onPaywall, language]);
+  }, [messages, belief.id, user.id, user.isPremium, state, speakResponse, onPaywall, language]);
 
+  // Handle send button
   const handleSend = useCallback(() => {
-    if (!inputText.trim() || isSpeaking || isProcessing) return;
-
+    if (!inputText.trim() || !isInputEnabled) return;
     const message = inputText.trim();
     setInputText('');
     sendToAI(message);
-  }, [inputText, isSpeaking, isProcessing, sendToAI]);
+  }, [inputText, isInputEnabled, sendToAI]);
 
+  // Handle enter key
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -520,71 +460,50 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     }
   };
 
-  // Voice input handling
+  /**
+   * MIC TOGGLE
+   * idle -> listening (start recording)
+   * listening -> idle (stop recording, populate input)
+   */
   const handleMicToggle = useCallback(() => {
-    // Clear any previous error
     setSpeechError(null);
 
-    if (isListening) {
+    if (state === 'listening') {
+      // Stop listening
       stopListening();
-      setIsListening(false);
-      // Send the final transcript
-      if (interimTranscript.trim()) {
-        setInputText(interimTranscript);
-        setInterimTranscript('');
-      }
-    } else {
+      setState('idle');
+    } else if (state === 'idle') {
+      // Start listening
       if (!isSpeechSupported()) {
         setSpeechError('Speech not supported');
         setTimeout(() => setSpeechError(null), 3000);
         return;
       }
 
-      // Unlock audio on mic tap (user gesture required for iOS)
       initAudio();
 
-      console.log('[ConversationScreen] Starting speech recognition...');
       startListening({
         language,
         onStart: () => {
-          console.log('[ConversationScreen] Speech recognition started');
-          setIsListening(true);
-          setSpeechError(null);
-          setInputText(''); // Clear input when starting
+          setState('listening');
+          setInputText('');
         },
-        onResult: (transcript, _isFinal) => {
-          console.log('[ConversationScreen] Speech result:', transcript);
-          // Always update the input text with accumulated transcript
-          // User must tap send manually - NO auto-send
+        onResult: (transcript) => {
           setInputText(transcript);
-          setInterimTranscript(transcript);
         },
         onEnd: () => {
-          console.log('[ConversationScreen] Speech recognition ended');
-          setIsListening(false);
-          // Keep the transcript in the input field for review
-          if (interimTranscript.trim()) {
-            setInputText(interimTranscript);
-          }
-          setInterimTranscript('');
+          setState('idle');
         },
         onError: (error) => {
-          console.error('[ConversationScreen] Speech error:', error);
-          setIsListening(false);
-          // Keep any captured text
-          if (interimTranscript.trim()) {
-            setInputText(interimTranscript);
-          }
-          setInterimTranscript('');
-          // Show error briefly
+          setState('idle');
           setSpeechError(error);
           setTimeout(() => setSpeechError(null), 3000);
         },
       });
     }
-  }, [isListening, interimTranscript, language]);
+  }, [state, language]);
 
-  // Clean up on unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopSpeaking();
@@ -599,19 +518,15 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
       className="relative w-full overflow-hidden"
       style={{
         background: 'var(--color-void)',
-        height: '100dvh', // Use dynamic viewport height for mobile
+        height: '100dvh',
         minHeight: '-webkit-fill-available',
       }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
     >
-      {/* Nebula background */}
       <NebulaBackground />
+      <div className="vignette vignette-strong" />
 
-      {/* Strong vignette for cinematic focus */}
-      <div className="vignette vignette-strong" aria-hidden="true" />
-
-      {/* UI Layer — explicit vertical layout for mobile */}
       <div
         className="relative z-10 flex flex-col"
         style={{
@@ -620,20 +535,20 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           paddingBottom: 'calc(80px + env(safe-area-inset-bottom, 20px))',
         }}
       >
-        {/* Back button row */}
+        {/* Header */}
         <header
-          className="flex items-center justify-between shrink-0 gpu-accelerated"
+          className="flex items-center justify-between shrink-0"
           style={{
             padding: '16px 24px',
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
-            transition: `all var(--duration-slower) var(--ease-out-expo)`,
+            transition: 'all 0.6s ease',
           }}
         >
           <button
             onClick={onBack}
-            aria-label="Go back to belief selection"
-            className="group flex items-center gap-2 py-2 px-3 -ml-3 rounded-lg btn-ghost"
+            aria-label="Go back"
+            className="group flex items-center gap-2 py-2 px-3 -ml-3 rounded-lg hover:bg-white/5"
           >
             <svg
               width="16"
@@ -642,38 +557,29 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
               fill="none"
               stroke="currentColor"
               strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="transition-transform group-hover:-translate-x-1"
               style={{ color: 'var(--color-text-muted)' }}
-              aria-hidden="true"
             >
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             <span
-              className="text-display hidden sm:inline"
-              style={{
-                fontSize: 'var(--text-sm)',
-                color: 'var(--color-text-muted)',
-              }}
+              className="hidden sm:inline"
+              style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}
             >
               {t('conversation.back', language)}
             </span>
           </button>
 
-          {/* Belief name indicator */}
           <span
-            className="text-caps"
             style={{
               fontSize: '0.6rem',
               letterSpacing: '0.15em',
               color: 'var(--color-text-subtle)',
+              textTransform: 'uppercase',
             }}
           >
             {belief.name}
           </span>
 
-          {/* Voice toggle */}
           <VoiceToggle
             enabled={voiceEnabled}
             onToggle={handleVoiceToggle}
@@ -681,21 +587,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           />
         </header>
 
-        {/* 20px gap after back button */}
-        <div style={{ height: '20px' }} aria-hidden="true" />
+        <div style={{ height: '20px' }} />
 
-        {/* Particle face — 35-40% viewport height */}
+        {/* Avatar */}
         <div
-          className="shrink-0 gpu-accelerated-opacity"
+          className="shrink-0"
           style={{
             height: '35vh',
             minHeight: '200px',
             maxHeight: '280px',
             opacity: isVisible ? 1 : 0,
-            transition: `opacity var(--duration-cinematic) var(--ease-out-expo)`,
-            transitionDelay: '200ms',
+            transition: 'opacity 0.8s ease 0.2s',
           }}
-          aria-hidden="true"
         >
           <LazyAvatarScene
             themeColor={belief.themeColor}
@@ -704,28 +607,33 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           />
         </div>
 
-        {/* 24px gap after particle face */}
-        <div style={{ height: '24px' }} aria-hidden="true" />
+        <div style={{ height: '24px' }} />
 
-        {/* Caption area — God's response text (takes remaining space) */}
+        {/* Caption area */}
         <div
-          className="flex-1 flex items-start justify-center overflow-y-auto gpu-accelerated-opacity"
+          className="flex-1 flex items-start justify-center overflow-y-auto"
           style={{
             minHeight: '80px',
             opacity: isVisible ? 1 : 0,
-            transition: `opacity var(--duration-slower) var(--ease-out-expo)`,
-            transitionDelay: '400ms',
+            transition: 'opacity 0.6s ease 0.4s',
           }}
         >
-          <FloatingText
-            text={currentCaption}
-            color={belief.themeColor}
-            isVisible={captionVisible}
-          />
+          {/* Show thinking dots when sending */}
+          {state === 'sending' && (
+            <ThinkingDots color={belief.themeColor} />
+          )}
+
+          {/* Show divine text when streaming or speaking */}
+          {(state === 'streaming' || state === 'speaking' || state === 'idle') && currentCaption && (
+            <DivineText
+              text={currentCaption}
+              color={belief.themeColor}
+              isVisible={true}
+            />
+          )}
         </div>
 
-        {/* 16px gap before message counter */}
-        <div style={{ height: '16px' }} aria-hidden="true" />
+        <div style={{ height: '16px' }} />
 
         {/* Message counter */}
         <div className="shrink-0">
@@ -739,33 +647,31 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           )}
         </div>
 
-        {/* 12px gap before text input */}
-        <div style={{ height: '12px' }} aria-hidden="true" />
+        <div style={{ height: '12px' }} />
 
-        {/* Text input row — 48px height */}
+        {/* Input row */}
         <div
-          className="shrink-0 gpu-accelerated"
+          className="shrink-0"
           style={{
             padding: '0 24px',
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-            transition: `all var(--duration-slower) var(--ease-out-expo)`,
-            transitionDelay: '500ms',
+            transition: 'all 0.6s ease 0.5s',
           }}
         >
           <div className="flex items-center gap-3 max-w-md mx-auto">
-            <label htmlFor="message-input" className="sr-only">
-              Type your message
-            </label>
             <input
               ref={inputRef}
-              id="message-input"
               type="text"
-              value={isListening ? interimTranscript || inputText : inputText}
+              value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isListening ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
-              disabled={isSpeaking || isProcessing}
+              placeholder={
+                state === 'listening'
+                  ? `${t('conversation.listening', language)}...`
+                  : t('conversation.speakYourTruth', language)
+              }
+              disabled={!isInputEnabled}
               maxLength={500}
               style={{
                 flex: 1,
@@ -773,21 +679,19 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
                 padding: '0 16px',
                 fontSize: '15px',
                 fontFamily: 'var(--font-display)',
-                fontWeight: 'var(--font-light)',
                 color: 'var(--color-text-primary)',
                 background: 'rgba(255, 255, 255, 0.04)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '12px',
                 outline: 'none',
-                opacity: isSpeaking || isProcessing ? 0.35 : 1,
-                transition: 'all var(--duration-normal) var(--ease-out-expo)',
+                opacity: isInputEnabled ? 1 : 0.35,
+                transition: 'all 0.3s ease',
               }}
             />
 
-            {/* Send button — 48px */}
             <button
               onClick={handleSend}
-              disabled={!inputText.trim() || isSpeaking || isProcessing}
+              disabled={!inputText.trim() || !isInputEnabled}
               aria-label="Send message"
               style={{
                 width: '48px',
@@ -798,9 +702,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
                 borderRadius: '12px',
                 background: inputText.trim() ? `${belief.themeColor}18` : 'rgba(255, 255, 255, 0.04)',
                 border: `1px solid ${inputText.trim() ? `${belief.themeColor}55` : 'rgba(255, 255, 255, 0.1)'}`,
-                opacity: inputText.trim() && !isSpeaking && !isProcessing ? 1 : 0.35,
-                cursor: inputText.trim() && !isSpeaking && !isProcessing ? 'pointer' : 'default',
-                transition: 'all var(--duration-normal) var(--ease-out-expo)',
+                opacity: inputText.trim() && isInputEnabled ? 1 : 0.35,
+                cursor: inputText.trim() && isInputEnabled ? 'pointer' : 'default',
+                transition: 'all 0.3s ease',
               }}
             >
               <svg
@@ -810,9 +714,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
                 fill="none"
                 stroke={inputText.trim() ? belief.themeColor : 'var(--color-text-muted)'}
                 strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
               >
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
@@ -820,28 +721,22 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
           </div>
         </div>
 
-        {/* 12px gap before mic button */}
-        <div style={{ height: '12px' }} aria-hidden="true" />
+        <div style={{ height: '12px' }} />
 
-        {/* Mic button — 64px, centered */}
+        {/* Mic button */}
         <div
-          className="shrink-0 flex justify-center gpu-accelerated"
+          className="shrink-0 flex justify-center"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-            transition: `all var(--duration-slower) var(--ease-out-expo)`,
-            transitionDelay: '600ms',
+            transition: 'all 0.6s ease 0.6s',
           }}
         >
           <MicButton
-            isListening={isListening}
-            isSpeaking={isSpeaking}
-            isProcessing={isProcessing}
-            isDisabled={hasReachedFreeLimit() && !user.isPremium}
+            state={state}
             themeColor={belief.themeColor}
             onToggle={handleMicToggle}
-            listeningLabel={t('conversation.listening', language)}
-            processingLabel="Processing..."
+            isDisabled={hasReachedFreeLimit() && !user.isPremium}
             errorMessage={speechError}
           />
         </div>
@@ -850,7 +745,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
   );
 }
 
-// Greeting messages per belief system (all 14)
+// Greeting messages per belief system
 function getGreeting(beliefId: string): string {
   const greetings: Record<string, string> = {
     protestant: "I am here. Speak freely, and I will listen with all the patience of eternity.",

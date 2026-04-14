@@ -2,6 +2,11 @@
  * Text-to-Speech Service
  * Uses browser SpeechSynthesis API with divine voice settings
  * Handles iOS audio context requirements
+ *
+ * TODO: Replace with Azure Neural TTS or ElevenLabs for production.
+ * Browser SpeechSynthesis is MVP placeholder only.
+ * Azure: "en-US-GuyNeural" - warm, authoritative, ~$0.01/conversation, includes viseme data
+ * ElevenLabs: Custom cloned voice, ~$0.03-0.05/conversation, most human-sounding
  */
 
 let audioContext: AudioContext | null = null;
@@ -18,12 +23,24 @@ function log(...args: unknown[]) {
   console.log('[TTS]', ...args);
 }
 
-// Voice settings for divine presence
+// Voice settings for divine presence - warm, deep, authoritative
 const VOICE_SETTINGS = {
-  rate: 0.88,     // Slower for gravitas
-  pitch: 0.92,    // Slightly lower pitch
+  rate: 0.82,     // Slower = more gravitas
+  pitch: 0.85,    // Lower = deeper, more authoritative
   volume: 1.0,
 };
+
+// Preferred voices in order of quality (most natural sounding first)
+const PREFERRED_VOICES = [
+  'Google UK English Male',   // Chrome desktop - best free option
+  'Daniel',                   // Safari/iOS - very natural British male
+  'Aaron',                    // macOS - good quality
+  'Google US English',        // Chrome fallback
+  'Microsoft David',          // Windows Edge
+  'Microsoft Mark',           // Windows
+  'Alex',                     // macOS fallback
+  'Samantha',                 // Last resort - female but high quality
+];
 
 /**
  * Run TTS diagnostics on module load
@@ -41,24 +58,24 @@ function runTTSDiagnostics() {
 
     if (voices.length === 0) {
       log('No voices yet, waiting for voiceschanged event...');
-      // Set up voiceschanged listener
       const handleVoicesChanged = () => {
         const loadedVoices = speechSynthesis.getVoices();
         log('voiceschanged fired, voices count:', loadedVoices.length);
         if (loadedVoices.length > 0) {
-          log('Sample voices:', loadedVoices.slice(0, 3).map(v => `${v.name} (${v.lang})`));
+          logSelectedVoice(loadedVoices);
           voicesLoaded = true;
         }
       };
       speechSynthesis.addEventListener('voiceschanged', handleVoicesChanged);
 
-      // Also try polling as backup
+      // Polling backup
       let pollCount = 0;
       const pollForVoices = () => {
         pollCount++;
         const polledVoices = speechSynthesis.getVoices();
         if (polledVoices.length > 0) {
           log('Voices loaded via polling (attempt', pollCount, '):', polledVoices.length);
+          logSelectedVoice(polledVoices);
           voicesLoaded = true;
         } else if (pollCount < 10) {
           setTimeout(pollForVoices, 200);
@@ -66,22 +83,28 @@ function runTTSDiagnostics() {
       };
       setTimeout(pollForVoices, 100);
     } else {
-      log('Voices already loaded:', voices.slice(0, 3).map(v => `${v.name} (${v.lang})`));
+      logSelectedVoice(voices);
       voicesLoaded = true;
     }
   }
 }
 
+function logSelectedVoice(voices: SpeechSynthesisVoice[]) {
+  const bestVoice = selectBestVoice(voices, 'en');
+  if (bestVoice) {
+    log('Selected voice:', bestVoice.name, '(', bestVoice.lang, ')');
+  }
+  log('Available voices sample:', voices.slice(0, 5).map(v => v.name).join(', '));
+}
+
 // Run diagnostics when module loads
 if (typeof window !== 'undefined') {
-  // Use setTimeout to ensure DOM is ready
   setTimeout(runTTSDiagnostics, 100);
 }
 
 /**
  * Initialize audio context (must be called on user interaction)
  * This is critical for iOS which requires user gesture to start audio
- * Call this on EVERY user tap (send button, mic button) to ensure unlock
  */
 export function initAudio(): void {
   log('initAudio() called, isAudioUnlocked:', isAudioUnlocked);
@@ -100,7 +123,7 @@ export function initAudio(): void {
     }
   }
 
-  // Resume audio context if suspended (iOS requirement)
+  // Resume audio context if suspended
   if (audioContext && audioContext.state === 'suspended') {
     audioContext.resume().then(() => {
       log('Audio context resumed successfully');
@@ -112,21 +135,16 @@ export function initAudio(): void {
     isAudioUnlocked = true;
   }
 
-  // ALWAYS try to unlock SpeechSynthesis on user gesture (iOS/Safari requirement)
-  // This must happen in direct response to user interaction
+  // Unlock SpeechSynthesis on user gesture (iOS/Safari requirement)
   if ('speechSynthesis' in window) {
     try {
-      // Cancel any pending speech first
       speechSynthesis.cancel();
-
-      // Speak silent utterance to unlock
       const unlockUtterance = new SpeechSynthesisUtterance(' ');
-      unlockUtterance.volume = 0.01; // Nearly silent but not zero (some browsers ignore 0)
-      unlockUtterance.rate = 10; // Fast to minimize any audible sound
+      unlockUtterance.volume = 0.01;
+      unlockUtterance.rate = 10;
       speechSynthesis.speak(unlockUtterance);
-
       isAudioUnlocked = true;
-      log('SpeechSynthesis unlock attempted via silent utterance');
+      log('SpeechSynthesis unlock attempted');
     } catch (e) {
       log('Failed to unlock SpeechSynthesis:', e);
     }
@@ -134,36 +152,21 @@ export function initAudio(): void {
     // Ensure voices are loaded
     const voices = speechSynthesis.getVoices();
     if (voices.length === 0 && !voicesLoaded) {
-      log('No voices during initAudio, triggering voice load...');
-      // Some browsers need this to trigger voice loading
       speechSynthesis.getVoices();
     }
   }
 }
 
-// Language to BCP-47 code mapping for TTS
+// Language to BCP-47 code mapping
 const languageToBCP47: Record<string, string> = {
-  en: 'en',
-  es: 'es',
-  ar: 'ar',
-  hi: 'hi',
-  pt: 'pt',
-  fr: 'fr',
-  id: 'id',
-  ur: 'ur',
-  tr: 'tr',
-  de: 'de',
-  sw: 'sw',
-  zh: 'zh',
-  ko: 'ko',
-  ja: 'ja',
-  tl: 'fil',
-  it: 'it',
+  en: 'en', es: 'es', ar: 'ar', hi: 'hi', pt: 'pt', fr: 'fr',
+  id: 'id', ur: 'ur', tr: 'tr', de: 'de', sw: 'sw', zh: 'zh',
+  ko: 'ko', ja: 'ja', tl: 'fil', it: 'it',
 };
 
-// Preferred voices for each language (premium/high-quality voices)
+// Preferred voices by language
 const preferredVoicesByLanguage: Record<string, string[]> = {
-  en: ['Google UK English Male', 'Microsoft David', 'Daniel', 'Google US English', 'Alex', 'Samantha'],
+  en: PREFERRED_VOICES,
   es: ['Google español', 'Microsoft Pablo', 'Jorge', 'Paulina'],
   ar: ['Google العربية', 'Microsoft Naayf', 'Maged'],
   hi: ['Google हिन्दी', 'Microsoft Hemant', 'Lekha'],
@@ -181,12 +184,11 @@ const preferredVoicesByLanguage: Record<string, string[]> = {
   it: ['Google italiano', 'Microsoft Cosimo', 'Alice'],
 };
 
-// Track if voices have been loaded
 let voicesLoaded = false;
 let voicesLoadedPromise: Promise<void> | null = null;
 
 /**
- * Wait for voices to be loaded (needed on some browsers)
+ * Wait for voices to be loaded
  */
 function waitForVoices(): Promise<void> {
   if (voicesLoaded) return Promise.resolve();
@@ -196,36 +198,23 @@ function waitForVoices(): Promise<void> {
     const voices = speechSynthesis.getVoices();
     if (voices.length > 0) {
       voicesLoaded = true;
-      log('Voices already loaded:', voices.length, 'voices available');
-      log('Available voices:', voices.slice(0, 5).map(v => v.name).join(', '), '...');
       resolve();
       return;
     }
 
-    // Wait for voices to load
-    log('Waiting for voices to load...');
     const onVoicesChanged = () => {
       const loadedVoices = speechSynthesis.getVoices();
       if (loadedVoices.length > 0) {
         voicesLoaded = true;
-        log('Voices loaded:', loadedVoices.length, 'voices available');
-        log('Available voices:', loadedVoices.slice(0, 5).map(v => v.name).join(', '), '...');
         speechSynthesis.onvoiceschanged = null;
         resolve();
       }
     };
-
     speechSynthesis.onvoiceschanged = onVoicesChanged;
 
-    // Timeout after 3 seconds
     setTimeout(() => {
       const fallbackVoices = speechSynthesis.getVoices();
-      if (fallbackVoices.length > 0) {
-        voicesLoaded = true;
-        log('Voices loaded via timeout:', fallbackVoices.length);
-      } else {
-        log('WARNING: No voices loaded after timeout');
-      }
+      if (fallbackVoices.length > 0) voicesLoaded = true;
       resolve();
     }, 3000);
   });
@@ -234,30 +223,19 @@ function waitForVoices(): Promise<void> {
 }
 
 /**
- * Get the best available voice for divine speech
+ * Select the best voice based on preference order
  */
-function getBestVoice(language: string = 'en'): SpeechSynthesisVoice | null {
-  const voices = speechSynthesis.getVoices();
+function selectBestVoice(voices: SpeechSynthesisVoice[], language: string): SpeechSynthesisVoice | null {
   const langCode = languageToBCP47[language] || 'en';
+  const preferredVoices = preferredVoicesByLanguage[language] || PREFERRED_VOICES;
 
-  log('getBestVoice called, voices available:', voices.length, 'language:', language);
-
-  if (voices.length === 0) {
-    log('WARNING: No voices available!');
-    return null;
-  }
-
-  // Try preferred voices for this language first
-  const preferredVoices = preferredVoicesByLanguage[language] || preferredVoicesByLanguage.en;
+  // Try preferred voices in order
   for (const name of preferredVoices) {
     const voice = voices.find(v => v.name.includes(name));
-    if (voice) {
-      log('Found preferred voice:', voice.name, 'lang:', voice.lang);
-      return voice;
-    }
+    if (voice) return voice;
   }
 
-  // Try to find a male voice for deeper sound
+  // Try any male voice for the language
   const maleVoice = voices.find(v =>
     v.lang.startsWith(langCode) &&
     (v.name.toLowerCase().includes('male') ||
@@ -266,51 +244,31 @@ function getBestVoice(language: string = 'en'): SpeechSynthesisVoice | null {
      v.name.includes('James') ||
      v.name.includes('Aaron'))
   );
-  if (maleVoice) {
-    log('Found male voice:', maleVoice.name);
-    return maleVoice;
-  }
+  if (maleVoice) return maleVoice;
 
-  // Fall back to any voice matching the language
+  // Any voice matching the language
   const langVoice = voices.find(v => v.lang.startsWith(langCode));
-  if (langVoice) {
-    log('Found language voice:', langVoice.name);
-    return langVoice;
-  }
+  if (langVoice) return langVoice;
 
-  // Ultimate fallback to any English voice
-  const englishVoice = voices.find(v => v.lang.startsWith('en'));
-  log('Falling back to:', englishVoice?.name || 'default voice');
-  return englishVoice || voices[0] || null;
+  // Ultimate fallback
+  return voices.find(v => v.lang.startsWith('en')) || voices[0] || null;
 }
 
 /**
- * Test TTS with a simple message - call this on first user interaction
+ * Calculate dynamic timeout based on text length
+ * Formula: length × 100ms per character, min 15s, max 120s
  */
-export async function testTTS(): Promise<boolean> {
-  log('testTTS() called');
-
-  if (!('speechSynthesis' in window)) {
-    log('SpeechSynthesis not available in this browser');
-    return false;
-  }
-
-  // Wait for voices
-  await waitForVoices();
-
-  const voices = speechSynthesis.getVoices();
-  if (voices.length === 0) {
-    log('No voices available for TTS');
-    return false;
-  }
-
-  log('TTS appears to be available with', voices.length, 'voices');
-  return true;
+function calculateTimeout(text: string): number {
+  const msPerChar = 100;
+  const minTimeout = 15000;
+  const maxTimeout = 120000;
+  const calculated = text.length * msPerChar;
+  return Math.min(maxTimeout, Math.max(minTimeout, calculated));
 }
 
 /**
  * Speak text with divine voice
- * Handles iOS audio requirements and provides fallback for errors
+ * Returns a promise that resolves when speech ends or fails
  */
 export function speak(
   text: string,
@@ -318,7 +276,7 @@ export function speak(
   onEnd?: () => void,
   onAudioLevel?: (level: number) => void
 ): void {
-  log('speak() called with text length:', text.length, 'language:', language, 'voiceEnabled:', voiceEnabled);
+  log('speak() called, text length:', text.length, 'voiceEnabled:', voiceEnabled);
 
   // Clear any previous timeout
   if (speechTimeoutId) {
@@ -329,18 +287,14 @@ export function speak(
   // Cancel any current speech
   stop();
 
-  // Store the onEnd callback so we can ensure it's called
   currentOnEndCallback = onEnd || null;
 
   // Helper to safely call onEnd only once
   let hasCalledOnEnd = false;
   const safeOnEnd = () => {
-    if (hasCalledOnEnd) {
-      log('onEnd already called, skipping');
-      return;
-    }
+    if (hasCalledOnEnd) return;
     hasCalledOnEnd = true;
-    log('Calling onEnd callback');
+    log('TTS complete, calling onEnd');
     stopAudioLevelSimulation();
     if (speechTimeoutId) {
       clearTimeout(speechTimeoutId);
@@ -356,32 +310,27 @@ export function speak(
     return;
   }
 
-  // If voice is disabled, just call onEnd immediately
   if (!voiceEnabled) {
     log('Voice disabled, skipping TTS');
     safeOnEnd();
     return;
   }
 
-  // Check if SpeechSynthesis is available
   if (!('speechSynthesis' in window)) {
     log('SpeechSynthesis not available');
     safeOnEnd();
     return;
   }
 
-  // Store callback for audio level updates
   onAudioLevelCallback = onAudioLevel || null;
 
-  // Try to unlock audio if not already done
+  // Try to unlock audio if needed
   if (!isAudioUnlocked) {
-    log('Audio not unlocked, attempting unlock...');
     try {
       const unlock = new SpeechSynthesisUtterance('');
       unlock.volume = 0;
       speechSynthesis.speak(unlock);
       isAudioUnlocked = true;
-      log('Audio unlocked via silent utterance');
     } catch (e) {
       log('Failed to unlock audio:', e);
     }
@@ -389,69 +338,64 @@ export function speak(
 
   // Create utterance
   const utterance = new SpeechSynthesisUtterance(text);
-
-  // Apply voice settings
   utterance.rate = VOICE_SETTINGS.rate;
   utterance.pitch = VOICE_SETTINGS.pitch;
   utterance.volume = VOICE_SETTINGS.volume;
 
-  // Set voice - try immediately, voices should be loaded
+  // Set voice
   const lang = language || 'en';
-  const voice = getBestVoice(lang);
+  const voices = speechSynthesis.getVoices();
+  const voice = selectBestVoice(voices, lang);
+
   if (voice) {
     utterance.voice = voice;
     utterance.lang = voice.lang;
-    log('Utterance created - voice:', voice.name, 'rate:', VOICE_SETTINGS.rate, 'pitch:', VOICE_SETTINGS.pitch);
+    log('Using voice:', voice.name, 'rate:', VOICE_SETTINGS.rate, 'pitch:', VOICE_SETTINGS.pitch);
   } else {
-    log('WARNING: No voice available, using browser default');
-    // Set language hint at least
+    log('No voice available, using browser default');
     utterance.lang = languageToBCP47[lang] || 'en-US';
   }
 
-  // Handle events
+  // Event handlers
   utterance.onstart = () => {
     log('Speech started');
     startAudioLevelSimulation();
   };
 
   utterance.onend = () => {
-    log('Speech ended naturally');
+    log('Speech ended naturally (onend event fired)');
     safeOnEnd();
   };
 
   utterance.onerror = (event) => {
-    log('Speech synthesis error:', event.error);
+    log('Speech error:', event.error);
     safeOnEnd();
   };
 
-  // iOS Safari fix: Resume speechSynthesis if it gets stuck
-  // This can happen if the page was backgrounded
+  // Resume if paused (iOS Safari fix)
   if (speechSynthesis.paused) {
-    log('SpeechSynthesis was paused, resuming');
     speechSynthesis.resume();
   }
 
   try {
-    log('Calling speechSynthesis.speak()');
     speechSynthesis.speak(utterance);
 
-    // SAFETY TIMEOUT: Force onEnd after 30 seconds max (or text length * 80ms, whichever is less)
-    // This prevents the input from being stuck disabled forever
-    const maxDuration = Math.min(30000, Math.max(5000, text.length * 80));
-    log('Setting safety timeout for', maxDuration, 'ms');
+    // Dynamic timeout based on text length
+    const timeout = calculateTimeout(text);
+    log('Setting dynamic timeout:', timeout, 'ms for', text.length, 'chars');
     speechTimeoutId = window.setTimeout(() => {
-      log('Safety timeout reached, forcing onEnd');
+      log('Timeout reached after', timeout, 'ms, forcing end');
       speechSynthesis.cancel();
       safeOnEnd();
-    }, maxDuration);
+    }, timeout);
 
-    // Also check for silent failure after 1 second
+    // Check for silent failure after 2 seconds
     setTimeout(() => {
       if (!hasCalledOnEnd && !speechSynthesis.speaking && !speechSynthesis.pending) {
-        log('Speech may have failed silently after 1s, forcing onEnd');
+        log('Speech failed silently, forcing end');
         safeOnEnd();
       }
-    }, 1000);
+    }, 2000);
 
   } catch (error) {
     log('Exception in speak():', error);
@@ -467,12 +411,10 @@ export function stop(): void {
     speechSynthesis.cancel();
   }
   stopAudioLevelSimulation();
-  // Clear safety timeout
   if (speechTimeoutId) {
     clearTimeout(speechTimeoutId);
     speechTimeoutId = null;
   }
-  // Call any pending onEnd callback
   if (currentOnEndCallback) {
     log('stop() called, triggering pending onEnd');
     const callback = currentOnEndCallback;
@@ -494,9 +436,7 @@ export function isSpeaking(): boolean {
 export function setVoiceEnabled(enabled: boolean): void {
   log('setVoiceEnabled:', enabled);
   voiceEnabled = enabled;
-  if (!enabled) {
-    stop();
-  }
+  if (!enabled) stop();
 }
 
 /**
@@ -506,20 +446,17 @@ export function isVoiceEnabled(): boolean {
   return voiceEnabled;
 }
 
-// Audio level simulation (since we can't get real audio data from SpeechSynthesis)
+// Audio level simulation
 let audioLevelInterval: number | null = null;
 
 function startAudioLevelSimulation(): void {
   if (audioLevelInterval) return;
 
-  // Simulate audio levels for lip sync
   audioLevelInterval = window.setInterval(() => {
     if (onAudioLevelCallback && speechSynthesis.speaking) {
-      // Generate pseudo-random levels that feel speech-like
       const baseLevel = 0.3;
       const variance = Math.random() * 0.4;
-      const level = baseLevel + variance;
-      onAudioLevelCallback(level);
+      onAudioLevelCallback(baseLevel + variance);
     }
   }, 80);
 }
@@ -533,36 +470,10 @@ function stopAudioLevelSimulation(): void {
 }
 
 /**
- * Speak a queue of sentences with smooth transitions
+ * Test TTS availability
  */
-export function speakSentences(
-  sentences: string[],
-  onSentenceStart?: (index: number) => void,
-  onComplete?: () => void,
-  onAudioLevel?: (level: number) => void
-): void {
-  let currentIndex = 0;
-
-  const speakNext = () => {
-    if (currentIndex >= sentences.length) {
-      onComplete?.();
-      return;
-    }
-
-    const sentence = sentences[currentIndex];
-    onSentenceStart?.(currentIndex);
-
-    speak(
-      sentence,
-      undefined,
-      () => {
-        currentIndex++;
-        // Small pause between sentences
-        setTimeout(speakNext, 200);
-      },
-      onAudioLevel
-    );
-  };
-
-  speakNext();
+export async function testTTS(): Promise<boolean> {
+  if (!('speechSynthesis' in window)) return false;
+  await waitForVoices();
+  return speechSynthesis.getVoices().length > 0;
 }
