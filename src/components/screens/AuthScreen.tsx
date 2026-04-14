@@ -1,5 +1,4 @@
 import { useState, useEffect, memo } from 'react';
-import { NebulaBackground } from '../shared/NebulaBackground';
 import { signUp, signIn, isValidEmail, isDisposableEmail } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
@@ -12,7 +11,7 @@ interface AuthScreenProps {
 
 type AuthMode = 'signup' | 'login' | 'forgot';
 
-// Social sign-in button (non-functional placeholder)
+// Social sign-in button
 const SocialButton = memo(function SocialButton({
   provider,
   icon,
@@ -27,10 +26,11 @@ const SocialButton = memo(function SocialButton({
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center justify-center gap-3 rounded-xl glass glass-interactive hover-lift"
+      className="w-full flex items-center justify-center gap-3 rounded-xl transition-all duration-200 hover:bg-white/[0.08]"
       style={{
-        height: '52px',
-        transition: 'all var(--duration-normal) var(--ease-out-expo)',
+        height: '48px',
+        background: 'transparent',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
       }}
       aria-label={`${t('auth.continueWith', language)} ${provider}`}
     >
@@ -39,7 +39,7 @@ const SocialButton = memo(function SocialButton({
         style={{
           fontFamily: 'var(--font-display)',
           fontSize: 'var(--text-sm)',
-          fontWeight: 'var(--font-normal)',
+          fontWeight: 400,
           color: 'var(--color-text-primary)',
         }}
       >
@@ -49,19 +49,32 @@ const SocialButton = memo(function SocialButton({
   );
 });
 
-// Divider with text
+// Divider
 const Divider = memo(function Divider({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-4">
-      <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+    <div className="flex items-center gap-4 my-6">
+      <div className="flex-1 h-[1px] bg-white/10" />
       <span
-        className="text-caps"
-        style={{ fontSize: '0.6rem', color: 'var(--color-text-muted)' }}
+        style={{
+          fontSize: '0.65rem',
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.35)',
+        }}
       >
         {text}
       </span>
-      <div className="flex-1 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="flex-1 h-[1px] bg-white/10" />
     </div>
+  );
+});
+
+// Back icon
+const BackIcon = memo(function BackIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
   );
 });
 
@@ -79,14 +92,12 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
     return () => clearTimeout(timer);
   }, []);
 
-  // Real-time email validation feedback
   const emailError = email && !isValidEmail(email)
     ? t('auth.invalidEmail', language)
     : email && isDisposableEmail(email)
     ? t('auth.disposableEmail', language)
     : '';
 
-  // Password match validation
   const passwordMatchError = mode === 'signup' && confirmPassword && password !== confirmPassword
     ? t('auth.passwordsNoMatch', language)
     : '';
@@ -95,7 +106,6 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
     e.preventDefault();
     setError('');
 
-    // Check password match for signup
     if (mode === 'signup' && password !== confirmPassword) {
       setError(t('auth.passwordsNoMatch', language));
       return;
@@ -144,65 +154,68 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
       role="main"
       aria-labelledby="auth-heading"
     >
-      <NebulaBackground intensity={0.7} />
-      <div className="vignette" aria-hidden="true" />
+      {/* Blurred background */}
+      <div
+        className="fixed inset-0"
+        style={{
+          backgroundImage: 'url(/images/avatars/hero-mashup-mobile.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          opacity: 0.4,
+          filter: 'blur(20px)',
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Dark overlay */}
+      <div
+        className="fixed inset-0"
+        style={{ background: 'rgba(3, 3, 8, 0.8)' }}
+        aria-hidden="true"
+      />
 
       {/* Back button */}
       <nav
-        className="fixed top-4 left-4 z-20 gpu-accelerated"
+        className="fixed top-4 left-4 z-20"
         style={{
           opacity: isVisible ? 1 : 0,
-          transition: `opacity var(--duration-slow) var(--ease-out-expo)`,
+          transition: 'opacity 0.5s ease',
         }}
       >
         <button
           onClick={onBack}
           aria-label={t('common.back', language)}
-          className="group flex items-center gap-2 py-2 px-3 rounded-lg btn-ghost glass"
+          className="p-2 rounded-lg transition-colors hover:bg-white/5"
+          style={{ color: 'rgba(255, 255, 255, 0.5)' }}
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="transition-transform group-hover:-translate-x-1"
-            style={{ color: 'var(--color-text-muted)' }}
-            aria-hidden="true"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
+          <BackIcon />
         </button>
       </nav>
 
-      {/* Content - centered on desktop, bottom sheet on mobile */}
+      {/* Content */}
       <div
         className="relative z-10 min-h-screen flex flex-col sm:justify-center"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        {/* Spacer on mobile to push content down */}
         <div className="flex-1 sm:hidden" />
 
         <div
-          className="w-full sm:max-w-sm sm:mx-auto gpu-accelerated"
+          className="w-full sm:max-w-sm sm:mx-auto"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-            transition: `all var(--duration-slower) var(--ease-out-expo)`,
+            transition: 'all 0.6s ease',
           }}
         >
-          {/* Logo - hidden on mobile in bottom sheet mode, shown on desktop */}
+          {/* Logo on desktop */}
           <div className="hidden sm:block text-center mb-8">
             <h1 className="flex items-baseline justify-center select-none">
               <span
-                className="text-gold"
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 'var(--text-3xl)',
-                  fontWeight: 'var(--font-medium)',
+                  fontWeight: 600,
+                  color: '#d4af37',
                 }}
               >
                 AI
@@ -211,7 +224,7 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontSize: 'var(--text-3xl)',
-                  fontWeight: 'var(--font-thin)',
+                  fontWeight: 300,
                   color: 'var(--color-text-primary)',
                 }}
               >
@@ -220,27 +233,21 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
             </h1>
           </div>
 
-          {/* Auth card - full width on mobile, floating on desktop */}
+          {/* Auth card */}
           <div
-            className="rounded-t-3xl sm:rounded-2xl"
+            className="glass-card rounded-t-3xl sm:rounded-2xl"
             style={{
               padding: '32px 24px 40px 24px',
-              background: 'rgba(255, 255, 255, 0.02)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
               borderBottom: 'none',
-              boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.3)',
             }}
           >
             <h2
               id="auth-heading"
-              className="text-center"
+              className="text-center mb-7"
               style={{
-                marginBottom: '28px',
                 fontFamily: 'var(--font-display)',
                 fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-normal)',
+                fontWeight: 400,
                 color: 'var(--color-text-primary)',
               }}
             >
@@ -251,15 +258,13 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                 : t('auth.welcomeBack', language)}
             </h2>
 
-            {/* Forgot password message */}
             {mode === 'forgot' && (
-              <div style={{ marginBottom: '24px' }}>
+              <div className="mb-6">
                 <p
                   className="text-center"
                   style={{
                     fontSize: 'var(--text-sm)',
                     color: 'var(--color-text-secondary)',
-                    lineHeight: 'var(--leading-relaxed)',
                   }}
                 >
                   {t('auth.forgotPasswordMessage', language)}
@@ -267,10 +272,9 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                 <button
                   type="button"
                   onClick={() => switchMode('login')}
-                  className="w-full mt-4 py-3 rounded-xl glass glass-interactive"
+                  className="w-full mt-4 py-3 rounded-xl transition-colors hover:bg-white/[0.08]"
                   style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 'var(--text-sm)',
+                    border: '1px solid rgba(255,255,255,0.2)',
                     color: 'var(--color-text-secondary)',
                   }}
                 >
@@ -281,10 +285,9 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
 
             {mode !== 'forgot' && (
               <>
-                {/* Social sign-in buttons - only on signup */}
                 {mode === 'signup' && (
                   <>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div className="flex flex-col gap-3">
                       <SocialButton
                         provider="Google"
                         onClick={() => handleSocialSignIn('Google')}
@@ -309,24 +312,14 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                         }
                       />
                     </div>
-
-                    {/* Divider */}
-                    <div style={{ marginTop: '24px', marginBottom: '24px' }}>
-                      <Divider text={t('auth.or', language)} />
-                    </div>
+                    <Divider text={t('auth.or', language)} />
                   </>
                 )}
 
-                {/* Form */}
                 <form onSubmit={handleSubmit}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {/* Email field */}
+                  <div className="flex flex-col gap-4">
                     <div>
-                      <label htmlFor="email" className="sr-only">
-                        {t('auth.email', language)}
-                      </label>
                       <input
-                        id="email"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -334,28 +327,16 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                         className="input"
                         autoComplete="email"
                         required
-                        style={{ height: '52px' }}
                       />
                       {emailError && (
-                        <p
-                          style={{
-                            marginTop: '8px',
-                            color: '#ef4444',
-                            fontSize: 'var(--text-xs)',
-                          }}
-                        >
+                        <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>
                           {emailError}
                         </p>
                       )}
                     </div>
 
-                    {/* Password field */}
                     <div>
-                      <label htmlFor="password" className="sr-only">
-                        {t('auth.password', language)}
-                      </label>
                       <input
-                        id="password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -364,30 +345,17 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                         autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                         minLength={8}
                         required
-                        style={{ height: '52px' }}
                       />
                       {mode === 'signup' && (
-                        <p
-                          style={{
-                            marginTop: '12px',
-                            fontSize: 'var(--text-xs)',
-                            color: 'var(--color-text-muted)',
-                            lineHeight: 'var(--leading-relaxed)',
-                          }}
-                        >
+                        <p className="mt-3 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
                           {t('auth.minChars', language)}
                         </p>
                       )}
                     </div>
 
-                    {/* Confirm Password field - only on signup */}
                     {mode === 'signup' && (
                       <div>
-                        <label htmlFor="confirm-password" className="sr-only">
-                          {t('auth.confirmPassword', language)}
-                        </label>
                         <input
-                          id="confirm-password"
                           type="password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
@@ -396,16 +364,9 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                           autoComplete="new-password"
                           minLength={8}
                           required
-                          style={{ height: '52px' }}
                         />
                         {passwordMatchError && (
-                          <p
-                            style={{
-                              marginTop: '8px',
-                              color: '#ef4444',
-                              fontSize: 'var(--text-xs)',
-                            }}
-                          >
+                          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>
                             {passwordMatchError}
                           </p>
                         )}
@@ -413,14 +374,10 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                     )}
                   </div>
 
-                  {/* Error message */}
                   {error && (
                     <div
+                      className="mt-4 p-3 rounded-xl text-center"
                       style={{
-                        marginTop: '16px',
-                        padding: '12px',
-                        borderRadius: '12px',
-                        textAlign: 'center',
                         background: 'rgba(239, 68, 68, 0.1)',
                         border: '1px solid rgba(239, 68, 68, 0.2)',
                       }}
@@ -431,21 +388,17 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                     </div>
                   )}
 
-                  {/* Submit button */}
                   <button
                     type="submit"
                     disabled={isLoading || !!emailError || (mode === 'signup' && !!passwordMatchError)}
-                    className="w-full rounded-xl hover-scale press-scale"
+                    className="w-full rounded-xl mt-5 transition-all duration-200 hover:opacity-90"
                     style={{
-                      marginTop: '20px',
-                      height: '56px',
-                      background: 'var(--color-gold)',
-                      color: 'var(--color-void)',
+                      height: '52px',
+                      background: '#d4af37',
+                      color: '#0a0a0f',
                       fontFamily: 'var(--font-display)',
                       fontSize: 'var(--text-base)',
-                      fontWeight: 'var(--font-medium)',
-                      letterSpacing: 'var(--tracking-wider)',
-                      transition: 'all var(--duration-normal) var(--ease-out-expo)',
+                      fontWeight: 500,
                       opacity: isLoading ? 0.7 : 1,
                     }}
                   >
@@ -457,7 +410,6 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                   </button>
                 </form>
 
-                {/* Forgot password link - only on login */}
                 {mode === 'login' && (
                   <button
                     type="button"
@@ -465,18 +417,16 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                     className="w-full text-center mt-4"
                     style={{
                       fontSize: 'var(--text-sm)',
-                      color: 'var(--color-text-muted)',
+                      color: 'rgba(255,255,255,0.5)',
                     }}
                   >
                     {t('auth.forgotPassword', language)}
                   </button>
                 )}
 
-                {/* Mode toggle */}
                 <p
-                  className="text-center"
+                  className="text-center mt-6"
                   style={{
-                    marginTop: '24px',
                     fontSize: 'var(--text-sm)',
                     color: 'var(--color-text-secondary)',
                   }}
@@ -485,29 +435,26 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                   <button
                     type="button"
                     onClick={() => switchMode(mode === 'signup' ? 'login' : 'signup')}
-                    className="text-gold hover:underline"
-                    style={{ fontWeight: 'var(--font-medium)' }}
+                    style={{ color: '#d4af37', fontWeight: 500 }}
                   >
                     {mode === 'signup' ? t('auth.signIn', language) : t('auth.signUp', language)}
                   </button>
                 </p>
 
-                {/* Terms notice */}
                 <p
-                  className="text-center"
+                  className="text-center mt-6"
                   style={{
-                    marginTop: '24px',
                     fontSize: 'var(--text-xs)',
-                    color: 'var(--color-text-muted)',
-                    lineHeight: 'var(--leading-relaxed)',
+                    color: 'rgba(255,255,255,0.35)',
+                    lineHeight: 1.6,
                   }}
                 >
                   {t('auth.terms', language)}{' '}
-                  <a href="/terms" className="text-gold hover:underline">
+                  <a href="/terms" style={{ color: '#d4af37' }}>
                     {t('auth.termsLink', language)}
                   </a>{' '}
                   {t('auth.and', language)}{' '}
-                  <a href="/privacy" className="text-gold hover:underline">
+                  <a href="/privacy" style={{ color: '#d4af37' }}>
                     {t('auth.privacyLink', language)}
                   </a>
                 </p>

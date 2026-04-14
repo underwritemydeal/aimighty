@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { NebulaBackground } from '../shared/NebulaBackground';
 import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem } from '../../types';
+import { type CategorizedBeliefSystem } from '../../data/beliefSystems';
 
 interface BeliefWelcomeScreenProps {
   belief: BeliefSystem;
@@ -31,12 +31,16 @@ const welcomeMessages: Record<string, string> = {
 export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue, language }: BeliefWelcomeScreenProps) {
   const [phase, setPhase] = useState(0);
 
+  // Get accent color from belief (cast to CategorizedBeliefSystem if needed)
+  const accentColor = (belief as CategorizedBeliefSystem).accentColor || belief.themeColor;
+  const imagePath = (belief as CategorizedBeliefSystem).imagePath || `/images/avatars/${belief.id}.jpg`;
+
   useEffect(() => {
-    // Cinematic reveal sequence — 2-3 second pause
+    // Cinematic reveal sequence
     const timers = [
       setTimeout(() => setPhase(1), 300),    // Background appears
-      setTimeout(() => setPhase(2), 800),    // Message fades in
-      setTimeout(() => setPhase(3), 3500),   // Auto-continue after 2.7s pause
+      setTimeout(() => setPhase(2), 1000),   // Message fades in
+      setTimeout(() => setPhase(3), 3500),   // Auto-continue after pause
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -54,36 +58,35 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue, l
     <div
       className="relative w-full overflow-hidden"
       style={{
-        background: 'var(--color-void)',
+        background: '#000',
         height: '100dvh',
         minHeight: '-webkit-fill-available',
       }}
       role="main"
       aria-label="Welcome message"
     >
-      {/* Nebula background with belief-specific intensity */}
-      <NebulaBackground intensity={phase >= 1 ? 0.8 : 0.2} />
-
-      {/* Strong vignette for focus */}
-      <div className="vignette vignette-strong" aria-hidden="true" />
-
-      {/* Glow orb in center */}
+      {/* Full-screen belief image */}
       <div
-        className="absolute left-1/2"
+        className="fixed inset-0 bg-image-cover"
         style={{
-          top: '35%',
-          width: '280px',
-          height: '280px',
-          background: `radial-gradient(circle, ${belief.themeColor}30 0%, ${belief.themeColor}10 40%, transparent 70%)`,
+          backgroundImage: `url(${imagePath})`,
+          backgroundPosition: 'center',
           opacity: phase >= 1 ? 1 : 0,
-          transform: `translateX(-50%) translateY(-50%) scale(${phase >= 1 ? 1 : 0.5})`,
-          transition: 'all 2s var(--ease-out-expo)',
-          filter: 'blur(50px)',
+          transition: 'opacity 1.5s ease-out',
         }}
         aria-hidden="true"
       />
 
-      {/* Content — centered with generous padding */}
+      {/* Radial gradient overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.2) 100%)',
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Content */}
       <div
         className="relative z-10 flex flex-col items-center justify-center h-full"
         style={{
@@ -92,32 +95,29 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue, l
           paddingBottom: 'env(safe-area-inset-bottom, 32px)',
         }}
       >
-        {/* Welcome message — centered, belief accent color */}
+        {/* Welcome message in Cormorant Garamond */}
         <blockquote
-          className="text-center gpu-accelerated"
+          className="text-center"
           style={{
-            maxWidth: '540px',
+            maxWidth: '85%',
             opacity: phase >= 2 ? 1 : 0,
-            transform: phase >= 2 ? 'translateY(0)' : 'translateY(24px)',
-            transition: 'all 1.2s var(--ease-out-expo)',
+            transform: phase >= 2 ? 'translateY(0)' : 'translateY(15px)',
+            transition: 'all 1s ease-out',
           }}
         >
           <p
+            className="text-divine"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(1.25rem, 5vw, 1.75rem)',
-              fontWeight: 'var(--font-light)',
-              lineHeight: '1.6',
-              letterSpacing: 'var(--tracking-wide)',
-              color: belief.themeColor,
-              textShadow: `0 0 40px ${belief.themeColor}35, 0 0 80px ${belief.themeColor}20`,
+              fontSize: 'clamp(1.25rem, 4vw, 1.75rem)',
+              color: 'rgba(255, 248, 240, 0.95)',
+              textShadow: `0 0 20px ${accentColor}25, 0 0 40px ${accentColor}15`,
             }}
           >
             {message}
           </p>
         </blockquote>
 
-        {/* Tap to skip hint */}
+        {/* Tap to continue hint */}
         <p
           className="absolute text-center"
           style={{
@@ -125,18 +125,18 @@ export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue, l
             left: '50%',
             transform: 'translateX(-50%)',
             opacity: phase >= 2 ? 0.35 : 0,
-            transition: 'opacity 1s var(--ease-out-expo)',
+            transition: 'opacity 1s ease-out',
             transitionDelay: '0.8s',
             fontSize: '0.7rem',
             letterSpacing: '0.1em',
-            color: 'var(--color-text-muted)',
+            color: 'rgba(255, 255, 255, 0.35)',
             textTransform: 'uppercase',
           }}
         >
           {t('common.continue', language)}
         </p>
 
-        {/* Skip button (tap anywhere) */}
+        {/* Tap anywhere to skip */}
         <button
           onClick={onContinue}
           className="absolute inset-0 cursor-pointer"

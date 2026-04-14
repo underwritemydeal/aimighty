@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
-import { NebulaBackground } from '../shared/NebulaBackground';
+import { useState, useEffect, memo } from 'react';
 
 interface TermsScreenProps {
   onBack: () => void;
 }
+
+const BackIcon = memo(function BackIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+});
 
 export function TermsScreen({ onBack }: TermsScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
@@ -15,72 +22,48 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
+      className="relative min-h-screen"
       style={{ background: 'var(--color-void)' }}
       role="main"
       aria-labelledby="terms-heading"
     >
-      <NebulaBackground intensity={0.5} />
-      <div className="vignette" aria-hidden="true" />
-
       {/* Back button */}
       <nav
-        className="fixed top-4 left-4 z-20 gpu-accelerated"
+        className="fixed top-4 left-4 z-20"
         style={{
           opacity: isVisible ? 1 : 0,
-          transition: `opacity var(--duration-slow) var(--ease-out-expo)`,
+          transition: 'opacity 0.5s ease',
         }}
       >
         <button
           onClick={onBack}
           aria-label="Go back"
-          className="group flex items-center gap-2 py-2 px-3 rounded-lg btn-ghost glass"
+          className="flex items-center gap-2 py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
+          style={{ color: 'rgba(255, 255, 255, 0.5)' }}
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="transition-transform group-hover:-translate-x-1"
-            style={{ color: 'var(--color-text-muted)' }}
-            aria-hidden="true"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span
-            className="text-display"
-            style={{
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-muted)',
-            }}
-          >
-            Back
-          </span>
+          <BackIcon />
+          <span style={{ fontSize: 'var(--text-sm)' }}>Back</span>
         </button>
       </nav>
 
       {/* Content */}
       <div className="relative z-10 min-h-screen overflow-y-auto">
         <div
-          className="max-w-2xl mx-auto px-6 py-20 gpu-accelerated"
+          className="max-w-2xl mx-auto px-6 py-20"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-            transition: `all var(--duration-slower) var(--ease-out-expo)`,
+            transition: 'all 0.6s ease',
           }}
         >
           <h1
             id="terms-heading"
-            className="text-gold mb-4"
+            className="mb-4"
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-3xl)',
-              fontWeight: 'var(--font-light)',
-              letterSpacing: 'var(--tracking-wide)',
+              fontWeight: 300,
+              color: '#d4af37',
             }}
           >
             Terms of Service
@@ -90,7 +73,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             className="mb-8"
             style={{
               fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-muted)',
+              color: 'rgba(255, 255, 255, 0.35)',
             }}
           >
             Last updated: April 13, 2026
@@ -101,19 +84,13 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-base)',
-              fontWeight: 'var(--font-light)',
-              color: 'var(--color-text-secondary)',
-              lineHeight: 'var(--leading-relaxed)',
+              fontWeight: 300,
+              color: 'rgba(255, 255, 255, 0.6)',
+              lineHeight: 1.8,
             }}
           >
             <section>
-              <h2
-                className="text-gold mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
+              <h2 className="mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
                 1. Acceptance of Terms
               </h2>
               <p>
@@ -123,13 +100,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             </section>
 
             <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
+              <h2 className="mt-10 mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
                 2. Description of Service
               </h2>
               <p>
@@ -140,23 +111,18 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             </section>
 
             <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
+              <h2 className="mt-10 mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
                 3. Not Professional Advice
               </h2>
               <div
-                className="p-4 rounded-xl glass"
-                style={{ borderColor: 'rgba(212, 175, 55, 0.2)' }}
+                className="p-4 rounded-xl"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(212, 175, 55, 0.2)',
+                }}
               >
-                <p>
-                  <strong style={{ color: 'var(--color-text-primary)' }}>
-                    AImighty does NOT provide:
-                  </strong>
+                <p style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                  <strong>AImighty does NOT provide:</strong>
                 </p>
                 <ul className="list-disc list-inside space-y-2 mt-4 ml-2">
                   <li>Medical or mental health advice</li>
@@ -172,13 +138,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             </section>
 
             <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
+              <h2 className="mt-10 mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
                 4. User Responsibilities
               </h2>
               <p>You agree to:</p>
@@ -192,13 +152,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             </section>
 
             <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
+              <h2 className="mt-10 mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
                 5. Subscription and Billing
               </h2>
               <p>
@@ -209,31 +163,8 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             </section>
 
             <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
-                6. Intellectual Property
-              </h2>
-              <p>
-                AImighty and its content are protected by copyright and other intellectual
-                property laws. You may not copy, modify, or distribute our content without
-                permission.
-              </p>
-            </section>
-
-            <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
-                7. Limitation of Liability
+              <h2 className="mt-10 mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+                6. Limitation of Liability
               </h2>
               <p>
                 AImighty is provided "as is" without warranties of any kind. We are not liable
@@ -243,34 +174,12 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             </section>
 
             <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
-                8. Changes to Terms
-              </h2>
-              <p>
-                We may update these terms from time to time. Continued use of the service
-                after changes constitutes acceptance of the new terms.
-              </p>
-            </section>
-
-            <section>
-              <h2
-                className="text-gold mt-10 mb-4"
-                style={{
-                  fontSize: 'var(--text-xl)',
-                  fontWeight: 'var(--font-normal)',
-                }}
-              >
-                9. Contact
+              <h2 className="mt-10 mb-4" style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+                7. Contact
               </h2>
               <p>
                 Questions about these terms? Contact us at{' '}
-                <a href="mailto:legal@aimighty.me" className="text-gold hover:underline">
+                <a href="mailto:legal@aimighty.me" style={{ color: '#d4af37' }}>
                   legal@aimighty.me
                 </a>
               </p>

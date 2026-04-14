@@ -1,6 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { NebulaBackground } from '../shared/NebulaBackground';
-import { beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
+import { beliefSystems, categoryLabels, type BeliefCategory, type CategorizedBeliefSystem } from '../../data/beliefSystems';
 import { t, type LanguageCode } from '../../data/translations';
 import type { BeliefSystem } from '../../types';
 
@@ -11,14 +10,20 @@ interface BeliefSelectorProps {
   onSignOut: () => void;
 }
 
-// Belief card with glass morphism effect
+// Preload image when card is hovered
+function preloadImage(src: string) {
+  const img = new Image();
+  img.src = src;
+}
+
+// Belief card with Midjourney image background
 const BeliefCard = memo(function BeliefCard({
   belief,
   index,
   isVisible,
   onSelect,
 }: {
-  belief: BeliefSystem;
+  belief: CategorizedBeliefSystem;
   index: number;
   isVisible: boolean;
   onSelect: () => void;
@@ -30,112 +35,89 @@ const BeliefCard = memo(function BeliefCard({
   return (
     <button
       onClick={onSelect}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        preloadImage(belief.imagePath);
+      }}
       onMouseLeave={() => setIsHovered(false)}
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}
       aria-label={`Select ${belief.name} - ${belief.subtitle}. ${belief.description}`}
-      className="w-full text-left gpu-accelerated"
+      className="w-full text-left belief-card"
       style={{
+        height: '130px',
+        backgroundImage: `url(${belief.imagePath})`,
+        borderColor: isActive ? `${belief.accentColor}66` : 'rgba(255, 255, 255, 0.08)',
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-        transition: `all var(--duration-slow) var(--ease-out-expo)`,
+        transition: `all 0.4s ease`,
         transitionDelay: `${150 + index * 40}ms`,
       }}
     >
+      {/* Dark overlay that lightens on hover */}
       <div
-        className="relative"
+        className="absolute inset-0"
         style={{
-          padding: '20px',
-          borderRadius: '16px',
-          background: isActive ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.02)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: `1px solid ${isActive ? `${belief.themeColor}60` : 'rgba(255, 255, 255, 0.08)'}`,
-          boxShadow: isActive
-            ? `0 0 30px ${belief.themeColor}15, inset 0 1px 0 rgba(255,255,255,0.05)`
-            : 'inset 0 1px 0 rgba(255,255,255,0.03)',
-          transform: isActive ? 'translateY(-2px)' : 'translateY(0)',
-          transition: 'all var(--duration-normal) var(--ease-out-expo)',
+          background: isActive ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.55)',
+          transition: 'background 0.4s ease',
         }}
-      >
-        {/* Top glow line on active */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: isActive ? '50%' : '0%',
-            height: '1px',
-            background: `linear-gradient(90deg, transparent, ${belief.themeColor}, transparent)`,
-            boxShadow: isActive ? `0 0 10px ${belief.themeColor}` : 'none',
-            transition: 'all var(--duration-normal) var(--ease-out-expo)',
-          }}
-          aria-hidden="true"
-        />
+        aria-hidden="true"
+      />
 
-        {/* Title and subtitle row */}
-        <div className="flex items-baseline justify-between gap-3">
-          <h3
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-base)',
-              fontWeight: 'var(--font-normal)',
-              color: isActive ? 'var(--color-text-primary)' : 'rgba(255,255,255,0.85)',
-              letterSpacing: 'var(--tracking-wide)',
-              transition: 'color var(--duration-fast)',
-            }}
-          >
-            {belief.name}
-          </h3>
+      {/* Card content */}
+      <div className="belief-card-content">
+        {/* Top row: subtitle label */}
+        <div className="flex justify-end">
           <span
-            className="text-caps shrink-0"
+            className="text-caps"
             style={{
-              fontSize: '0.6rem',
-              color: isActive ? belief.themeColor : 'var(--color-text-muted)',
-              transition: 'color var(--duration-fast)',
+              fontSize: '0.7rem',
+              letterSpacing: '0.1em',
+              color: isActive ? belief.accentColor : 'rgba(255, 255, 255, 0.5)',
+              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+              transition: 'color 0.3s ease',
             }}
           >
             {belief.subtitle}
           </span>
         </div>
 
-        {/* Description */}
-        <p
-          style={{
-            marginTop: '8px',
-            fontFamily: 'var(--font-display)',
-            fontSize: 'var(--text-sm)',
-            fontWeight: 'var(--font-light)',
-            color: 'var(--color-text-secondary)',
-            lineHeight: 'var(--leading-relaxed)',
-          }}
-        >
-          {belief.description}
-        </p>
+        {/* Spacer */}
+        <div className="flex-1" />
 
-        {/* Focus indicator */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: isFocused ? '30%' : '0%',
-            height: '2px',
-            borderRadius: '2px',
-            background: belief.themeColor,
-            transition: 'all var(--duration-fast) var(--ease-out-expo)',
-          }}
-          aria-hidden="true"
-        />
+        {/* Bottom: name and description */}
+        <div>
+          <h3
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.1rem',
+              fontWeight: 600,
+              color: '#fff',
+              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+              marginBottom: '4px',
+            }}
+          >
+            {belief.name}
+          </h3>
+          <p
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: '0.85rem',
+              fontWeight: 300,
+              color: 'rgba(255, 255, 255, 0.6)',
+              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+              lineHeight: 1.4,
+            }}
+          >
+            {belief.description}
+          </p>
+        </div>
       </div>
     </button>
   );
 });
 
-// Category section header - subtle divider style
+// Category section header
 const CategoryHeader = memo(function CategoryHeader({
   category,
   isVisible,
@@ -152,26 +134,66 @@ const CategoryHeader = memo(function CategoryHeader({
   const categoryKey = `beliefs.${category}` as const;
   return (
     <div
-      className="gpu-accelerated-opacity"
       style={{
         marginTop: isFirst ? '0' : '32px',
         marginBottom: '16px',
-        opacity: isVisible ? 0.7 : 0,
-        transition: `opacity var(--duration-slow) var(--ease-out-expo)`,
+        opacity: isVisible ? 0.4 : 0,
+        transition: `opacity 0.5s ease`,
         transitionDelay: `${delay}ms`,
       }}
     >
       <h2
-        className="text-caps text-center"
         style={{
-          fontSize: '0.65rem',
-          color: 'rgba(255, 255, 255, 0.6)',
-          letterSpacing: '0.2em',
+          fontFamily: 'var(--font-display)',
+          fontSize: '0.7rem',
+          fontWeight: 300,
+          letterSpacing: '0.15em',
+          textTransform: 'uppercase',
+          color: 'rgba(255, 255, 255, 0.4)',
+          textAlign: 'center',
         }}
       >
         {t(categoryKey, language) || categoryLabels[category]}
       </h2>
     </div>
+  );
+});
+
+// Thin line art logout icon
+const LogoutIcon = memo(function LogoutIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+});
+
+// Back arrow icon
+const BackIcon = memo(function BackIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
   );
 });
 
@@ -195,8 +217,25 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
       role="main"
       aria-labelledby="belief-heading"
     >
-      <NebulaBackground />
-      <div className="vignette" aria-hidden="true" />
+      {/* Subtle darkened background */}
+      <div
+        className="fixed inset-0"
+        style={{
+          backgroundImage: 'url(/images/avatars/hero-mashup-desktop.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          opacity: 0.1,
+          filter: 'blur(20px)',
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Dark overlay */}
+      <div
+        className="fixed inset-0"
+        style={{ background: 'rgba(3, 3, 8, 0.9)' }}
+        aria-hidden="true"
+      />
 
       {/* Scrollable content */}
       <div className="relative z-10 min-h-screen overflow-y-auto">
@@ -204,110 +243,71 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
           style={{
             maxWidth: '640px',
             margin: '0 auto',
-            padding: '80px 24px 120px 24px',
+            padding: '80px 20px 100px 20px',
           }}
         >
-          {/* Back button - fixed */}
+          {/* Back button */}
           <nav
-            className="fixed top-4 left-4 z-20 gpu-accelerated"
+            className="fixed top-4 left-4 z-20"
             style={{
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
-              transition: `all var(--duration-slow) var(--ease-out-expo)`,
+              transition: `all 0.5s ease`,
             }}
           >
             <button
               onClick={onBack}
               aria-label={t('common.back', language)}
-              className="group flex items-center gap-2 py-2 px-3 rounded-lg btn-ghost glass"
+              className="flex items-center gap-2 py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
+              style={{ color: 'rgba(255, 255, 255, 0.5)' }}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="transition-transform group-hover:-translate-x-1"
-                style={{ color: 'var(--color-text-muted)' }}
-                aria-hidden="true"
-              >
-                <path d="M19 12H5M12 19l-7-7 7-7" />
-              </svg>
-              <span
-                className="text-display hidden sm:inline"
-                style={{
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                {t('common.back', language)}
-              </span>
+              <BackIcon />
             </button>
           </nav>
 
-          {/* Sign out button - fixed top right */}
+          {/* Sign out button */}
           <div
-            className="fixed top-4 right-4 z-20 gpu-accelerated"
+            className="fixed top-4 right-4 z-20"
             style={{
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
-              transition: `all var(--duration-slow) var(--ease-out-expo)`,
+              transition: `all 0.5s ease`,
             }}
           >
             <button
               onClick={onSignOut}
               aria-label="Sign out"
-              className="py-2 px-3 rounded-lg btn-ghost glass"
-              style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-text-muted)',
-              }}
+              className="py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
+              style={{ color: 'rgba(255, 255, 255, 0.4)' }}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
+              <LogoutIcon />
             </button>
           </div>
 
           {/* Header */}
           <header
-            className="text-center gpu-accelerated"
+            className="text-center"
             style={{
               marginBottom: '12px',
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-              transition: `all var(--duration-slower) var(--ease-out-expo)`,
+              transition: `all 0.6s ease`,
             }}
           >
             <h1
               id="belief-heading"
-              className="text-display"
               style={{
-                fontSize: 'clamp(1.5rem, 5vw, 2rem)',
-                fontWeight: 'var(--font-light)',
-                letterSpacing: 'var(--tracking-wide)',
+                fontFamily: 'var(--font-display)',
+                fontSize: 'clamp(1.5rem, 5vw, 2.25rem)',
+                fontWeight: 300,
+                letterSpacing: '0.02em',
               }}
             >
               <span style={{ color: 'var(--color-text-primary)' }}>{t('beliefs.chooseYour', language)} </span>
               <span
-                className="text-gold"
                 style={{
-                  fontWeight: 'var(--font-normal)',
+                  fontWeight: 500,
+                  color: '#d4af37',
                   textShadow: '0 0 30px rgba(212,175,55,0.25), 0 0 60px rgba(212,175,55,0.1)',
                 }}
               >
@@ -316,32 +316,30 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
             </h1>
           </header>
 
-          {/* Tagline */}
+          {/* Subtitle */}
           <p
-            className="text-center text-caps gpu-accelerated-opacity"
+            className="text-center"
             style={{
               marginBottom: '32px',
-              opacity: isVisible ? 0.65 : 0,
-              fontSize: '0.65rem',
-              color: 'var(--color-text-muted)',
-              transition: `opacity var(--duration-slower) var(--ease-out-expo)`,
+              opacity: isVisible ? 0.6 : 0,
+              transition: `opacity 0.6s ease`,
               transitionDelay: '100ms',
+              fontFamily: 'var(--font-display)',
+              fontSize: '0.9rem',
+              fontWeight: 300,
+              letterSpacing: '0.05em',
+              color: 'rgba(255, 255, 255, 0.6)',
             }}
           >
             {t('beliefs.selectTradition', language)}
           </p>
 
-          {/* Cards - single column on mobile, grid on tablet+ */}
+          {/* Cards */}
           <div>
             {/* Religious Traditions */}
             <section role="region" aria-label={t('beliefs.religious', language)}>
               <CategoryHeader category="religious" isVisible={isVisible} delay={150} isFirst={true} language={language} />
-              <div
-                className="grid gap-3"
-                style={{
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                }}
-              >
+              <div className="flex flex-col gap-3">
                 {religious.map((belief, index) => (
                   <BeliefCard
                     key={belief.id}
@@ -357,12 +355,7 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
             {/* Spiritual Paths */}
             <section role="region" aria-label={t('beliefs.spiritual', language)}>
               <CategoryHeader category="spiritual" isVisible={isVisible} delay={400} isFirst={false} language={language} />
-              <div
-                className="grid gap-3"
-                style={{
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                }}
-              >
+              <div className="flex flex-col gap-3">
                 {spiritual.map((belief, index) => (
                   <BeliefCard
                     key={belief.id}
@@ -378,12 +371,7 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
             {/* Philosophical Frameworks */}
             <section role="region" aria-label={t('beliefs.philosophical', language)}>
               <CategoryHeader category="philosophical" isVisible={isVisible} delay={550} isFirst={false} language={language} />
-              <div
-                className="grid gap-3"
-                style={{
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-                }}
-              >
+              <div className="flex flex-col gap-3">
                 {philosophical.map((belief, index) => (
                   <BeliefCard
                     key={belief.id}
@@ -397,19 +385,17 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
             </section>
           </div>
 
-          {/* Footer text */}
+          {/* Footer */}
           <p
-            className="text-center gpu-accelerated-opacity"
+            className="text-center"
             style={{
               marginTop: '32px',
               opacity: isVisible ? 0.3 : 0,
-              transition: `opacity var(--duration-slower) var(--ease-out-expo)`,
+              transition: `opacity 0.6s ease`,
               transitionDelay: '800ms',
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-xs)',
-              fontWeight: 'var(--font-light)',
               color: 'var(--color-text-muted)',
-              lineHeight: 'var(--leading-relaxed)',
             }}
           >
             {t('beliefs.trainedOn', language)}

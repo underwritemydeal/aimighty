@@ -5,6 +5,8 @@ export type BeliefCategory = 'religious' | 'spiritual' | 'philosophical';
 
 export interface CategorizedBeliefSystem extends BeliefSystem {
   category: BeliefCategory;
+  accentColor: string; // For glows, borders, highlights
+  imagePath: string;   // Path to Midjourney avatar image
 }
 
 export const beliefSystems: CategorizedBeliefSystem[] = [
@@ -18,9 +20,11 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     icon: '✝️',
     description: 'Connect with the God of the Bible',
     themeColor: '#d4af37',
+    accentColor: '#d4af37', // gold
     particleColor: '#ffd700',
     backgroundGradient: ['#1a1a0a', '#2a2000'],
     category: 'religious',
+    imagePath: '/images/avatars/protestant.jpg',
   },
   {
     id: 'catholic',
@@ -28,10 +32,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Catholic',
     icon: '⛪',
     description: 'Speak with the Holy Father',
-    themeColor: '#8b0000',
-    particleColor: '#ff4444',
-    backgroundGradient: ['#1a0a0a', '#200000'],
+    themeColor: '#4169E1',
+    accentColor: '#4169E1', // royal blue
+    particleColor: '#6495ED',
+    backgroundGradient: ['#0a0a1a', '#101030'],
     category: 'religious',
+    imagePath: '/images/avatars/catholic.jpg',
   },
   {
     id: 'islam',
@@ -39,10 +45,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Muslim',
     icon: '☪️',
     description: 'Connect with Allah, the Most Merciful',
-    themeColor: '#006400',
+    themeColor: '#00A86B',
+    accentColor: '#00A86B', // emerald green
     particleColor: '#00ff88',
     backgroundGradient: ['#0a1a0a', '#002000'],
     category: 'religious',
+    imagePath: '/images/avatars/islam.jpg',
   },
   {
     id: 'judaism',
@@ -50,10 +58,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Jewish',
     icon: '✡️',
     description: 'Speak with Adonai, the God of Israel',
-    themeColor: '#1e3a8a',
-    particleColor: '#60a5fa',
-    backgroundGradient: ['#0a0a1a', '#001040'],
+    themeColor: '#d4af37',
+    accentColor: '#d4af37', // gold
+    particleColor: '#ffd700',
+    backgroundGradient: ['#1a1a0a', '#2a2000'],
     category: 'religious',
+    imagePath: '/images/avatars/judaism.jpg',
   },
   {
     id: 'hinduism',
@@ -61,10 +71,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Hindu',
     icon: '🕉️',
     description: 'Connect with Brahman, the universal soul',
-    themeColor: '#ff6b00',
+    themeColor: '#FF6B00',
+    accentColor: '#FF6B00', // saffron
     particleColor: '#ffaa44',
     backgroundGradient: ['#1a0a00', '#301500'],
     category: 'religious',
+    imagePath: '/images/avatars/hinduism.jpg',
   },
   {
     id: 'buddhism',
@@ -72,10 +84,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Buddhist',
     icon: '☸️',
     description: 'Find wisdom on the path to enlightenment',
-    themeColor: '#eab308',
+    themeColor: '#d4af37',
+    accentColor: '#d4af37', // gold
     particleColor: '#fcd34d',
     backgroundGradient: ['#1a1a00', '#282000'],
     category: 'religious',
+    imagePath: '/images/avatars/buddhism.jpg',
   },
   {
     id: 'mormonism',
@@ -83,10 +97,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'LDS / Mormon',
     icon: '📖',
     description: 'Speak with Heavenly Father',
-    themeColor: '#0369a1',
-    particleColor: '#38bdf8',
-    backgroundGradient: ['#001520', '#002030'],
+    themeColor: '#F5F5DC',
+    accentColor: '#F5F5DC', // warm white
+    particleColor: '#fffef0',
+    backgroundGradient: ['#101015', '#181820'],
     category: 'religious',
+    imagePath: '/images/avatars/mormon.jpg',
   },
   {
     id: 'sikhism',
@@ -94,10 +110,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Sikh',
     icon: '🙏',
     description: 'Connect with Waheguru, the Wonderful Teacher',
-    themeColor: '#f97316',
+    themeColor: '#FF8C00',
+    accentColor: '#FF8C00', // deep orange
     particleColor: '#fb923c',
     backgroundGradient: ['#1a0800', '#301000'],
     category: 'religious',
+    imagePath: '/images/avatars/sikhism.jpg',
   },
 
   // ═══════════════════════════════════════
@@ -109,10 +127,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Spiritual But Not Religious',
     icon: '✨',
     description: 'Connect with the Universe, Source, and Spirit',
-    themeColor: '#7b2d8e',
+    themeColor: '#9370DB',
+    accentColor: '#9370DB', // medium purple
     particleColor: '#cc77ff',
     backgroundGradient: ['#1a0a2a', '#200040'],
     category: 'spiritual',
+    imagePath: '/images/avatars/sbnr.jpg',
   },
   {
     id: 'taoism',
@@ -120,10 +140,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Taoist',
     icon: '☯️',
     description: 'Flow with the Tao, the eternal Way',
-    themeColor: '#059669',
+    themeColor: '#2E8B57',
+    accentColor: '#2E8B57', // sage green
     particleColor: '#34d399',
     backgroundGradient: ['#001510', '#002018'],
     category: 'spiritual',
+    imagePath: '/images/avatars/taoism.jpg',
   },
   {
     id: 'pantheism',
@@ -131,10 +153,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Earth & Nature',
     icon: '🌍',
     description: 'Speak with the divine in all things',
-    themeColor: '#16a34a',
+    themeColor: '#228B22',
+    accentColor: '#228B22', // forest green
     particleColor: '#4ade80',
     backgroundGradient: ['#0a1a0a', '#001a00'],
     category: 'spiritual',
+    imagePath: '/images/avatars/pantheism.jpg',
   },
 
   // ═══════════════════════════════════════
@@ -146,10 +170,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'The Universe',
     icon: '🔬',
     description: 'Explore meaning through science and wonder',
-    themeColor: '#1e90ff',
+    themeColor: '#4682B4',
+    accentColor: '#4682B4', // steel blue
     particleColor: '#4488ff',
     backgroundGradient: ['#0a0a2a', '#000040'],
     category: 'philosophical',
+    imagePath: '/images/avatars/science.jpg',
   },
   {
     id: 'agnosticism',
@@ -157,10 +183,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'The Unknown',
     icon: '❓',
     description: 'Explore the honest uncertainty of existence',
-    themeColor: '#6b7280',
-    particleColor: '#9ca3af',
+    themeColor: '#B8860B',
+    accentColor: '#B8860B', // dark gold
+    particleColor: '#daa520',
     backgroundGradient: ['#0a0a10', '#151520'],
     category: 'philosophical',
+    imagePath: '/images/avatars/agnosticism.jpg',
   },
   {
     id: 'atheism',
@@ -168,10 +196,12 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Atheist / Stoic',
     icon: '🏛️',
     description: 'Find meaning through reason and virtue',
-    themeColor: '#78716c',
+    themeColor: '#4682B4',
+    accentColor: '#4682B4', // steel blue
     particleColor: '#a8a29e',
     backgroundGradient: ['#0f0f0a', '#1a1a15'],
     category: 'philosophical',
+    imagePath: '/images/avatars/stoicism.jpg',
   },
 ];
 
@@ -186,3 +216,8 @@ export const categoryLabels: Record<BeliefCategory, string> = {
   spiritual: 'Spiritual Paths',
   philosophical: 'Philosophical Frameworks',
 };
+
+// Get belief by ID
+export function getBeliefById(id: string): CategorizedBeliefSystem | undefined {
+  return beliefSystems.find(b => b.id === id);
+}

@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
-import { NebulaBackground } from '../shared/NebulaBackground';
+import { useState, useEffect, memo } from 'react';
 
 interface AboutScreenProps {
   onBack: () => void;
 }
+
+const BackIcon = memo(function BackIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+});
 
 export function AboutScreen({ onBack }: AboutScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
@@ -15,72 +22,48 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
+      className="relative min-h-screen"
       style={{ background: 'var(--color-void)' }}
       role="main"
       aria-labelledby="about-heading"
     >
-      <NebulaBackground intensity={0.5} />
-      <div className="vignette" aria-hidden="true" />
-
       {/* Back button */}
       <nav
-        className="fixed top-4 left-4 z-20 gpu-accelerated"
+        className="fixed top-4 left-4 z-20"
         style={{
           opacity: isVisible ? 1 : 0,
-          transition: `opacity var(--duration-slow) var(--ease-out-expo)`,
+          transition: 'opacity 0.5s ease',
         }}
       >
         <button
           onClick={onBack}
           aria-label="Go back"
-          className="group flex items-center gap-2 py-2 px-3 rounded-lg btn-ghost glass"
+          className="flex items-center gap-2 py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
+          style={{ color: 'rgba(255, 255, 255, 0.5)' }}
         >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="transition-transform group-hover:-translate-x-1"
-            style={{ color: 'var(--color-text-muted)' }}
-            aria-hidden="true"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span
-            className="text-display"
-            style={{
-              fontSize: 'var(--text-sm)',
-              color: 'var(--color-text-muted)',
-            }}
-          >
-            Back
-          </span>
+          <BackIcon />
+          <span style={{ fontSize: 'var(--text-sm)' }}>Back</span>
         </button>
       </nav>
 
       {/* Content */}
       <div className="relative z-10 min-h-screen overflow-y-auto">
         <div
-          className="max-w-2xl mx-auto px-6 py-20 gpu-accelerated"
+          className="max-w-2xl mx-auto px-6 py-20"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-            transition: `all var(--duration-slower) var(--ease-out-expo)`,
+            transition: 'all 0.6s ease',
           }}
         >
           <h1
             id="about-heading"
-            className="text-gold mb-8"
+            className="mb-8"
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-3xl)',
-              fontWeight: 'var(--font-light)',
-              letterSpacing: 'var(--tracking-wide)',
+              fontWeight: 300,
+              color: '#d4af37',
             }}
           >
             About AImighty
@@ -91,9 +74,9 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-base)',
-              fontWeight: 'var(--font-light)',
-              color: 'var(--color-text-secondary)',
-              lineHeight: 'var(--leading-relaxed)',
+              fontWeight: 300,
+              color: 'rgba(255, 255, 255, 0.6)',
+              lineHeight: 1.8,
             }}
           >
             <p>
@@ -105,11 +88,8 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
             </p>
 
             <h2
-              className="text-gold mt-10 mb-4"
-              style={{
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-normal)',
-              }}
+              className="mt-10 mb-4"
+              style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}
             >
               How It Works
             </h2>
@@ -121,22 +101,20 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
             </p>
 
             <h2
-              className="text-gold mt-10 mb-4"
-              style={{
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-normal)',
-              }}
+              className="mt-10 mb-4"
+              style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}
             >
               Important Disclaimer
             </h2>
             <div
-              className="p-4 rounded-xl glass"
-              style={{ borderColor: 'rgba(212, 175, 55, 0.2)' }}
+              className="p-4 rounded-xl"
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(212, 175, 55, 0.2)',
+              }}
             >
-              <p className="mb-4">
-                <strong style={{ color: 'var(--color-text-primary)' }}>
-                  AImighty is an AI tool, not a replacement for:
-                </strong>
+              <p className="mb-4" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                <strong>AImighty is an AI tool, not a replacement for:</strong>
               </p>
               <ul className="list-disc list-inside space-y-2 ml-2">
                 <li>Professional religious or spiritual leaders</li>
@@ -151,33 +129,14 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
             </div>
 
             <h2
-              className="text-gold mt-10 mb-4"
-              style={{
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-normal)',
-              }}
-            >
-              Not Affiliated
-            </h2>
-            <p>
-              AImighty is not officially affiliated with, endorsed by, or representative of any
-              religion, denomination, spiritual tradition, or philosophical school. The AI's
-              responses are generated based on its training and should not be considered
-              official doctrine or teaching from any tradition.
-            </p>
-
-            <h2
-              className="text-gold mt-10 mb-4"
-              style={{
-                fontSize: 'var(--text-xl)',
-                fontWeight: 'var(--font-normal)',
-              }}
+              className="mt-10 mb-4"
+              style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}
             >
               Contact
             </h2>
             <p>
               Questions or feedback? Reach out to us at{' '}
-              <a href="mailto:hello@aimighty.me" className="text-gold hover:underline">
+              <a href="mailto:hello@aimighty.me" style={{ color: '#d4af37' }}>
                 hello@aimighty.me
               </a>
             </p>
@@ -187,7 +146,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
                 href="https://instagram.com/aimightyapp"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gold hover:underline"
+                style={{ color: '#d4af37' }}
               >
                 @aimightyapp
               </a>
