@@ -31,12 +31,14 @@ export async function sendMessage(
   beliefSystem: string,
   userId: string,
   callbacks: StreamCallbacks,
-  language: string = 'en'
+  language: string = 'en',
+  character: string = 'god'
 ): Promise<void> {
   // Always log for debugging
   console.log('=== CLAUDE API REQUEST ===');
   console.log('[ClaudeAPI] URL:', WORKER_URL);
   console.log('[ClaudeAPI] Belief system:', beliefSystem);
+  console.log('[ClaudeAPI] Character:', character);
   console.log('[ClaudeAPI] Language:', language);
   console.log('[ClaudeAPI] User ID:', userId);
   console.log('[ClaudeAPI] Messages count:', messages.length);
@@ -47,6 +49,7 @@ export async function sendMessage(
     beliefSystem,
     userId,
     language,
+    character,
   };
   console.log('[ClaudeAPI] Request body:', JSON.stringify(requestBody, null, 2));
 

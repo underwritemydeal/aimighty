@@ -28,6 +28,27 @@ const DISPOSABLE_DOMAINS = [
 const USER_STORAGE_KEY = 'aimighty_user';
 const SESSION_STORAGE_KEY = 'aimighty_session';
 const ACCOUNTS_STORAGE_KEY = 'aimighty_accounts';
+const REMEMBER_ME_KEY = 'aimighty_remember_me';
+
+// Helper to get storage (localStorage if remembered, sessionStorage if not)
+function getStorage(): Storage {
+  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === 'true';
+  return remembered ? localStorage : sessionStorage;
+}
+
+// Set remember me preference
+export function setRememberMe(remember: boolean): void {
+  if (remember) {
+    localStorage.setItem(REMEMBER_ME_KEY, 'true');
+  } else {
+    localStorage.removeItem(REMEMBER_ME_KEY);
+  }
+}
+
+// Get remember me preference
+export function getRememberMe(): boolean {
+  return localStorage.getItem(REMEMBER_ME_KEY) === 'true';
+}
 
 // Session interface
 export interface Session {
@@ -95,10 +116,14 @@ function saveAccount(email: string, passwordHash: string, userId: string): void 
   localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
 }
 
-// Get current user from localStorage
+// Get current user from storage
 export function getCurrentUser(): User | null {
   try {
-    const stored = localStorage.getItem(USER_STORAGE_KEY);
+    // Check localStorage first (remembered), then sessionStorage
+    let stored = localStorage.getItem(USER_STORAGE_KEY);
+    if (!stored) {
+      stored = sessionStorage.getItem(USER_STORAGE_KEY);
+    }
     if (!stored) return null;
     return JSON.parse(stored) as User;
   } catch {
@@ -106,15 +131,22 @@ export function getCurrentUser(): User | null {
   }
 }
 
-// Save user to localStorage
-function saveUser(user: User): void {
-  localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+// Save user to storage
+function saveUser(user: User, rememberMe?: boolean): void {
+  const storage = rememberMe !== undefined
+    ? (rememberMe ? localStorage : sessionStorage)
+    : getStorage();
+  storage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 }
 
 // Get current session
 export function getSession(): Session | null {
   try {
-    const stored = localStorage.getItem(SESSION_STORAGE_KEY);
+    // Check localStorage first (remembered), then sessionStorage
+    let stored = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (!stored) {
+      stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    }
     if (!stored) return null;
     return JSON.parse(stored) as Session;
   } catch {
@@ -123,8 +155,11 @@ export function getSession(): Session | null {
 }
 
 // Save session
-export function saveSession(session: Session): void {
-  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+export function saveSession(session: Session, rememberMe?: boolean): void {
+  const storage = rememberMe !== undefined
+    ? (rememberMe ? localStorage : sessionStorage)
+    : getStorage();
+  storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
 // Update session with belief system
@@ -148,7 +183,7 @@ export function updateSessionLanguage(language: LanguageCode): void {
 }
 
 // Sign up with email and password (no verification - direct account creation)
-export async function signUp(email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> {
+export async function signUp(email: string, password: string, rememberMe: boolean = true): Promise<{ success: boolean; error?: string; user?: User }> {
   // Validate email
   if (!isValidEmail(email)) {
     return { success: false, error: 'Please enter a valid email address' };
@@ -182,10 +217,13 @@ export async function signUp(email: string, password: string): Promise<{ success
     isPremium: false,
   };
 
-  // Save account and user
+  // Set remember me preference
+  setRememberMe(rememberMe);
+
+  // Save account (always in localStorage for persistence) and user
   const passwordHash = simpleHash(password);
   saveAccount(email, passwordHash, userId);
-  saveUser(user);
+  saveUser(user, rememberMe);
 
   // Create session
   const session: Session = {
@@ -193,13 +231,13 @@ export async function signUp(email: string, password: string): Promise<{ success
     email: email.toLowerCase(),
     lastActive: Date.now(),
   };
-  saveSession(session);
+  saveSession(session, rememberMe);
 
   return { success: true, user };
 }
 
 // Sign in with email and password
-export async function signIn(email: string, password: string): Promise<{ success: boolean; error?: string; user?: User }> {
+export async function signIn(email: string, password: string, rememberMe: boolean = true): Promise<{ success: boolean; error?: string; user?: User }> {
   // Validate email
   if (!isValidEmail(email)) {
     return { success: false, error: 'Please enter a valid email address' };
@@ -219,6 +257,9 @@ export async function signIn(email: string, password: string): Promise<{ success
     return { success: false, error: 'Incorrect password' };
   }
 
+  // Set remember me preference
+  setRememberMe(rememberMe);
+
   // Get or create user object
   let user = getCurrentUser();
   if (!user || user.id !== account.userId) {
@@ -230,7 +271,10 @@ export async function signIn(email: string, password: string): Promise<{ success
       messageCount: 0,
       isPremium: false,
     };
-    saveUser(user);
+    saveUser(user, rememberMe);
+  } else {
+    // Re-save to correct storage based on rememberMe
+    saveUser(user, rememberMe);
   }
 
   // Create session
@@ -239,15 +283,19 @@ export async function signIn(email: string, password: string): Promise<{ success
     email: email.toLowerCase(),
     lastActive: Date.now(),
   };
-  saveSession(session);
+  saveSession(session, rememberMe);
 
   return { success: true, user };
 }
 
 // Sign out
 export function signOut(): void {
+  // Clear from both storages
   localStorage.removeItem(USER_STORAGE_KEY);
   localStorage.removeItem(SESSION_STORAGE_KEY);
+  localStorage.removeItem(REMEMBER_ME_KEY);
+  sessionStorage.removeItem(USER_STORAGE_KEY);
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
 }
 
 // Check if user is logged in (has valid session)

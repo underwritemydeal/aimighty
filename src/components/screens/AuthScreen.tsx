@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { signUp, signIn, isValidEmail } from '../../services/auth';
+import { signUp, signIn, isValidEmail, getRememberMe } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
 
@@ -48,6 +48,7 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotMessage, setShowForgotMessage] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => getRememberMe());
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 150);
@@ -75,14 +76,14 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
 
     try {
       if (mode === 'signup') {
-        const result = await signUp(email, password);
+        const result = await signUp(email, password, rememberMe);
         if (result.success && result.user) {
           onAuthSuccess(result.user);
         } else {
           setError(result.error || 'Something went wrong');
         }
       } else {
-        const result = await signIn(email, password);
+        const result = await signIn(email, password, rememberMe);
         if (result.success && result.user) {
           onAuthSuccess(result.user);
         } else {
@@ -264,6 +265,22 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                   Minimum 8 characters
                 </p>
               </div>
+
+              {/* Remember me toggle */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/20 bg-transparent accent-[#d4af37]"
+                  style={{
+                    accentColor: '#d4af37',
+                  }}
+                />
+                <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+                  Remember me
+                </span>
+              </label>
             </div>
 
             {/* Error message */}

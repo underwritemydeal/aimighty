@@ -348,8 +348,8 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
         {/* MIDDLE SECTION: Sacred space - divine figure visible (60%) */}
         <div className="flex-1" aria-hidden="true" />
 
-        {/* BOTTOM SECTION: BEGIN button (bottom 20%) */}
-        <div className="pb-12">
+        {/* BOTTOM SECTION: BEGIN button (at least 80px from bottom) */}
+        <div style={{ paddingBottom: 'max(80px, env(safe-area-inset-bottom, 80px))' }}>
           <button
             onClick={onBegin}
             onKeyDown={handleKeyDown}

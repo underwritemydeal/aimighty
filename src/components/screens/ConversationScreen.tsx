@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { sendMessage, type Message } from '../../services/claudeApi';
-import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled } from '../../services/openaiTTS';
+import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
@@ -586,7 +586,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   // Speak response using OpenAI TTS
   const speakResponse = useCallback((text: string) => {
+    const speakStartTime = Date.now();
+    console.log('[Conversation] speakResponse called, text length:', text.length);
+
     if (!voiceEnabled) {
+      console.log('[Conversation] Voice disabled, skipping TTS');
       setState('idle');
       // If muted, hide controls after 2 seconds
       hideControlsTimer.current = setTimeout(() => {
@@ -595,19 +599,22 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       return;
     }
     setState('speaking');
+    console.log('[Conversation] State set to speaking, calling TTS immediately (t+%dms)', Date.now() - speakStartTime);
 
-    // Use OpenAI TTS with selected character
+    // Use OpenAI TTS with selected character - fire immediately, no delays
     speakWithOpenAI(
       text,
       belief.id,
       character,
       language,
       () => {
+        console.log('[Conversation] TTS callback received (t+%dms)', Date.now() - speakStartTime);
         setState('idle');
         // Hide controls after speech ends
         scheduleHideControls();
       }
-    ).catch(() => {
+    ).catch((e) => {
+      console.error('[Conversation] TTS error:', e);
       setState('idle');
       scheduleHideControls();
     });
@@ -692,13 +699,15 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         },
         onSentence: () => {},
         onComplete: (text) => {
+          console.log('[Conversation] Stream complete, firing TTS immediately');
           fullResponseRef.current = text;
           streamingMessageId.current = null;
-          // Final update
+          // Final update - sync state then immediately fire TTS
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: text } : m))
           );
           setApiMessages([...newApiMessages, { role: 'assistant', content: text }]);
+          // Fire TTS immediately - no awaits, no delays
           speakResponse(text);
           setTimeout(scrollToBottom, 100);
 
@@ -715,13 +724,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           speakResponse(errorMessage);
         },
       },
-      language
+      language,
+      character
     );
-  }, [apiMessages, belief.id, user.id, user.isPremium, speakResponse, onPaywall, language, scrollToBottom]);
+  }, [apiMessages, belief.id, user.id, user.isPremium, speakResponse, onPaywall, language, scrollToBottom, character]);
 
   // Handle send
   const handleSend = useCallback(() => {
     if (!inputText.trim() || !isInputEnabled) return;
+    // Unlock mobile audio on user gesture
+    unlockMobileAudio();
     const message = inputText.trim();
     setInputText('');
     sendToAI(message);
@@ -737,6 +749,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   // Mic toggle
   const handleMicToggle = useCallback(() => {
+    // Unlock mobile audio on user gesture
+    unlockMobileAudio();
     setSpeechError(null);
     if (state === 'listening') {
       stopListening();
@@ -905,10 +919,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           }}
         >
           {/* Vertical centering wrapper - centers content when only greeting */}
+          {/* Desktop: max-width 800px centered. Mobile: full width */}
           <div
-            className="max-w-2xl mx-auto flex flex-col"
+            className="mx-auto flex flex-col"
             style={{
               minHeight: '100%',
+              maxWidth: 'min(800px, 100%)',
               justifyContent: displayMessages.length <= 1 ? 'center' : 'flex-start',
               paddingTop: displayMessages.length <= 1 ? '0' : '24px',
               paddingBottom: '24px',
@@ -918,7 +934,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             {displayMessages.map((message, index) => (
               <div
                 key={message.id}
-                className={`${message.role === 'user' ? 'flex justify-end' : 'flex justify-center'}`}
+                className={`${message.role === 'user' ? 'flex justify-end md:justify-center' : 'flex justify-center'}`}
                 style={{
                   animation: `fadeInUp 0.5s ease forwards`,
                   animationDelay: `${index * 0.05}s`,
@@ -926,10 +942,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 }}
               >
                 {message.role === 'user' ? (
-                  // User message - glass bubble, right-aligned
+                  // User message - glass bubble
+                  // Mobile: right-aligned, max 85%
+                  // Desktop: centered container, right-aligned text, max 50%
                   <div
+                    className="user-message-bubble"
                     style={{
-                      maxWidth: '85%',
+                      maxWidth: 'min(85%, 400px)',
                       padding: '12px 16px',
                       background: 'rgba(255, 255, 255, 0.08)',
                       backdropFilter: 'blur(10px)',
@@ -939,14 +958,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                       fontWeight: 400,
                       color: 'rgba(255, 248, 240, 0.95)',
                       lineHeight: 1.6,
+                      textAlign: 'right',
                     }}
                   >
                     {message.content}
                   </div>
                 ) : (
                   // God's message - divine text, centered
+                  // Mobile: max 85%, smaller font
+                  // Desktop: max 65%, larger font, more line-height
                   <div
-                    className="text-divine text-center"
+                    className="text-divine text-center divine-message"
                     style={{
                       maxWidth: '85%',
                       fontSize: 'clamp(1.15rem, 3.2vw, 1.5rem)',
