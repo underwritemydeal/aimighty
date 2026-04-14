@@ -35,7 +35,7 @@ export async function speakWithOpenAI(
   language: string = 'en',
   onEnd?: () => void
 ): Promise<void> {
-  console.log('[OpenAI TTS] Speaking:', text.substring(0, 50) + '...', 'voice enabled:', voiceEnabled);
+  console.log('[OpenAI TTS] Speaking:', text.substring(0, 50) + '...', 'beliefSystem:', beliefSystem, 'character:', character, 'language:', language, 'voice enabled:', voiceEnabled);
 
   // Stop any current audio
   stop();

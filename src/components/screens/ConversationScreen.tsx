@@ -28,6 +28,24 @@ type Character = 'god' | 'jesus' | 'mary';
 // Belief systems that can use Jesus character
 const CHRISTIAN_BELIEFS = ['protestant', 'catholic', 'mormonism'];
 
+// Character labels per belief system
+const CHARACTER_LABELS: Record<string, { god: string; jesus?: string; mary: string }> = {
+  protestant: { god: 'God', jesus: 'Jesus', mary: 'Mary' },
+  catholic: { god: 'God', jesus: 'Jesus', mary: 'Mary' },
+  mormonism: { god: 'God', jesus: 'Jesus', mary: 'Mary' },
+  islam: { god: 'Allah', mary: 'Divine Feminine' },
+  judaism: { god: 'Adonai', mary: 'Shekhinah' },
+  hinduism: { god: 'Brahman', mary: 'Divine Mother' },
+  buddhism: { god: 'The Buddha', mary: 'Kuan Yin' },
+  sikhism: { god: 'Waheguru', mary: 'Divine Light' },
+  taoism: { god: 'The Tao', mary: 'Divine Feminine' },
+  sbnr: { god: 'The Universe', mary: 'Source Energy' },
+  pantheism: { god: 'The Earth', mary: 'Gaia' },
+  science: { god: 'The Cosmos', mary: 'The Universe' },
+  agnosticism: { god: 'Wisdom', mary: 'Inner Voice' },
+  atheism: { god: 'Reason', mary: 'Wisdom' },
+};
+
 // Message with metadata for display
 interface DisplayMessage {
   id: string;
@@ -118,21 +136,24 @@ const SendIcon = memo(function SendIcon() {
 const CharacterSelector = memo(function CharacterSelector({
   character,
   onChange,
-  isChristian,
+  beliefId,
   accentColor,
 }: {
   character: Character;
   onChange: (c: Character) => void;
-  isChristian: boolean;
+  beliefId: string;
   accentColor: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Character labels - vary by belief system
-  const labels: Record<Character, string> = {
-    god: isChristian ? 'God' : 'The Divine',
-    jesus: 'Jesus',
-    mary: isChristian ? 'Mary' : 'Divine Mother',
+  const isChristian = CHRISTIAN_BELIEFS.includes(beliefId);
+  const beliefLabels = CHARACTER_LABELS[beliefId] || CHARACTER_LABELS.sbnr;
+
+  // Get label for current character
+  const getLabel = (char: Character): string => {
+    if (char === 'god') return beliefLabels.god;
+    if (char === 'jesus') return beliefLabels.jesus || 'Jesus';
+    return beliefLabels.mary;
   };
 
   const options: Character[] = isChristian
@@ -148,7 +169,7 @@ const CharacterSelector = memo(function CharacterSelector({
         aria-label="Select voice character"
       >
         <span style={{ fontSize: '0.7rem', letterSpacing: '0.05em' }}>
-          {labels[character]}
+          {getLabel(character)}
         </span>
         <ChevronDownIcon />
       </button>
@@ -178,7 +199,7 @@ const CharacterSelector = memo(function CharacterSelector({
                   fontWeight: character === opt ? 500 : 400,
                 }}
               >
-                {labels[opt]}
+                {getLabel(opt)}
               </button>
             ))}
           </div>
@@ -449,9 +470,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [character, setCharacter] = useState<Character>('god');
-
-  // Check if current belief supports Jesus character
-  const isChristianBelief = CHRISTIAN_BELIEFS.includes(belief.id);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -768,7 +786,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             <CharacterSelector
               character={character}
               onChange={setCharacter}
-              isChristian={isChristianBelief}
+              beliefId={belief.id}
               accentColor={accentColor}
             />
           </div>
