@@ -1,9 +1,6 @@
 @import "tailwindcss";
 
-/* ============================================
-   GOOGLE FONTS — Cormorant Garamond for divine text
-   ============================================ */
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&display=swap');
+/* Cormorant Garamond font loaded via index.html to avoid PostCSS @import ordering issues */
 
 /* ============================================
    DESIGN TOKENS — PREMIUM SPIRITUAL DESIGN

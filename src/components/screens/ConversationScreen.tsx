@@ -380,10 +380,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     >
       {/* Background image */}
       <div
-        className="fixed inset-0 bg-image-cover"
+        className="fixed inset-0"
         style={{
           backgroundImage: `url(${imagePath})`,
-          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+          backgroundPosition: 'top center',
+          backgroundRepeat: 'no-repeat',
         }}
         aria-hidden="true"
       />

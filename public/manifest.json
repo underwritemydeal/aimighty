@@ -1,0 +1,20 @@
+{
+  "name": "AImighty",
+  "short_name": "AImighty",
+  "description": "Every belief. One voice. AI-powered spiritual guidance.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#030308",
+  "theme_color": "#d4af37",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["lifestyle", "education"],
+  "lang": "en"
+}

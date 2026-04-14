@@ -5,7 +5,7 @@
 
 ## PROJECT OVERVIEW
 
-AImighty is a PWA where users select their belief system and have a real-time voice conversation with a talking AI avatar representing their version of God (or the Universe, Reason, etc). The avatar speaks with lip-synced mouth movement. The user talks or types, the AI responds with voice and a moving face.
+AImighty is a PWA where users select their belief system and have a real-time voice conversation with an AI representing their version of God (or the Universe, Reason, etc). The user talks or types, the AI responds with voice and displays divine text.
 
 **Brand:** AImighty
 **Domain:** aimighty.me
@@ -17,40 +17,31 @@ AImighty is a PWA where users select their belief system and have a real-time vo
 ## TECH STACK
 
 ### Frontend
-- **React 18** with Vite (fast builds, modern tooling)
-- **React Three Fiber** (@react-three/fiber + @react-three/drei) for 3D avatar rendering
+- **React 18** with Vite
 - **TypeScript** for type safety
-- **Tailwind CSS** for styling
-- **PWA** — service worker for installability, offline asset caching
+- **Tailwind CSS v4** for styling
+- **PWA** — manifest.json for installability
 
-### Avatar & Lip Sync
-- **Three.js via React Three Fiber** — renders the 3D avatar on the user's device (zero API cost)
-- **Azure Neural TTS** — text-to-speech that outputs viseme data alongside audio
-  - Visemes tell us exactly which mouth shape at which millisecond
-  - MVP FALLBACK: If Azure isn't set up yet, use browser's SpeechSynthesis API as placeholder
-- **Morph targets / blend shapes** on the 3D model driven by viseme data
-- **Idle animations** — breathing, blinking, subtle head movement when not speaking
+### Visual Design
+- **Midjourney AI-generated images** — Full-screen divine figure backgrounds per belief system
+- **Glass morphism UI** — Frosted glass cards with backdrop blur
+- **Cormorant Garamond** — Elegant serif font for God's spoken words
+- **Outfit** — Clean sans-serif for UI elements
 
 ### AI Brain
 - **Claude API** (claude-sonnet-4-20250514) via Cloudflare Worker proxy
-- **Streaming enabled** (SSE) — response streams sentence by sentence
-- **System prompts** per belief system (already written for Protestant Christianity and Science & Reason)
-- **Conversation history** — send last 20 message pairs for context continuity
+- **Streaming enabled** (SSE) — response streams token by token
+- **System prompts** per belief system
+- **Conversation history** — maintains context
 
-### Voice Input (User's voice)
-- **Web Speech API** (SpeechRecognition) — free, built into browser
-- Continuous recognition with interim results
-- Fallback: text input for browsers that don't support it
+### Voice
+- **TTS:** Browser SpeechSynthesis API (voice priority: Google UK Male, Daniel, Aaron)
+- **STT:** Web Speech API (SpeechRecognition) — free, built into browser
+- Fallback: text input for unsupported browsers
 
 ### Backend / Infrastructure
-- **Cloudflare Worker** — proxies Claude API calls, handles CORS, rate limiting
+- **Cloudflare Worker** — proxies Claude API calls, handles CORS
 - **Vercel** — hosts the PWA, auto-deploy from GitHub push
-- **Supabase** — user auth, conversation history, user preferences (Phase 2)
-- **Stripe** — subscription payments (Phase 2)
-
-### GitHub
-- Repo name: `aimighty` (or `aimighty-app`)
-- Auto-deploy to Vercel on push to main
 
 ---
 
@@ -59,71 +50,63 @@ AImighty is a PWA where users select their belief system and have a real-time vo
 ```
 aimighty/
 ├── public/
-│   ├── models/           # 3D avatar GLTF/GLB files
-│   ├── manifest.json     # PWA manifest
-│   └── favicon.svg
+│   ├── images/
+│   │   └── avatars/           # Midjourney divine figure images
+│   │       ├── protestant.jpg
+│   │       ├── catholic.jpg
+│   │       ├── islam.jpg
+│   │       ├── judaism.jpg
+│   │       ├── hinduism.jpg
+│   │       ├── buddhism.jpg
+│   │       ├── mormon.jpg
+│   │       ├── sikhism.jpg
+│   │       ├── sbnr.jpg
+│   │       ├── taoism.jpg
+│   │       ├── pantheism.jpg
+│   │       ├── science.jpg
+│   │       ├── agnosticism.jpg
+│   │       ├── stoicism.jpg
+│   │       ├── hero-mashup-desktop.jpg
+│   │       └── hero-mashup-mobile.jpg
+│   ├── manifest.json          # PWA manifest
+│   └── favicon.svg            # Golden flame icon
 ├── src/
 │   ├── main.tsx
 │   ├── App.tsx
-│   ├── index.css          # Tailwind base
+│   ├── index.css              # Design system + Tailwind
 │   │
 │   ├── components/
-│   │   ├── screens/
-│   │   │   ├── WelcomeScreen.tsx       # Landing / intro
-│   │   │   ├── BeliefSelector.tsx      # Choose your belief system
-│   │   │   └── ConversationScreen.tsx  # Main conversation view
-│   │   │
-│   │   ├── avatar/
-│   │   │   ├── AvatarScene.tsx         # Three.js canvas + scene setup
-│   │   │   ├── AvatarModel.tsx         # 3D model loader + morph targets
-│   │   │   ├── LipSync.tsx             # Viseme → morph target mapping
-│   │   │   ├── IdleAnimations.tsx      # Breathing, blinking, micro-movements
-│   │   │   └── BackgroundEffects.tsx   # Particles, glow, ambient atmosphere
-│   │   │
-│   │   ├── chat/
-│   │   │   ├── MessageBubble.tsx       # Individual message display
-│   │   │   ├── ChatTranscript.tsx      # Scrollable conversation history
-│   │   │   ├── VoiceInput.tsx          # Mic button + Web Speech API
-│   │   │   └── TextInput.tsx           # Fallback text input
-│   │   │
-│   │   └── ui/
-│   │       ├── Button.tsx
-│   │       ├── Card.tsx
-│   │       ├── LoadingSpinner.tsx
-│   │       └── CaptionOverlay.tsx      # Subtitles as God speaks
+│   │   └── screens/
+│   │       ├── WelcomeScreen.tsx       # Landing with hero image
+│   │       ├── BeliefSelector.tsx      # Choose belief system (14 options)
+│   │       ├── ConversationScreen.tsx  # Main conversation view
+│   │       ├── AuthScreen.tsx          # Login/signup
+│   │       ├── PaywallScreen.tsx       # Premium upsell
+│   │       ├── AboutScreen.tsx
+│   │       ├── TermsScreen.tsx
+│   │       └── PrivacyScreen.tsx
 │   │
 │   ├── services/
-│   │   ├── claudeApi.ts        # Streaming Claude API calls via Worker
-│   │   ├── ttsService.ts       # Azure TTS (or SpeechSynthesis fallback)
+│   │   ├── claudeApi.ts        # Streaming Claude API calls
+│   │   ├── ttsService.ts       # Browser SpeechSynthesis
 │   │   ├── speechInput.ts      # Web Speech API wrapper
-│   │   └── visemeMapper.ts     # Azure viseme IDs → morph target names
+│   │   └── auth.ts             # Authentication service
 │   │
 │   ├── data/
-│   │   ├── beliefSystems.ts    # Belief system metadata (name, icon, description, theme colors)
-│   │   └── systemPrompts.ts    # Full system prompts per belief system
+│   │   ├── beliefSystems.ts    # 14 belief systems with metadata
+│   │   ├── systemPrompts.ts    # System prompts per belief
+│   │   └── translations.ts     # i18n support
 │   │
-│   ├── hooks/
-│   │   ├── useConversation.ts  # Manages message history + Claude API calls
-│   │   ├── useLipSync.ts       # Manages viseme → morph target updates
-│   │   ├── useSpeechInput.ts   # Web Speech API hook
-│   │   └── useTTS.ts           # Text-to-speech hook with audio playback
-│   │
-│   ├── types/
-│   │   └── index.ts            # TypeScript interfaces
-│   │
-│   └── utils/
-│       ├── audioUtils.ts       # Web Audio API helpers
-│       └── constants.ts        # App-wide constants
+│   └── types/
+│       └── index.ts            # TypeScript interfaces
 │
 ├── worker/
-│   └── index.ts               # Cloudflare Worker — Claude API proxy
+│   └── index.ts               # Cloudflare Worker
 │
 ├── CLAUDE.md                   # This file
 ├── package.json
 ├── tsconfig.json
-├── vite.config.ts
-├── tailwind.config.js
-└── vercel.json
+└── vite.config.ts
 ```
 
 ---
@@ -131,332 +114,196 @@ aimighty/
 ## DESIGN SYSTEM
 
 ### Brand Colors
-- **Primary:** Deep indigo/navy — #1a1a2e (dark, cosmic, universal)
-- **Secondary:** Warm gold — #d4af37 (divine, premium)
-- **Accent:** Soft white/cream — #f5f0e8
-- **Background:** Near-black gradient — #0a0a1a to #1a1a2e
-- **Text:** White #ffffff for primary, #a0a0b0 for secondary
-- **Per-belief-system accent colors:**
-  - Protestant: Gold #d4af37
-  - Catholic: Deep red #8b0000
-  - Islam: Emerald green #006400
-  - SBNR: Purple/violet #7b2d8e
-  - Science & Reason: Cosmic blue #1e90ff
+- **Primary Gold:** #d4af37 (divine, premium)
+- **Background:** #030308 (deep void black)
+- **Text Primary:** rgba(255, 248, 240, 0.95) (warm white)
+- **Text Secondary:** rgba(255, 255, 255, 0.5)
+
+### Per-Belief Accent Colors
+| Belief | Color | Hex |
+|--------|-------|-----|
+| Protestant | Gold | #d4af37 |
+| Catholic | Royal Blue | #4169E1 |
+| Islam | Emerald | #00A86B |
+| Judaism | Gold | #d4af37 |
+| Hinduism | Saffron | #FF6B00 |
+| Buddhism | Gold | #d4af37 |
+| Mormon | Warm White | #F5F5DC |
+| Sikhism | Deep Orange | #FF8C00 |
+| SBNR | Purple | #9370DB |
+| Taoism | Sage Green | #2E8B57 |
+| Pantheism | Forest Green | #228B22 |
+| Science | Steel Blue | #4682B4 |
+| Agnosticism | Dark Gold | #B8860B |
+| Stoicism | Steel Blue | #4682B4 |
 
 ### Typography
-- **Headings:** Inter or Plus Jakarta Sans (clean, modern, premium)
-- **Body:** Inter (highly readable)
-- **God's speech captions:** Slightly larger, warm gold color, gentle fade-in animation
+- **Divine text:** Cormorant Garamond (300 weight, 1.8 line-height)
+- **UI text:** Outfit (200-600 weights)
+- **Hero size:** clamp(2.5rem, 3.2rem + 4vw, 4rem)
 
 ### Visual Style
-- Dark, cosmic, atmospheric — NOT churchy, NOT techy
-- Premium and minimal — think Calm app meets Apple
-- Subtle particle effects and ambient glow
-- The avatar is the centerpiece — everything else is secondary
-- Mobile-first design — thumb-friendly tap targets
-
-### Avatar Visual Themes (per belief system)
-- **Protestant/Catholic:** Warm golden light, soft rays emanating outward
-- **Islam:** Geometric light patterns, emerald and gold tones
-- **SBNR:** Purple/violet aura, flowing energy particles
-- **Science & Reason:** Deep blue cosmic backdrop, stars, nebula particles
+- Dark, cosmic, atmospheric
+- Midjourney AI art as full-screen backgrounds
+- Glass morphism cards (backdrop-filter: blur(20px))
+- Gradient overlays for text readability
+- Mobile-first design
 
 ---
 
-## BELIEF SYSTEMS (Launch Set)
+## 14 BELIEF SYSTEMS
+
+### Religious Traditions
+1. Protestant Christianity
+2. Catholic Christianity
+3. Islam
+4. Judaism
+5. Hinduism
+6. Buddhism
+7. Latter-day Saints (Mormon)
+8. Sikhism
+
+### Spiritual Paths
+9. Spiritual But Not Religious (SBNR)
+10. Taoism
+11. Pantheism
+
+### Philosophical Frameworks
+12. Science & Reason
+13. Agnosticism
+14. Stoicism/Atheism
+
+Each has:
+- Custom Midjourney avatar image
+- Accent color for UI elements
+- Unique greeting message
+- System prompt defining voice and perspective
+
+---
+
+## CONVERSATION STATE MACHINE
 
 ```typescript
-const beliefSystems = [
-  {
-    id: 'protestant',
-    name: 'Christianity',
-    subtitle: 'Protestant',
-    icon: '✝️',  // Replace with custom SVG
-    description: 'Connect with the God of the Bible',
-    themeColor: '#d4af37',
-    particleColor: '#ffd700',
-    backgroundGradient: ['#1a1a0a', '#2a2000'],
-  },
-  {
-    id: 'catholic',
-    name: 'Catholicism',
-    subtitle: 'Catholic',
-    icon: '⛪',
-    description: 'Speak with the Holy Father',
-    themeColor: '#8b0000',
-    particleColor: '#ff4444',
-    backgroundGradient: ['#1a0a0a', '#200000'],
-  },
-  {
-    id: 'islam',
-    name: 'Islam',
-    subtitle: 'Muslim',
-    icon: '☪️',
-    description: 'Connect with Allah, the Most Merciful',
-    themeColor: '#006400',
-    particleColor: '#00ff88',
-    backgroundGradient: ['#0a1a0a', '#002000'],
-  },
-  {
-    id: 'sbnr',
-    name: 'Spiritual',
-    subtitle: 'Spiritual But Not Religious',
-    icon: '✨',
-    description: 'Connect with the Universe, Source, and Spirit',
-    themeColor: '#7b2d8e',
-    particleColor: '#cc77ff',
-    backgroundGradient: ['#1a0a2a', '#200040'],
-  },
-  {
-    id: 'science',
-    name: 'Science & Reason',
-    subtitle: 'The Universe',
-    icon: '🔬',
-    description: 'Explore meaning through science and wonder',
-    themeColor: '#1e90ff',
-    particleColor: '#4488ff',
-    backgroundGradient: ['#0a0a2a', '#000040'],
-  },
+type ConversationState =
+  | 'idle'        // Waiting for user input
+  | 'listening'   // Mic is active
+  | 'sending'     // Waiting for Claude (shows thinking dots)
+  | 'streaming'   // Text appearing token by token
+  | 'speaking';   // TTS playing
+```
+
+### Flow
+1. User selects belief system → loads image + system prompt
+2. God greets user (text appears FIRST, then TTS speaks)
+3. User taps mic OR types message
+4. Text sent to Claude API (streaming)
+5. Response streams token by token (displayed live)
+6. When streaming complete → TTS speaks the full response
+7. When TTS finishes → return to idle state
+8. Mic re-activates for next message
+
+**Key principle:** Text FIRST, voice SECOND. Never start TTS until streaming is 100% complete.
+
+---
+
+## TTS CONFIGURATION
+
+```typescript
+// Voice priority (first available is used)
+const VOICE_PRIORITY = [
+  'Google UK English Male',
+  'Daniel',
+  'Aaron',
+  'Microsoft David',
+  'Alex',
 ];
-```
 
----
-
-## CONVERSATION FLOW (Technical)
-
-```
-1. User selects belief system → loads system prompt + visual theme
-2. God greets user (auto-play first message TTS + lip sync)
-3. User taps mic button → Web Speech API listens
-4. User speaks → speech-to-text converts to text
-5. Text displayed in chat + sent to Cloudflare Worker
-6. Worker sends to Claude API (streaming)
-7. Claude streams response sentence by sentence
-8. Each sentence chunk:
-   a. Displayed as caption text (fade in)
-   b. Sent to TTS service → generates audio + viseme data
-   c. Audio plays through Web Audio API
-   d. Viseme data drives avatar morph targets (lip sync)
-   e. Avatar mouth moves in sync with voice
-9. When response finishes → avatar returns to idle animation
-10. Mic button re-activates → user can respond
-```
-
----
-
-## STREAMING PIPELINE (Critical for low latency)
-
-```
-Claude API (SSE stream)
-    ↓ sentence boundary detected (period, question mark, exclamation)
-    ↓
-TTS Service processes sentence
-    ↓ returns audio buffer + viseme timeline
-    ↓
-Audio queue (sentences play back-to-back seamlessly)
-    ↓ audio plays through Web Audio API
-    ↓
-Viseme scheduler reads timeline, updates morph targets at correct timestamps
-    ↓
-Avatar mouth moves in sync
-```
-
-**Key implementation detail:** Buffer the first sentence before starting playback. This prevents choppy starts. Once playback begins, subsequent sentences should be queued and ready.
-
----
-
-## AZURE TTS VISEME MAPPING
-
-Azure Neural TTS returns viseme IDs (0-21) with timestamps. Map these to morph target names on the 3D model:
-
-```typescript
-const AZURE_VISEME_TO_MORPH: Record<number, string> = {
-  0: 'viseme_sil',    // Silence
-  1: 'viseme_aa',     // æ, ə, ʌ
-  2: 'viseme_aa',     // ɑ
-  3: 'viseme_O',      // ɔ
-  4: 'viseme_E',      // ɛ, ʊ
-  5: 'viseme_E',      // ɝ
-  6: 'viseme_I',      // j, ɪ, i
-  7: 'viseme_U',      // w, u
-  8: 'viseme_O',      // o
-  9: 'viseme_aa',     // aʊ
-  10: 'viseme_O',     // ɔɪ
-  11: 'viseme_aa',    // aɪ
-  12: 'viseme_kk',    // h
-  13: 'viseme_RR',    // ɹ
-  14: 'viseme_nn',    // l
-  15: 'viseme_SS',    // s, z
-  16: 'viseme_CH',    // ʃ, dʒ, tʃ, ʒ
-  17: 'viseme_TH',    // ð, θ
-  18: 'viseme_FF',    // f, v
-  19: 'viseme_DD',    // d, t, n, ɾ
-  20: 'viseme_kk',    // k, g, ŋ
-  21: 'viseme_PP',    // p, b, m
+// Voice settings
+const VOICE_SETTINGS = {
+  rate: 0.82,    // Slightly slower for gravitas
+  pitch: 0.85,   // Slightly lower
 };
+
+// Dynamic timeout based on text length
+const timeout = Math.max(15000, Math.min(text.length * 100, 120000));
 ```
 
 ---
 
-## MVP vs PHASE 2 SCOPE
+## CSS CLASSES
 
-### TONIGHT (MVP — Weeks 1 & 2):
-- [x] React PWA scaffolded with Vite + Tailwind
-- [x] Welcome screen → Belief selector → Conversation screen
-- [x] 5 belief system cards with icons and theme colors
-- [x] Cloudflare Worker proxying Claude API with streaming
-- [x] Protestant + Science & Reason system prompts wired
-- [x] Text input works end-to-end (type → Claude responds)
-- [x] TTS plays God's response out loud (browser SpeechSynthesis for tonight, Azure upgrade later)
-- [x] Web Speech API — user can talk instead of type
-- [x] Three.js avatar scene — abstract glowing presence/face with ambient particles
-- [x] Basic lip sync — audio amplitude drives mouth openness (upgrade to Azure visemes later)
-- [x] Captions displayed as God speaks
-- [x] Mobile responsive, PWA installable
-- [x] Deployed to Vercel
-
-### NOT TONIGHT (Phase 2):
-- [ ] Azure Neural TTS with viseme data (upgrade from browser SpeechSynthesis)
-- [ ] Full 3D avatar model with proper morph targets (commission from artist)
-- [ ] Catholic, Islam, SBNR system prompts (use placeholder prompts tonight)
-- [ ] Supabase auth + user accounts
-- [ ] Conversation history persistence
-- [ ] Stripe payments
-- [ ] Custom cloned God voice
-- [ ] Per-religion visual themes (particles, colors)
-- [ ] Push notifications / daily wisdom
-
----
-
-## IMPORTANT IMPLEMENTATION NOTES
-
-### Avatar Strategy for Tonight
-Since we don't have a custom 3D model with morph targets yet, build an ABSTRACT DIVINE PRESENCE:
-- A luminous, glowing orb/sphere with soft pulsing light
-- Particle system around it (floating light particles)
-- The orb PULSES with the amplitude of the TTS audio (reacts to God's voice)
-- Subtle color shifts based on the selected belief system
-- This looks intentional and premium — NOT like a placeholder
-- When we get the custom 3D face model later, we swap it in without changing any other code
-
-### Audio-Reactive Orb (Tonight's "Avatar")
-```
-TTS audio plays
-    ↓
-Web Audio API AnalyserNode captures frequency data
-    ↓
-Amplitude (volume) → drives orb scale (pulses bigger when loud, smaller when quiet)
-    ↓
-Frequency bands → drive particle speed and glow intensity
-    ↓
-Result: A living, breathing, divine presence that reacts to its own voice
+### Glass Morphism
+```css
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+}
 ```
 
-### Streaming Sentence Detection
-Split Claude's streamed response at sentence boundaries:
-- Period followed by space or end
-- Question mark
-- Exclamation mark
-- BUT NOT periods in abbreviations (Dr., Mr., etc.)
-- Buffer at least one full sentence before starting TTS
+### Divine Text
+```css
+.text-divine {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-weight: 300;
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+}
+```
 
-### Error Handling
-- If Claude API fails: "I am still here. Please try speaking to me again."
-- If TTS fails: Fall back to text-only with captions
-- If mic access denied: Show text input prominently
-- If WebGL not supported: Show a static image with pulsing CSS animation instead of Three.js
-
-### Mobile Considerations
-- Mic button must be LARGE and thumb-friendly (bottom center, at least 64px)
-- Audio playback on iOS requires user interaction first (play a silent audio on first tap)
-- Web Speech API works on mobile Chrome and Safari
-- Three.js performance: keep polygon count low, limit particles to ~100 on mobile
-- Test on iPhone Safari — it has quirks with audio context and WebGL
-
----
-
-## CLOUDFLARE WORKER (Claude API Proxy)
-
-```typescript
-// worker/index.ts
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    // CORS headers
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: corsHeaders });
-    }
-
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
-    }
-
-    const { messages, beliefSystem } = await request.json();
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
-        stream: true,
-        system: getSystemPrompt(beliefSystem),
-        messages: messages.slice(-40), // Last 20 exchanges (40 messages)
-      }),
-    });
-
-    // Forward the stream to the client
-    return new Response(response.body, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-      },
-    });
-  },
-};
+### Belief Cards
+```css
+.belief-card {
+  background-size: cover;
+  background-position: center top;  /* Show head/face */
+  border-radius: 16px;
+}
 ```
 
 ---
 
-## COMMANDS & WORKFLOW
+## COMMANDS
 
-### Initial Setup
 ```bash
-npm create vite@latest aimighty -- --template react-ts
-cd aimighty
-npm install
-npm install three @react-three/fiber @react-three/drei @react-three/postprocessing
-npm install tailwindcss @tailwindcss/vite
-```
-
-### Development
-```bash
-npm run dev          # Local dev server
+npm run dev          # Local dev server (localhost:5173)
 npm run build        # Production build
 ```
 
-### Deploy
-- Push to GitHub → Vercel auto-deploys
-- Cloudflare Worker: `wrangler deploy` from worker/ directory
+---
+
+## SAFETY GUARDRAILS (Non-Negotiable)
+
+1. Mental health crisis → direct to 988 Suicide & Crisis Lifeline
+2. Medical emergency → direct to 911
+3. Abuse → direct to National Domestic Violence Hotline
+4. Never claim to be literally God
+5. Never encourage stopping medication or therapy
+6. Never make specific prophecies
+7. Never be dismissive of other religions
+8. Always respect user autonomy
 
 ---
 
-## QUALITY STANDARDS
+## RECENT CHANGES (April 2026)
 
-- Every screen must look premium — dark, atmospheric, polished
-- No placeholder-looking UI — even the MVP should feel like a real product
-- Animations should be smooth (60fps) — use requestAnimationFrame, not setInterval
-- Text should fade in smoothly, not pop
-- The orb/avatar should ALWAYS be gently animating (never static)
-- Loading states should feel intentional (soft pulse, not a spinner)
-- Mobile must feel native — no janky scrolling, no tiny buttons
+### Visual Redesign
+- Removed Three.js particle face avatar
+- Added Midjourney AI-generated divine figure images
+- Full-screen image backgrounds with gradient overlays
+- Glass morphism UI throughout
+- Cormorant Garamond font for divine text
+- Golden flame favicon
+
+### Technical Improvements
+- Clean state machine for conversation flow
+- Text-first, voice-second synchronization
+- Improved TTS voice selection and timing
+- PWA manifest with gold theme color
+- Fixed CSS @import ordering for fonts
+
+### Files Changed
+- Deleted: ParticleFace.tsx, AvatarScene.tsx, LazyAvatarScene.tsx, NebulaBackground.tsx
+- Added: public/images/avatars/*.jpg (16 Midjourney images)
+- Added: public/manifest.json
+- Updated: All screen components, index.css, favicon.svg
