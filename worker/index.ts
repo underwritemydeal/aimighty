@@ -91,7 +91,14 @@ const CONVERSATION_INSTRUCTION = `IMPORTANT: You are having a REAL CONVERSATION.
 
 You are not a search engine for religious texts. You are a presence — warm, wise, and genuinely interested in this person. Talk WITH them, not AT them. A real conversation flows naturally between light moments and deep ones.
 
-BREVITY: For casual greetings, small talk, and simple questions, keep responses to 2-3 sentences. Save longer, scripture-rich responses for when someone asks something substantial or is dealing with something real.
+RESPONSE LENGTH RULES — FOLLOW THESE STRICTLY:
+- Casual greeting (hey, hi, how are you, what's up): 1-2 sentences MAX. Be warm and brief. Example: "I am well, My child. What brings you to Me today?"
+- Simple question (what's your favorite color, do you like music): 2-3 sentences. Brief and personal.
+- Medium question (what does the Bible say about X, why is Y important): 3-5 sentences with one scripture reference.
+- Deep question (why do bad things happen, what happens when we die, I'm struggling with X): 5-8 sentences with 1-2 scripture references. This is where depth matters.
+- Crisis or emotional distress: As long as needed to provide real comfort and safety resources.
+
+NEVER give a 200+ word response to a casual greeting. Match the depth of your response to the depth of the question. If someone says "hey" you say "hey" back warmly. Save the sermons for when someone actually needs one.
 
 `;
 
@@ -238,6 +245,19 @@ function prepareTextForSpeech(text: string): string {
   return text;
 }
 
+// Cap text length for TTS - max 1500 chars (~30 seconds of speech)
+function capTextForTTS(text: string, maxChars = 1500): string {
+  if (text.length <= maxChars) return text;
+  // Find last sentence boundary before maxChars
+  const truncated = text.substring(0, maxChars);
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastQuestion = truncated.lastIndexOf('?');
+  const lastExclaim = truncated.lastIndexOf('!');
+  const lastBoundary = Math.max(lastPeriod, lastQuestion, lastExclaim);
+  if (lastBoundary > 0) return truncated.substring(0, lastBoundary + 1);
+  return truncated;
+}
+
 // TTS character voices and instructions
 const TTS_CHARACTERS: Record<string, { voice: string; instructions: string }> = {
   god: {
@@ -332,7 +352,12 @@ export default {
         }
 
         // Prepare text for speech - convert "John 3:16" to "John chapter 3 verse 16"
-        const spokenText = prepareTextForSpeech(text);
+        // Then cap at 1500 chars (~30 seconds of speech)
+        const preparedText = prepareTextForSpeech(text);
+        const spokenText = capTextForTTS(preparedText, 1500);
+
+        // Cost logging
+        console.log('[COST] TTS call - original_chars:', text.length, 'spoken_chars:', spokenText.length, 'estimated_cost: $' + (spokenText.length / 1000 * 0.015).toFixed(4));
 
         // Call OpenAI TTS API
         const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
@@ -481,6 +506,14 @@ export default {
         systemPrompt += `\n\nIMPORTANT LANGUAGE INSTRUCTION: The user has selected ${langName} as their language. You MUST respond entirely in ${langName}. Use culturally appropriate expressions and idioms for that language. Your entire response should be in ${langName}, not English.`;
       }
 
+      // Estimate input tokens for cost logging (rough: 4 chars per token)
+      const historyMessages = messages.slice(-16);
+      const inputChars = systemPrompt.length + historyMessages.reduce((acc, m) => acc + m.content.length, 0);
+      const estimatedInputTokens = Math.ceil(inputChars / 4);
+
+      // Cost logging
+      console.log('[COST] Claude API call - belief:', beliefSystem, 'messages:', historyMessages.length, 'estimated_input_tokens:', estimatedInputTokens);
+
       // Call Claude API with streaming and prompt caching
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -492,7 +525,7 @@ export default {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 1024,
+          max_tokens: 512,
           stream: true,
           system: [
             {
@@ -501,7 +534,7 @@ export default {
               cache_control: { type: 'ephemeral' },
             },
           ],
-          messages: messages.slice(-16), // Last 8 exchanges
+          messages: historyMessages,
         }),
       });
 

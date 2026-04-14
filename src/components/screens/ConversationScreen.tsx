@@ -17,6 +17,17 @@ type ConversationState =
   | 'streaming'   // Text appearing
   | 'speaking';   // TTS playing
 
+/**
+ * CHARACTER VOICES
+ * god = Onyx (masculine divine)
+ * jesus = Ash (for Christian beliefs only)
+ * mary = Coral (feminine divine, available to all)
+ */
+type Character = 'god' | 'jesus' | 'mary';
+
+// Belief systems that can use Jesus character
+const CHRISTIAN_BELIEFS = ['protestant', 'catholic', 'mormonism'];
+
 // Message with metadata for display
 interface DisplayMessage {
   id: string;
@@ -100,6 +111,80 @@ const SendIcon = memo(function SendIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12h14M12 5l7 7-7 7" />
     </svg>
+  );
+});
+
+// Character selector dropdown
+const CharacterSelector = memo(function CharacterSelector({
+  character,
+  onChange,
+  isChristian,
+  accentColor,
+}: {
+  character: Character;
+  onChange: (c: Character) => void;
+  isChristian: boolean;
+  accentColor: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Character labels - vary by belief system
+  const labels: Record<Character, string> = {
+    god: isChristian ? 'God' : 'The Divine',
+    jesus: 'Jesus',
+    mary: isChristian ? 'Mary' : 'Divine Mother',
+  };
+
+  const options: Character[] = isChristian
+    ? ['god', 'jesus', 'mary']
+    : ['god', 'mary'];
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
+        style={{ color: 'rgba(255,255,255,0.5)' }}
+        aria-label="Select voice character"
+      >
+        <span style={{ fontSize: '0.7rem', letterSpacing: '0.05em' }}>
+          {labels[character]}
+        </span>
+        <ChevronDownIcon />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 py-1"
+            style={{
+              background: 'rgba(20, 20, 25, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '10px',
+              minWidth: '120px',
+              overflow: 'hidden',
+            }}
+          >
+            {options.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => { onChange(opt); setIsOpen(false); }}
+                className="w-full px-3 py-2 text-left transition-colors hover:bg-white/5"
+                style={{
+                  fontSize: '0.8rem',
+                  color: character === opt ? accentColor : 'var(--color-text-primary)',
+                  fontWeight: character === opt ? 500 : 400,
+                }}
+              >
+                {labels[opt]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 });
 
@@ -363,6 +448,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showSettings, setShowSettings] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [character, setCharacter] = useState<Character>('god');
+
+  // Check if current belief supports Jesus character
+  const isChristianBelief = CHRISTIAN_BELIEFS.includes(belief.id);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -428,11 +517,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
     setState('speaking');
 
-    // Use OpenAI TTS with belief-specific character
+    // Use OpenAI TTS with selected character
     speakWithOpenAI(
       text,
       belief.id,
-      'god', // Default character
+      character,
       language,
       () => setState('idle')
     ).catch(() => setState('idle'));
@@ -441,7 +530,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     setTimeout(() => {
       setState((current) => (current === 'speaking' ? 'idle' : current));
     }, Math.max(30000, text.length * 150)); // Longer timeout for API-based TTS
-  }, [belief.id, language, voiceEnabled]);
+  }, [belief.id, character, language, voiceEnabled]);
 
   // Greeting on load - TEXT ONLY, no TTS
   useEffect(() => {
@@ -642,12 +731,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       {/* UI Layer */}
       <div
         className="relative z-10 flex flex-col h-full safe-top"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 20px) + 80px)' }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 16px)' }}
       >
         {/* Top bar */}
         <header
           className="flex items-center justify-between shrink-0"
-          style={{ padding: '16px 20px', opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}
+          style={{ padding: '12px 20px 0 20px', opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}
         >
           <button
             onClick={onBack}
@@ -658,17 +747,31 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             <BackIcon />
           </button>
 
-          {/* Tappable belief name */}
-          <button
-            onClick={() => setShowBeliefModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors hover:bg-white/5"
-            style={{ color: 'rgba(255,255,255,0.5)' }}
-          >
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 300, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-              {belief.name}
-            </span>
-            <ChevronDownIcon />
-          </button>
+          {/* Center: Belief name + Character selector */}
+          <div className="flex items-center gap-2">
+            {/* Tappable belief name */}
+            <button
+              onClick={() => setShowBeliefModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors hover:bg-white/5"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 300, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+                {belief.name}
+              </span>
+              <ChevronDownIcon />
+            </button>
+
+            {/* Divider */}
+            <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.15)' }} />
+
+            {/* Character selector */}
+            <CharacterSelector
+              character={character}
+              onChange={setCharacter}
+              isChristian={isChristianBelief}
+              accentColor={accentColor}
+            />
+          </div>
 
           {/* Right controls */}
           <div className="flex items-center gap-1">
@@ -702,19 +805,31 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         {/* Conversation thread */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-5"
+          className="flex-1 overflow-y-auto"
           style={{
             opacity: isVisible ? 1 : 0,
             transition: 'opacity 0.5s ease 0.2s',
-            maskImage: 'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
+            marginTop: '20px',
+            padding: '0 24px',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
           }}
         >
-          <div className="max-w-2xl mx-auto py-8 space-y-6">
+          {/* Vertical centering wrapper - centers content when only greeting */}
+          <div
+            className="max-w-2xl mx-auto flex flex-col"
+            style={{
+              minHeight: '100%',
+              justifyContent: displayMessages.length <= 1 ? 'center' : 'flex-start',
+              paddingTop: displayMessages.length <= 1 ? '0' : '24px',
+              paddingBottom: '24px',
+              gap: '24px',
+            }}
+          >
             {displayMessages.map((message, index) => (
               <div
                 key={message.id}
-                className={`${message.role === 'user' ? 'flex justify-end' : ''}`}
+                className={`${message.role === 'user' ? 'flex justify-end' : 'flex justify-center'}`}
                 style={{
                   animation: `fadeInUp 0.5s ease forwards`,
                   animationDelay: `${index * 0.05}s`,
@@ -740,11 +855,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                     {message.content}
                   </div>
                 ) : (
-                  // God's message - divine text, floating
+                  // God's message - divine text, centered
                   <div
-                    className="text-divine"
+                    className="text-divine text-center"
                     style={{
-                      maxWidth: '95%',
+                      maxWidth: '85%',
                       fontSize: 'clamp(1.15rem, 3.2vw, 1.5rem)',
                       color: 'rgba(255, 248, 240, 0.95)',
                       textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
@@ -759,7 +874,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
             {/* Thinking dots */}
             {state === 'sending' && (
-              <div style={{ animation: 'fadeInUp 0.3s ease forwards' }}>
+              <div className="flex justify-center" style={{ animation: 'fadeInUp 0.3s ease forwards' }}>
                 <ThinkingDots color={accentColor} />
               </div>
             )}
@@ -787,13 +902,29 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
         {/* Message counter */}
         {!user.isPremium && remainingMessages <= 3 && (
-          <div className="shrink-0 text-center mb-2" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>
+          <div
+            className="shrink-0 text-center"
+            style={{
+              fontSize: '10px',
+              color: 'rgba(255,255,255,0.25)',
+              marginTop: '20px',
+              marginBottom: '16px',
+            }}
+          >
             {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
           </div>
         )}
 
         {/* Mic button */}
-        <div className="shrink-0 flex justify-center mb-3" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.4s' }}>
+        <div
+          className="shrink-0 flex justify-center"
+          style={{
+            opacity: isVisible ? 1 : 0,
+            transition: 'opacity 0.5s ease 0.4s',
+            marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '20px',
+            marginBottom: '16px',
+          }}
+        >
           <MicButton
             state={state}
             accentColor={accentColor}
@@ -803,7 +934,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         </div>
 
         {/* Text input */}
-        <div className="shrink-0 px-5" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.5s' }}>
+        <div className="shrink-0" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.5s', padding: '0 20px' }}>
           <div className="relative max-w-md mx-auto">
             <input
               ref={inputRef}
@@ -815,7 +946,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               disabled={!isInputEnabled}
               maxLength={500}
               className="conversation-input"
-              style={{ paddingRight: inputText.trim() ? '50px' : '20px', opacity: isInputEnabled ? 1 : 0.35 }}
+              style={{
+                paddingRight: inputText.trim() ? '50px' : '20px',
+                opacity: isInputEnabled ? 1 : 0.35,
+                height: '48px',
+              }}
             />
             {inputText.trim() && isInputEnabled && (
               <button
