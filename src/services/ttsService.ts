@@ -15,8 +15,15 @@ let onAudioLevelCallback: ((level: number) => void) | null = null;
 let isAudioUnlocked = false;
 let currentOnEndCallback: (() => void) | null = null;
 let speechTimeoutId: number | null = null;
-let voiceEnabled = true;
 let hasTestedTTS = false;
+
+// Voice enabled state with localStorage persistence
+const VOICE_STORAGE_KEY = 'aimighty-voice-enabled';
+let voiceEnabled = (() => {
+  if (typeof window === 'undefined') return true;
+  const stored = localStorage.getItem(VOICE_STORAGE_KEY);
+  return stored === null ? true : stored === 'true';
+})();
 
 // Always log for debugging TTS issues
 function log(...args: unknown[]) {
@@ -431,11 +438,14 @@ export function isSpeaking(): boolean {
 }
 
 /**
- * Enable or disable voice output
+ * Enable or disable voice output (persists to localStorage)
  */
 export function setVoiceEnabled(enabled: boolean): void {
   log('setVoiceEnabled:', enabled);
   voiceEnabled = enabled;
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(VOICE_STORAGE_KEY, String(enabled));
+  }
   if (!enabled) stop();
 }
 

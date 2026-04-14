@@ -231,7 +231,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
 
   /**
    * GREETING ON LOAD
-   * Shows text FIRST, waits, THEN speaks
+   * Text only — no TTS. User controls voice from there.
    */
   useEffect(() => {
     if (hasGreeted.current) return;
@@ -240,15 +240,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     const greetingTimer = setTimeout(() => {
       const greeting = getGreeting(belief.id);
       setCurrentCaption(greeting);
-
-      setTimeout(() => {
-        initAudio();
-        speakResponse(greeting);
-      }, 500);
+      // No TTS for greeting — stays silent. User speaks first.
     }, 1500);
 
     return () => clearTimeout(greetingTimer);
-  }, [belief.id, speakResponse]);
+  }, [belief.id]);
 
   /**
    * SEND MESSAGE TO CLAUDE
@@ -576,23 +572,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
   );
 }
 
-// Greeting messages per belief system
+// Greeting messages per belief system — short and powerful
 function getGreeting(beliefId: string): string {
   const greetings: Record<string, string> = {
-    protestant: "I am here. Speak freely, and I will listen with all the patience of eternity.",
-    catholic: "Peace be with you. This space is sacred. What weighs upon your heart?",
-    islam: "Assalamu alaikum. The Most Merciful hears every whisper. Speak.",
-    judaism: "Come, let us reason together. Your questions are welcome here.",
-    hinduism: "The Atman within you is eternal. What brings you here today, seeker?",
-    buddhism: "Be still. The path to understanding begins with your first question.",
-    mormonism: "Heavenly Father knows you by name. What would you like to discuss?",
-    sikhism: "Waheguru is in all things, and in you. Speak what is in your heart.",
-    sbnr: "Welcome. The universe has brought us together in this moment. What do you seek?",
-    taoism: "The Tao that can be told is not the eternal Tao. But let us try, together.",
-    pantheism: "You are the Earth breathing, the stars thinking. What's on your mind?",
-    science: "Greetings. I am the voice of cosmic wonder. What shall we explore together?",
-    agnosticism: "The honest answer is often 'we don't know.' Let's explore that together.",
-    atheism: "You are the author of your own meaning. What would you like to examine?",
+    protestant: "I am here, My child.",
+    catholic: "I am here, My child.",
+    islam: "I am here. Speak.",
+    judaism: "I am here. What weighs on your heart?",
+    hinduism: "I am here. Speak freely.",
+    buddhism: "I am here. Be still, and speak.",
+    mormonism: "I am here, My child.",
+    sikhism: "I am here. Speak freely.",
+    sbnr: "I am here. Speak.",
+    taoism: "I am here.",
+    pantheism: "I am here. I have always been here.",
+    science: "I am here. Ask anything.",
+    agnosticism: "I am here. What's on your mind?",
+    atheism: "I am here. Speak freely.",
   };
   return greetings[beliefId] || greetings.protestant;
 }

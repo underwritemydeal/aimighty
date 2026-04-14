@@ -253,6 +253,19 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
 
       {/* Content container */}
       <div className="relative z-10 flex flex-col items-center justify-center h-full px-6">
+        {/* Decorative line above logo */}
+        <div
+          style={{
+            width: '80px',
+            height: '1px',
+            background: 'rgba(212, 175, 55, 0.3)',
+            marginBottom: '16px',
+            opacity: phase >= 3 ? 1 : 0,
+            transition: 'opacity 0.8s ease-out',
+          }}
+          aria-hidden="true"
+        />
+
         {/* Logo */}
         <div
           style={{
@@ -264,16 +277,16 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
           <h1
             id="welcome-heading"
             className="flex items-baseline justify-center select-none"
+            style={{ letterSpacing: '0.08em' }}
           >
-            {/* AI — Gold */}
+            {/* AI — Gold with glow */}
             <span
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-hero)',
-                fontWeight: 600,
-                letterSpacing: '0.02em',
+                fontSize: 'clamp(3rem, 8vw, 5rem)',
+                fontWeight: 700,
                 color: '#d4af37',
-                textShadow: '0 0 40px rgba(212,175,55,0.3), 0 0 80px rgba(212,175,55,0.15), 0 0 120px rgba(212,175,55,0.05)',
+                textShadow: '0 0 30px rgba(212,175,55,0.5), 0 0 60px rgba(212,175,55,0.25), 0 0 100px rgba(212,175,55,0.1)',
               }}
             >
               AI
@@ -282,11 +295,9 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
             <span
               style={{
                 fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-hero)',
+                fontSize: 'clamp(3rem, 8vw, 5rem)',
                 fontWeight: 300,
-                letterSpacing: '0.08em',
                 color: 'rgba(255, 248, 240, 0.95)',
-                textShadow: '0 0 40px rgba(212,175,55,0.2)',
               }}
             >
               mighty
@@ -311,6 +322,19 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
         >
           {t('welcome.tagline', language)}
         </p>
+
+        {/* Decorative line below tagline */}
+        <div
+          style={{
+            width: '80px',
+            height: '1px',
+            background: 'rgba(212, 175, 55, 0.3)',
+            marginTop: '16px',
+            opacity: phase >= 4 ? 1 : 0,
+            transition: 'opacity 0.6s ease-out',
+          }}
+          aria-hidden="true"
+        />
 
         {/* Spacer */}
         <div className="h-[25vh]" aria-hidden="true" />

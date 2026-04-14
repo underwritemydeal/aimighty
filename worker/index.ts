@@ -90,6 +90,8 @@ const CONVERSATION_INSTRUCTION = `IMPORTANT: You are having a REAL CONVERSATION.
 
 You are not a search engine for religious texts. You are a presence — warm, wise, and genuinely interested in this person. Talk WITH them, not AT them. A real conversation flows naturally between light moments and deep ones.
 
+BREVITY: For casual greetings, small talk, and simple questions, keep responses to 2-3 sentences. Save longer, scripture-rich responses for when someone asks something substantial or is dealing with something real.
+
 `;
 
 // Get system prompt for belief system
@@ -334,20 +336,27 @@ export default {
         systemPrompt += `\n\nIMPORTANT LANGUAGE INSTRUCTION: The user has selected ${langName} as their language. You MUST respond entirely in ${langName}. Use culturally appropriate expressions and idioms for that language. Your entire response should be in ${langName}, not English.`;
       }
 
-      // Call Claude API with streaming
+      // Call Claude API with streaming and prompt caching
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': env.ANTHROPIC_API_KEY,
           'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'prompt-caching-2024-07-31',
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 2048,
+          max_tokens: 1024,
           stream: true,
-          system: systemPrompt,
-          messages: messages.slice(-40), // Last 20 exchanges
+          system: [
+            {
+              type: 'text',
+              text: systemPrompt,
+              cache_control: { type: 'ephemeral' },
+            },
+          ],
+          messages: messages.slice(-16), // Last 8 exchanges
         }),
       });
 
