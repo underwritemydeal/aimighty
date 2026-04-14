@@ -132,6 +132,28 @@ const SendIcon = memo(function SendIcon() {
   );
 });
 
+// Subtle chevron for showing/hiding controls
+const ChevronIndicator = memo(function ChevronIndicator({ pointsUp }: { pointsUp: boolean }) {
+  return (
+    <svg
+      width="12"
+      height="6"
+      viewBox="0 0 12 6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        transform: pointsUp ? 'rotate(0deg)' : 'rotate(180deg)',
+        transition: 'transform 0.3s ease',
+      }}
+    >
+      <path d="M1 5L6 1L11 5" />
+    </svg>
+  );
+});
+
 // Character selector dropdown
 const CharacterSelector = memo(function CharacterSelector({
   character,
@@ -470,8 +492,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [character, setCharacter] = useState<Character>('god');
+  const [controlsHidden, setControlsHidden] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const hasGreeted = useRef(false);
@@ -513,7 +537,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
   }, []);
 
-  // Track scroll position for "scroll to bottom" button
+  // Track scroll position for "scroll to bottom" button and auto-show controls
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -521,16 +545,53 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     const handleScroll = () => {
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
       setShowScrollButton(!isNearBottom && displayMessages.length > 2);
+      // Show controls when user scrolls (they're trying to interact)
+      if (controlsHidden) {
+        setControlsHidden(false);
+      }
     };
 
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [displayMessages.length]);
+  }, [displayMessages.length, controlsHidden]);
+
+  // Auto-hide controls after response completes
+  const scheduleHideControls = useCallback(() => {
+    // Clear any existing timer
+    if (hideControlsTimer.current) {
+      clearTimeout(hideControlsTimer.current);
+    }
+    // Hide controls after a short delay
+    hideControlsTimer.current = setTimeout(() => {
+      setControlsHidden(true);
+    }, 500);
+  }, []);
+
+  // Show controls (tap anywhere or chevron)
+  const showControls = useCallback(() => {
+    if (hideControlsTimer.current) {
+      clearTimeout(hideControlsTimer.current);
+    }
+    setControlsHidden(false);
+  }, []);
+
+  // Toggle controls visibility
+  const toggleControls = useCallback(() => {
+    if (controlsHidden) {
+      showControls();
+    } else {
+      setControlsHidden(true);
+    }
+  }, [controlsHidden, showControls]);
 
   // Speak response using OpenAI TTS
   const speakResponse = useCallback((text: string) => {
     if (!voiceEnabled) {
       setState('idle');
+      // If muted, hide controls after 2 seconds
+      hideControlsTimer.current = setTimeout(() => {
+        setControlsHidden(true);
+      }, 2000);
       return;
     }
     setState('speaking');
@@ -541,14 +602,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       belief.id,
       character,
       language,
-      () => setState('idle')
-    ).catch(() => setState('idle'));
+      () => {
+        setState('idle');
+        // Hide controls after speech ends
+        scheduleHideControls();
+      }
+    ).catch(() => {
+      setState('idle');
+      scheduleHideControls();
+    });
 
     // Fallback timeout in case TTS hangs
     setTimeout(() => {
       setState((current) => (current === 'speaking' ? 'idle' : current));
     }, Math.max(30000, text.length * 150)); // Longer timeout for API-based TTS
-  }, [belief.id, character, language, voiceEnabled]);
+  }, [belief.id, character, language, voiceEnabled, scheduleHideControls]);
 
   // Greeting on load - TEXT ONLY, no TTS
   useEffect(() => {
@@ -820,17 +888,20 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         </header>
 
-        {/* Conversation thread */}
+        {/* Conversation thread - tap to show controls when hidden */}
         <div
           ref={messagesContainerRef}
           className="flex-1 overflow-y-auto"
+          onClick={controlsHidden ? showControls : undefined}
           style={{
             opacity: isVisible ? 1 : 0,
             transition: 'opacity 0.5s ease 0.2s',
             marginTop: '20px',
             padding: '0 24px',
+            paddingBottom: controlsHidden ? '20px' : '180px', // Extra padding when controls visible
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
+            cursor: controlsHidden ? 'pointer' : 'auto',
           }}
         >
           {/* Vertical centering wrapper - centers content when only greeting */}
@@ -918,77 +989,97 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </button>
         )}
 
-        {/* Message counter */}
-        {!user.isPremium && remainingMessages <= 3 && (
+        {/* Input controls - hideable for clean screenshot view */}
+        <div
+          className="shrink-0"
+          style={{
+            opacity: controlsHidden ? 0 : (isVisible ? 1 : 0),
+            transform: controlsHidden ? 'translateY(20px)' : 'translateY(0)',
+            transition: controlsHidden ? 'opacity 0.5s ease, transform 0.5s ease' : 'opacity 0.5s ease 0.4s, transform 0.3s ease',
+            pointerEvents: controlsHidden ? 'none' : 'auto',
+          }}
+        >
+          {/* Message counter */}
+          {!user.isPremium && remainingMessages <= 3 && (
+            <div
+              className="text-center"
+              style={{
+                fontSize: '10px',
+                color: 'rgba(255,255,255,0.25)',
+                marginTop: '20px',
+                marginBottom: '16px',
+              }}
+            >
+              {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
+            </div>
+          )}
+
+          {/* Mic button */}
           <div
-            className="shrink-0 text-center"
+            className="flex justify-center"
             style={{
-              fontSize: '10px',
-              color: 'rgba(255,255,255,0.25)',
-              marginTop: '20px',
+              marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '20px',
               marginBottom: '16px',
             }}
           >
-            {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
-          </div>
-        )}
-
-        {/* Mic button */}
-        <div
-          className="shrink-0 flex justify-center"
-          style={{
-            opacity: isVisible ? 1 : 0,
-            transition: 'opacity 0.5s ease 0.4s',
-            marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '20px',
-            marginBottom: '16px',
-          }}
-        >
-          <MicButton
-            state={state}
-            accentColor={accentColor}
-            onToggle={handleMicToggle}
-            isDisabled={hasReachedFreeLimit() && !user.isPremium}
-          />
-        </div>
-
-        {/* Text input */}
-        <div className="shrink-0 w-full" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.5s', padding: '0 20px' }}>
-          <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
-              disabled={!isInputEnabled}
-              maxLength={500}
-              className="conversation-input"
-              style={{
-                paddingRight: inputText.trim() ? '50px' : '20px',
-                opacity: isInputEnabled ? 1 : 0.35,
-                height: '48px',
-              }}
+            <MicButton
+              state={state}
+              accentColor={accentColor}
+              onToggle={handleMicToggle}
+              isDisabled={hasReachedFreeLimit() && !user.isPremium}
             />
-            {inputText.trim() && isInputEnabled && (
-              <button
-                onClick={handleSend}
-                aria-label="Send message"
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
-                style={{ color: accentColor }}
-              >
-                <SendIcon />
-              </button>
-            )}
           </div>
+
+          {/* Text input */}
+          <div className="w-full" style={{ padding: '0 20px' }}>
+            <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={showControls}
+                placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
+                disabled={!isInputEnabled}
+                maxLength={500}
+                className="conversation-input"
+                style={{
+                  paddingRight: inputText.trim() ? '50px' : '20px',
+                  opacity: isInputEnabled ? 1 : 0.35,
+                  height: '48px',
+                }}
+              />
+              {inputText.trim() && isInputEnabled && (
+                <button
+                  onClick={handleSend}
+                  aria-label="Send message"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
+                  style={{ color: accentColor }}
+                >
+                  <SendIcon />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Error message */}
+          {speechError && (
+            <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+              {speechError}
+            </div>
+          )}
         </div>
 
-        {/* Error message */}
-        {speechError && (
-          <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-            {speechError}
-          </div>
-        )}
+        {/* Chevron indicator - always visible, tap to show/hide controls */}
+        <button
+          onClick={toggleControls}
+          className="shrink-0 flex justify-center items-center w-full py-3"
+          style={{ color: 'rgba(255, 255, 255, 0.2)' }}
+          aria-label={controlsHidden ? 'Show input controls' : 'Hide input controls'}
+        >
+          <ChevronIndicator pointsUp={controlsHidden} />
+        </button>
       </div>
 
       {/* Belief selector modal */}

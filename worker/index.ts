@@ -80,6 +80,22 @@ function checkVelocity(userId: string): boolean {
   return true;
 }
 
+// Normalize belief system IDs - handle aliases from frontend
+function normalizeBeliefId(id: string): string {
+  const aliases: Record<string, string> = {
+    'earth': 'pantheism',
+    'spiritual': 'sbnr',
+    'stoicism': 'atheism',  // Frontend uses 'atheism' for Stoicism
+    'lds': 'mormonism',
+    'mormon': 'mormonism',
+    'protestant-christianity': 'protestant',
+    'christianity': 'protestant',
+  };
+  const normalized = aliases[id] || id;
+  console.log('[NORMALIZE] beliefId:', id, '->', normalized);
+  return normalized;
+}
+
 // Conversational instruction to prepend to all prompts
 const CONVERSATION_INSTRUCTION = `IMPORTANT: You are having a REAL CONVERSATION. If someone says "hey, how are you?" or "what's up?" — respond naturally and warmly like a friend before shifting to anything spiritual. Not every message needs a deep theological response. Match the user's energy:
 
@@ -328,17 +344,20 @@ export default {
           language?: string;
         };
 
-        const { text, beliefSystem, character, language = 'en' } = body;
+        const { text, beliefSystem: rawBeliefSystem, character, language = 'en' } = body;
 
-        if (!text || !beliefSystem) {
+        if (!text || !rawBeliefSystem) {
           return new Response(
             JSON.stringify({ error: 'Missing text or beliefSystem' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
+        // Normalize belief system ID
+        const beliefSystem = normalizeBeliefId(rawBeliefSystem);
+
         // Log incoming request
-        console.log('[TTS] Request - beliefSystem:', beliefSystem, 'character:', character, 'language:', language, 'text_length:', text.length);
+        console.log('[TTS] Request - raw:', rawBeliefSystem, 'normalized:', beliefSystem, 'character:', character, 'language:', language, 'text_length:', text.length);
 
         // Select character and voice
         const selectedChar = TTS_CHARACTERS[character || ''] ||
@@ -451,15 +470,19 @@ export default {
         language?: string;
       };
 
-      const { messages, beliefSystem, userId, language = 'en' } = body;
+      const { messages, beliefSystem: rawBeliefSystem, userId, language = 'en' } = body;
 
       // Validate input
-      if (!messages || !Array.isArray(messages) || !beliefSystem) {
+      if (!messages || !Array.isArray(messages) || !rawBeliefSystem) {
         return new Response(
           JSON.stringify({ error: 'Invalid request body' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      // Normalize belief system ID
+      const beliefSystem = normalizeBeliefId(rawBeliefSystem);
+      console.log('[CHAT] beliefSystem raw:', rawBeliefSystem, 'normalized:', beliefSystem);
 
       // Check message length
       const lastMessage = messages[messages.length - 1];
