@@ -1,309 +1,257 @@
-# CLAUDE.md — AImighty (aimighty.me)
-## AI-Powered Spiritual Guidance Platform
+# AImighty Project Instructions
 
----
+**Voice AI for spiritual guidance across 14 belief systems.**
+**Last Updated: April 14, 2026**
 
-## PROJECT OVERVIEW
+## What This Is
 
-AImighty is a PWA where users select their belief system and have a real-time voice conversation with an AI representing their version of God (or the Universe, Reason, etc). The user talks or types, the AI responds with voice and displays divine text.
+AImighty lets users have voice conversations with an AI speaking as the divine voice of their chosen belief system. User selects a tradition (Christianity, Islam, Buddhism, etc.), speaks into their phone, and hears a response in the authentic voice and wisdom of that tradition.
 
-**Brand:** AImighty
-**Domain:** aimighty.me
-**Tagline:** "Every belief. One voice."
-**Instagram:** @aimightyapp
+Think "talk to God" but personalized to YOUR beliefs. Not text — voice. Not generic — tradition-specific.
 
----
+## Tech Stack
 
-## TECH STACK
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | React 18 + Vite + TypeScript |
+| **Styling** | Tailwind CSS v4 + Glass morphism |
+| **Visual** | Midjourney AI-generated divine figure images |
+| **Backend** | Cloudflare Workers (serverless) |
+| **AI Chat** | Claude API (claude-sonnet-4-20250514) via streaming SSE |
+| **TTS** | OpenAI gpt-4o-mini-tts via Worker proxy (Onyx/Ash/Coral voices) |
+| **STT** | Web Speech API (free, browser-native) |
+| **Storage** | Cloudflare KV (article generation history) |
+| **Auth** | Email/password with localStorage/sessionStorage |
+| **Hosting** | Vercel (auto-deploy from GitHub) |
 
-### Frontend
-- **React 18** with Vite
-- **TypeScript** for type safety
-- **Tailwind CSS v4** for styling
-- **PWA** — manifest.json for installability
-
-### Visual Design
-- **Midjourney AI-generated images** — Full-screen divine figure backgrounds per belief system
-- **Glass morphism UI** — Frosted glass cards with backdrop blur
-- **Cormorant Garamond** — Elegant serif font for God's spoken words
-- **Outfit** — Clean sans-serif for UI elements
-
-### AI Brain
-- **Claude API** (claude-sonnet-4-20250514) via Cloudflare Worker proxy
-- **Streaming enabled** (SSE) — response streams token by token
-- **System prompts** per belief system
-- **Conversation history** — maintains context
-
-### Voice
-- **TTS:** Browser SpeechSynthesis API (voice priority: Google UK Male, Daniel, Aaron)
-- **STT:** Web Speech API (SpeechRecognition) — free, built into browser
-- Fallback: text input for unsupported browsers
-
-### Backend / Infrastructure
-- **Cloudflare Worker** — proxies Claude API calls, handles CORS
-- **Vercel** — hosts the PWA, auto-deploy from GitHub push
-
----
-
-## PROJECT STRUCTURE
+## Project Structure
 
 ```
-aimighty/
-├── public/
-│   ├── images/
-│   │   └── avatars/           # Midjourney divine figure images
-│   │       ├── protestant.jpg
-│   │       ├── catholic.jpg
-│   │       ├── islam.jpg
-│   │       ├── judaism.jpg
-│   │       ├── hinduism.jpg
-│   │       ├── buddhism.jpg
-│   │       ├── mormon.jpg
-│   │       ├── sikhism.jpg
-│   │       ├── sbnr.jpg
-│   │       ├── taoism.jpg
-│   │       ├── pantheism.jpg
-│   │       ├── science.jpg
-│   │       ├── agnosticism.jpg
-│   │       ├── stoicism.jpg
-│   │       ├── hero-mashup-desktop.jpg
-│   │       └── hero-mashup-mobile.jpg
-│   ├── manifest.json          # PWA manifest
-│   └── favicon.svg            # Golden flame icon
-├── src/
-│   ├── main.tsx
-│   ├── App.tsx
-│   ├── index.css              # Design system + Tailwind
-│   │
-│   ├── components/
-│   │   └── screens/
-│   │       ├── WelcomeScreen.tsx       # Landing with hero image
-│   │       ├── BeliefSelector.tsx      # Choose belief system (14 options)
-│   │       ├── ConversationScreen.tsx  # Main conversation view
-│   │       ├── AuthScreen.tsx          # Login/signup
-│   │       ├── PaywallScreen.tsx       # Premium upsell
-│   │       ├── AboutScreen.tsx
-│   │       ├── TermsScreen.tsx
-│   │       └── PrivacyScreen.tsx
-│   │
-│   ├── services/
-│   │   ├── claudeApi.ts        # Streaming Claude API calls
-│   │   ├── ttsService.ts       # Browser SpeechSynthesis
-│   │   ├── speechInput.ts      # Web Speech API wrapper
-│   │   └── auth.ts             # Authentication service
-│   │
-│   ├── data/
-│   │   ├── beliefSystems.ts    # 14 belief systems with metadata
-│   │   ├── systemPrompts.ts    # System prompts per belief
-│   │   └── translations.ts     # i18n support
-│   │
-│   └── types/
-│       └── index.ts            # TypeScript interfaces
+Aimighty/
+├── CLAUDE.md              # This file (project overview)
+├── TODO.md                # Current task list
+├── docs/
+│   └── reference.md       # Full belief system library, prompts, SEO
 │
-├── worker/
-│   └── index.ts               # Cloudflare Worker
-│
-├── CLAUDE.md                   # This file
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
+└── aimighty/              # Main application
+    ├── public/
+    │   └── images/avatars/   # 16 Midjourney divine figure images
+    ├── src/
+    │   ├── components/screens/
+    │   │   ├── WelcomeScreen.tsx      # Hero image landing
+    │   │   ├── BeliefSelector.tsx     # 14 belief system cards
+    │   │   ├── ConversationScreen.tsx # Main voice conversation
+    │   │   ├── AuthScreen.tsx         # Login/signup with remember me
+    │   │   └── PaywallScreen.tsx      # Premium upsell
+    │   ├── services/
+    │   │   ├── claudeApi.ts           # Streaming Claude calls
+    │   │   ├── openaiTTS.ts           # OpenAI TTS with mobile unlock
+    │   │   ├── speechInput.ts         # Web Speech API wrapper
+    │   │   └── auth.ts                # Auth with session persistence
+    │   └── data/
+    │       ├── beliefSystems.ts       # 14 beliefs with metadata
+    │       └── translations.ts        # i18n (15+ languages)
+    │
+    └── worker/
+        ├── index.ts                   # Cloudflare Worker
+        └── wrangler.toml              # Worker config with KV binding
 ```
 
----
+## User Flow
 
-## DESIGN SYSTEM
+1. **Welcome Screen** → User taps BEGIN
+2. **Belief Selector** → User picks from 14 belief systems
+3. **Auth Screen** → Email + password (remember me toggle)
+4. **Conversation Screen**:
+   - God greets user (text appears, then voice speaks)
+   - User taps mic OR types message
+   - Claude streams response token by token
+   - When complete → OpenAI TTS speaks the response
+   - User can continue conversation
 
-### Brand Colors
-- **Primary Gold:** #d4af37 (divine, premium)
-- **Background:** #030308 (deep void black)
-- **Text Primary:** rgba(255, 248, 240, 0.95) (warm white)
-- **Text Secondary:** rgba(255, 255, 255, 0.5)
+**Key principle:** Text FIRST, voice SECOND. Never start TTS until streaming is 100% complete.
 
-### Per-Belief Accent Colors
-| Belief | Color | Hex |
-|--------|-------|-----|
-| Protestant | Gold | #d4af37 |
-| Catholic | Royal Blue | #4169E1 |
-| Islam | Emerald | #00A86B |
-| Judaism | Gold | #d4af37 |
-| Hinduism | Saffron | #FF6B00 |
-| Buddhism | Gold | #d4af37 |
-| Mormon | Warm White | #F5F5DC |
-| Sikhism | Deep Orange | #FF8C00 |
-| SBNR | Purple | #9370DB |
-| Taoism | Sage Green | #2E8B57 |
-| Pantheism | Forest Green | #228B22 |
-| Science | Steel Blue | #4682B4 |
-| Agnosticism | Dark Gold | #B8860B |
-| Stoicism | Steel Blue | #4682B4 |
-
-### Typography
-- **Divine text:** Cormorant Garamond (300 weight, 1.8 line-height)
-- **UI text:** Outfit (200-600 weights)
-- **Hero size:** clamp(2.5rem, 3.2rem + 4vw, 4rem)
-
-### Visual Style
-- Dark, cosmic, atmospheric
-- Midjourney AI art as full-screen backgrounds
-- Glass morphism cards (backdrop-filter: blur(20px))
-- Gradient overlays for text readability
-- Mobile-first design
-
----
-
-## 14 BELIEF SYSTEMS
+## 14 Belief Systems
 
 ### Religious Traditions
-1. Protestant Christianity
-2. Catholic Christianity
-3. Islam
-4. Judaism
-5. Hinduism
-6. Buddhism
-7. Latter-day Saints (Mormon)
-8. Sikhism
+1. Protestant Christianity — God (Father), Jesus, Mary
+2. Catholic Christianity — God, Jesus, Mary (Marian devotion)
+3. Islam — Allah
+4. Judaism — Adonai, Shekhinah
+5. Hinduism — Brahman, Divine Mother
+6. Buddhism — The Buddha, Kuan Yin
+7. Mormonism (LDS) — God, Jesus
+8. Sikhism — Waheguru
 
 ### Spiritual Paths
-9. Spiritual But Not Religious (SBNR)
-10. Taoism
-11. Pantheism
+9. SBNR (Spiritual But Not Religious) — The Universe, Source Energy
+10. Taoism — The Tao, Divine Feminine
+11. Pantheism — The Earth, Gaia
 
 ### Philosophical Frameworks
-12. Science & Reason
-13. Agnosticism
-14. Stoicism/Atheism
+12. Science & Reason — The Cosmos
+13. Agnosticism — Wisdom, Inner Voice
+14. Atheism/Stoicism — Reason, Wisdom
 
-Each has:
-- Custom Midjourney avatar image
-- Accent color for UI elements
-- Unique greeting message
-- System prompt defining voice and perspective
+## Character System
 
----
+Each belief system supports multiple character voices:
 
-## CONVERSATION STATE MACHINE
+| Character | Voice | Available For |
+|-----------|-------|---------------|
+| God/Primary | Onyx (masculine) | All beliefs |
+| Jesus | Ash (warm) | Christian beliefs only |
+| Mary/Divine Feminine | Coral (feminine) | All beliefs (belief-specific identity) |
+
+The worker modifies the system prompt based on character selection:
+- Jesus speaks AS Jesus (first person), not as God talking about Jesus
+- Mary/Divine Feminine adapts to each tradition (Shekhinah, Kuan Yin, Gaia, etc.)
+
+## Conversation State Machine
 
 ```typescript
 type ConversationState =
   | 'idle'        // Waiting for user input
   | 'listening'   // Mic is active
-  | 'sending'     // Waiting for Claude (shows thinking dots)
+  | 'sending'     // Waiting for Claude (thinking dots)
   | 'streaming'   // Text appearing token by token
   | 'speaking';   // TTS playing
 ```
 
-### Flow
-1. User selects belief system → loads image + system prompt
-2. God greets user (text appears FIRST, then TTS speaks)
-3. User taps mic OR types message
-4. Text sent to Claude API (streaming)
-5. Response streams token by token (displayed live)
-6. When streaming complete → TTS speaks the full response
-7. When TTS finishes → return to idle state
-8. Mic re-activates for next message
+## Cloudflare Worker Endpoints
 
-**Key principle:** Text FIRST, voice SECOND. Never start TTS until streaming is 100% complete.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/` | POST | Claude chat (streaming SSE) |
+| `/tts` | POST | OpenAI TTS audio generation |
+| `/daily-topic` | GET | Get today's article topic + titles |
+| `/topic-history` | GET | View covered/remaining topics |
+| `/reset-topics` | POST | Reset topic cycle (admin) |
 
----
+### Worker Environment Variables
+- `ANTHROPIC_API_KEY` — Claude API key (secret)
+- `OPENAI_API_KEY` — OpenAI API key (secret)
+- `ARTICLES` — KV namespace binding for topic history
 
-## TTS CONFIGURATION
+## TTS Configuration
 
 ```typescript
-// Voice priority (first available is used)
-const VOICE_PRIORITY = [
-  'Google UK English Male',
-  'Daniel',
-  'Aaron',
-  'Microsoft David',
-  'Alex',
-];
-
-// Voice settings
-const VOICE_SETTINGS = {
-  rate: 0.82,    // Slightly slower for gravitas
-  pitch: 0.85,   // Slightly lower
+// OpenAI TTS voices
+const TTS_CHARACTERS = {
+  god: { voice: 'onyx', instructions: 'Speak with deep warmth and authority...' },
+  jesus: { voice: 'ash', instructions: 'Speak with gentle warmth and compassion...' },
+  mary: { voice: 'coral', instructions: 'Speak with nurturing maternal warmth...' },
 };
 
-// Dynamic timeout based on text length
-const timeout = Math.max(15000, Math.min(text.length * 100, 120000));
+// Audio format: opus (faster than mp3)
+// Max text: 1500 chars (~30 seconds)
 ```
 
----
+### Mobile Audio Strategy
+iOS Safari requires `audio.play()` in the same call stack as user gesture. Solution:
+1. Create ONE persistent Audio element
+2. On ANY tap, play silent audio to "unlock" it
+3. Reuse same element for all TTS playback
+4. Multiple unlock points: container tap, buttons, chevron
 
-## CSS CLASSES
+## Smart Topic Selection
 
-### Glass Morphism
-```css
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-}
+Daily article generation picks topics intelligently:
+- 50 topics cycle through then reset
+- Heavy topics (death, grief, suffering) never back-to-back
+- After heavy topic → next day picks uplifting/practical topic
+
+```javascript
+const HEAVY_TOPICS = ['death', 'suffering', 'grief', 'loss', 'betrayal', 
+                      'addiction', 'shame', 'guilt', 'enemies', 'sacrifice'];
 ```
 
-### Divine Text
-```css
-.text-divine {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-weight: 300;
-  line-height: 1.8;
-  letter-spacing: 0.02em;
-}
-```
+## Design System
 
-### Belief Cards
-```css
-.belief-card {
-  background-size: cover;
-  background-position: center top;  /* Show head/face */
-  border-radius: 16px;
-}
-```
+### Colors
+- **Primary Gold:** #d4af37
+- **Background:** #030308 (deep void black)
+- **Text Primary:** rgba(255, 248, 240, 0.95)
 
----
+### Typography
+- **Divine text:** Cormorant Garamond (300 weight)
+- **UI text:** Outfit (200-600 weights)
 
-## COMMANDS
+### Desktop vs Mobile Layout
+- **Divine messages:**
+  - Mobile: max-width 85%, font 1.15-1.5rem, line-height 1.8
+  - Desktop: max-width 65%, font 1.3-1.8rem, line-height 1.9, centered
+- **User messages:**
+  - Mobile: max-width 85%, right-aligned
+  - Desktop: max-width 50%, right margin 10%
 
-```bash
-npm run dev          # Local dev server (localhost:5173)
-npm run build        # Production build
-```
+## Auth System
 
----
+- Email + password (minimum 8 characters)
+- Disposable email domains blocked
+- "Remember me" toggle:
+  - ON → localStorage (persists across browser sessions)
+  - OFF → sessionStorage (cleared when browser closes)
+- Rate limits: 50 msgs/hour, 500 char max input
 
-## SAFETY GUARDRAILS (Non-Negotiable)
+## Safety Guardrails (Non-Negotiable)
 
-1. Mental health crisis → direct to 988 Suicide & Crisis Lifeline
-2. Medical emergency → direct to 911
-3. Abuse → direct to National Domestic Violence Hotline
+1. Mental health crisis → 988 Suicide & Crisis Lifeline
+2. Medical emergency → 911
+3. Abuse → National Domestic Violence Hotline 1-800-799-7233
 4. Never claim to be literally God
 5. Never encourage stopping medication or therapy
 6. Never make specific prophecies
 7. Never be dismissive of other religions
 8. Always respect user autonomy
 
----
+## Monetization
 
-## RECENT CHANGES (April 2026)
+| Tier | Price | Features |
+|------|-------|----------|
+| Free (Seeker) | $0 | 3 messages total |
+| Believer | $4.99/mo | Unlimited conversations |
+| Devoted | $9.99/mo | + content library, priority |
 
-### Visual Redesign
-- Removed Three.js particle face avatar
-- Added Midjourney AI-generated divine figure images
-- Full-screen image backgrounds with gradient overlays
-- Glass morphism UI throughout
-- Cormorant Garamond font for divine text
-- Golden flame favicon
+## Commands
 
-### Technical Improvements
-- Clean state machine for conversation flow
-- Text-first, voice-second synchronization
-- Improved TTS voice selection and timing
-- PWA manifest with gold theme color
-- Fixed CSS @import ordering for fonts
+```bash
+# Frontend (in /aimighty)
+npm run dev          # Local dev server
+npm run build        # Production build
 
-### Files Changed
-- Deleted: ParticleFace.tsx, AvatarScene.tsx, LazyAvatarScene.tsx, NebulaBackground.tsx
-- Added: public/images/avatars/*.jpg (16 Midjourney images)
-- Added: public/manifest.json
-- Updated: All screen components, index.css, favicon.svg
+# Worker (in /aimighty/worker)
+npx wrangler dev     # Local worker
+npx wrangler deploy  # Deploy to Cloudflare
+```
+
+## Recent Changes (April 14, 2026)
+
+### Voice System
+- Migrated from browser SpeechSynthesis to OpenAI gpt-4o-mini-tts
+- Added character system (God/Jesus/Mary) with belief-specific identities
+- Fixed mobile audio with persistent audio element strategy
+- Opus audio format for faster loading
+
+### Worker Enhancements
+- Added belief ID normalization (earth→pantheism, spiritual→sbnr, etc.)
+- Added character personality system to system prompts
+- Added smart topic selection with KV storage
+- Added /daily-topic, /topic-history, /reset-topics endpoints
+
+### UI Improvements
+- Fixed desktop text centering (God's messages centered, larger font)
+- Added "Remember me" toggle to auth
+- Fixed BEGIN button positioning (80px from bottom)
+- Added controls auto-hide for clean screenshot mode
+
+## When Helping With This Project
+
+1. **Read belief system details** before modifying prompts
+2. **Follow safety guardrails** — non-negotiable
+3. **Test voice flow** — responses must sound natural spoken aloud
+4. **Keep responses warm** — spiritual guidance, not information retrieval
+5. **Respect all traditions** — never favor one belief over another
+6. **Mobile first** — test on iOS Safari and Android Chrome
+7. **Image positioning** — use `background-position: top center` for divine figures
