@@ -337,10 +337,15 @@ export default {
           );
         }
 
+        // Log incoming request
+        console.log('[TTS] Request - beliefSystem:', beliefSystem, 'character:', character, 'language:', language, 'text_length:', text.length);
+
         // Select character and voice
         const selectedChar = TTS_CHARACTERS[character || ''] ||
           TTS_CHARACTERS[DEFAULT_CHARACTER[beliefSystem] || 'god'] ||
           TTS_CHARACTERS.god;
+
+        console.log('[TTS] Using voice:', selectedChar.voice);
 
         // Build instructions
         let finalInstructions = selectedChar.instructions + (BELIEF_INSTRUCTIONS[beliefSystem] || '');
@@ -359,7 +364,7 @@ export default {
         // Cost logging
         console.log('[COST] TTS call - original_chars:', text.length, 'spoken_chars:', spokenText.length, 'estimated_cost: $' + (spokenText.length / 1000 * 0.015).toFixed(4));
 
-        // Call OpenAI TTS API
+        // Call OpenAI TTS API with opus for faster loading
         const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
           headers: {
@@ -371,25 +376,27 @@ export default {
             voice: selectedChar.voice,
             input: spokenText.substring(0, 4096),
             instructions: finalInstructions,
-            response_format: 'mp3',
+            response_format: 'opus',
             speed: 1.0,
           }),
         });
 
         if (!ttsResponse.ok) {
           const errorText = await ttsResponse.text();
-          console.error('OpenAI TTS error:', errorText);
+          console.error('[TTS] OpenAI API error:', ttsResponse.status, errorText);
           return new Response(
-            JSON.stringify({ error: 'TTS failed' }),
+            JSON.stringify({ error: 'TTS failed', details: errorText }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        // Return audio stream
+        console.log('[TTS] OpenAI responded OK, streaming audio');
+
+        // Return audio stream (opus format)
         return new Response(ttsResponse.body, {
           headers: {
             ...corsHeaders,
-            'Content-Type': 'audio/mpeg',
+            'Content-Type': 'audio/ogg',
           },
         });
       } catch (error) {

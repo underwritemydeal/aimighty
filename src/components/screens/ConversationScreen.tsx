@@ -749,7 +749,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       {/* UI Layer */}
       <div
         className="relative z-10 flex flex-col h-full safe-top"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 16px)' }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 24px) + 100px)' }}
       >
         {/* Top bar */}
         <header

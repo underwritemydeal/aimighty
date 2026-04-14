@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { signUp, signIn, isValidEmail, isDisposableEmail } from '../../services/auth';
+import { signUp, signIn, isValidEmail } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
 
@@ -9,7 +9,7 @@ interface AuthScreenProps {
   language: LanguageCode;
 }
 
-type AuthMode = 'signup' | 'login' | 'forgot';
+type AuthMode = 'signup' | 'login';
 
 // Back icon
 const BackIcon = memo(function BackIcon() {
@@ -44,60 +44,30 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
   const [mode, setMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotMessage, setShowForgotMessage] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 150);
     return () => clearTimeout(timer);
   }, []);
 
-  // Validate email on blur
-  const handleEmailBlur = () => {
-    if (!email) {
-      setEmailError('');
-      return;
-    }
-    if (!isValidEmail(email)) {
-      setEmailError(t('auth.invalidEmail', language));
-    } else if (isDisposableEmail(email)) {
-      setEmailError(t('auth.disposableEmail', language));
-    } else {
-      setEmailError('');
-    }
-  };
-
-  // Validate confirm password
-  const handleConfirmPasswordBlur = () => {
-    if (mode === 'signup' && confirmPassword && password !== confirmPassword) {
-      setPasswordError(t('auth.passwordsNoMatch', language));
-    } else {
-      setPasswordError('');
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setShowForgotMessage(false);
 
-    // Validate email
+    // Basic email validation
     if (!isValidEmail(email)) {
-      setEmailError(t('auth.invalidEmail', language));
-      return;
-    }
-    if (isDisposableEmail(email)) {
-      setEmailError(t('auth.disposableEmail', language));
+      setError('Please enter a valid email address');
       return;
     }
 
-    // Validate password match for signup
-    if (mode === 'signup' && password !== confirmPassword) {
-      setPasswordError(t('auth.passwordsNoMatch', language));
+    // Password minimum length
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
 
@@ -109,35 +79,35 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
         if (result.success && result.user) {
           onAuthSuccess(result.user);
         } else {
-          setError(result.error || t('common.error', language));
+          setError(result.error || 'Something went wrong');
         }
-      } else if (mode === 'login') {
+      } else {
         const result = await signIn(email, password);
         if (result.success && result.user) {
           onAuthSuccess(result.user);
         } else {
-          setError(result.error || t('common.error', language));
+          setError('Account not found or incorrect password');
         }
       }
     } catch {
-      setError(t('common.error', language));
+      setError('Something went wrong');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const switchMode = (newMode: AuthMode) => {
-    setMode(newMode);
+  const switchMode = () => {
+    setMode(mode === 'signup' ? 'login' : 'signup');
     setError('');
-    setEmailError('');
-    setPasswordError('');
-    setPassword('');
-    setConfirmPassword('');
-    setShowPassword(false);
-    setShowConfirmPassword(false);
+    setShowForgotMessage(false);
   };
 
-  const isFormValid = email && password && (mode !== 'signup' || (confirmPassword && password === confirmPassword)) && !emailError;
+  const handleForgotPassword = () => {
+    setShowForgotMessage(true);
+    setError('');
+  };
+
+  const isFormValid = email.length > 0 && password.length >= 8;
 
   return (
     <div
@@ -206,7 +176,7 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
           }}
         >
           {/* Logo */}
-          <div className="text-center mb-6">
+          <div className="text-center mb-8">
             <h1 className="flex items-baseline justify-center select-none">
               <span
                 style={{
@@ -231,92 +201,41 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
             </h1>
           </div>
 
-          {/* Heading */}
-          <h2
-            id="auth-heading"
-            className="text-center mb-8"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.5rem',
-              fontWeight: 500,
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            {mode === 'forgot'
-              ? t('auth.forgotPassword', language)
-              : mode === 'signup'
-              ? t('auth.createAccount', language)
-              : t('auth.signIn', language)}
-          </h2>
+          <form onSubmit={handleSubmit}>
+            <div className="flex flex-col" style={{ gap: '20px' }}>
+              {/* Email field */}
+              <div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                  placeholder="Email"
+                  autoComplete="email"
+                  required
+                  style={{
+                    width: '100%',
+                    height: '52px',
+                    padding: '0 16px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: 0,
+                    color: 'rgba(255, 248, 240, 0.95)',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: '1rem',
+                  }}
+                />
+              </div>
 
-          {mode === 'forgot' ? (
-            <div>
-              <p
-                className="text-center mb-6"
-                style={{
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {t('auth.forgotPasswordMessage', language)}
-              </p>
-              <button
-                type="button"
-                onClick={() => switchMode('login')}
-                className="w-full py-3 rounded-xl transition-colors hover:bg-white/[0.08]"
-                style={{
-                  border: '1px solid rgba(255,255,255,0.2)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {t('auth.backToSignIn', language)}
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div className="flex flex-col" style={{ gap: '16px' }}>
-                {/* Email field */}
-                <div>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value);
-                      setEmailError('');
-                    }}
-                    onBlur={handleEmailBlur}
-                    placeholder={t('auth.email', language)}
-                    autoComplete="email"
-                    required
-                    style={{
-                      width: '100%',
-                      height: '52px',
-                      padding: '0 16px',
-                      background: 'transparent',
-                      border: 'none',
-                      borderBottom: emailError ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: 0,
-                      color: 'rgba(255, 248, 240, 0.95)',
-                      fontFamily: 'var(--font-display)',
-                      fontSize: '1rem',
-                    }}
-                  />
-                  {emailError && (
-                    <p className="mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-                      {emailError}
-                    </p>
-                  )}
-                </div>
-
-                {/* Password field */}
+              {/* Password field */}
+              <div>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t('auth.password', language)}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    placeholder="Password"
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                    minLength={8}
                     required
                     style={{
                       width: '100%',
@@ -340,157 +259,85 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
                   >
                     <EyeIcon visible={showPassword} />
                   </button>
-                  {mode === 'signup' && (
-                    <p className="mt-2" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.35)' }}>
-                      {t('auth.minChars', language)}
-                    </p>
-                  )}
                 </div>
-
-                {/* Confirm password field (signup only) */}
-                {mode === 'signup' && (
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => {
-                        setConfirmPassword(e.target.value);
-                        setPasswordError('');
-                      }}
-                      onBlur={handleConfirmPasswordBlur}
-                      placeholder={t('auth.confirmPassword', language)}
-                      autoComplete="new-password"
-                      minLength={8}
-                      required
-                      style={{
-                        width: '100%',
-                        height: '52px',
-                        padding: '0 48px 0 16px',
-                        background: 'transparent',
-                        border: 'none',
-                        borderBottom: passwordError ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.2)',
-                        borderRadius: 0,
-                        color: 'rgba(255, 248, 240, 0.95)',
-                        fontFamily: 'var(--font-display)',
-                        fontSize: '1rem',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
-                      style={{ color: 'rgba(255, 255, 255, 0.35)' }}
-                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    >
-                      <EyeIcon visible={showConfirmPassword} />
-                    </button>
-                    {passwordError && (
-                      <p className="mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-                        {passwordError}
-                      </p>
-                    )}
-                  </div>
-                )}
+                <p className="mt-2" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.35)' }}>
+                  Minimum 8 characters
+                </p>
               </div>
+            </div>
 
-              {/* General error */}
-              {error && (
-                <div
-                  className="mt-4 p-3 rounded-xl text-center"
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                  }}
-                >
-                  <p style={{ fontSize: 'var(--text-sm)', color: '#ef4444' }}>
-                    {error}
-                  </p>
-                </div>
-              )}
+            {/* Error message */}
+            {error && (
+              <div className="mt-4">
+                <p style={{ fontSize: '0.85rem', color: '#ef4444' }}>
+                  {error}
+                </p>
+              </div>
+            )}
 
-              {/* Submit button */}
-              <button
-                type="submit"
-                disabled={isLoading || !isFormValid}
-                className="w-full mt-6 transition-all duration-200"
-                style={{
-                  height: '52px',
-                  background: '#d4af37',
-                  color: '#0a0a0f',
-                  borderRadius: '12px',
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1rem',
-                  fontWeight: 500,
-                  opacity: isLoading || !isFormValid ? 0.6 : 1,
-                  animation: isLoading ? 'pulse 1.5s ease-in-out infinite' : 'none',
-                }}
-              >
-                {isLoading
-                  ? mode === 'signup'
-                    ? 'Creating Account...'
-                    : 'Signing In...'
-                  : mode === 'signup'
-                  ? t('auth.createAccount', language)
-                  : t('auth.signIn', language)}
-              </button>
-            </form>
+            {/* Forgot password message */}
+            {showForgotMessage && (
+              <div className="mt-4">
+                <p style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.6)' }}>
+                  Password reset coming soon. For now, create a new account.
+                </p>
+              </div>
+            )}
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={isLoading || !isFormValid}
+              className="w-full mt-6 transition-all duration-200"
+              style={{
+                height: '52px',
+                background: '#d4af37',
+                color: '#0a0a0f',
+                borderRadius: '12px',
+                fontFamily: 'var(--font-display)',
+                fontSize: '1rem',
+                fontWeight: 500,
+                opacity: isLoading || !isFormValid ? 0.6 : 1,
+              }}
+            >
+              {isLoading
+                ? (mode === 'signup' ? 'Creating...' : 'Signing In...')
+                : (mode === 'signup' ? 'Create Account' : 'Sign In')}
+            </button>
+          </form>
+
+          {/* Forgot password */}
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              className="w-full text-center mt-4"
+              style={{
+                fontSize: '0.85rem',
+                color: 'rgba(255, 255, 255, 0.4)',
+              }}
+            >
+              Forgot Password?
+            </button>
           )}
 
-          {mode !== 'forgot' && (
-            <>
-              {/* Forgot password */}
-              {mode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => switchMode('forgot')}
-                  className="w-full text-center mt-4"
-                  style={{
-                    fontSize: 'var(--text-sm)',
-                    color: 'rgba(255, 255, 255, 0.5)',
-                  }}
-                >
-                  {t('auth.forgotPassword', language)}?
-                </button>
-              )}
-
-              {/* Switch mode */}
-              <p
-                className="text-center mt-6"
-                style={{
-                  fontSize: 'var(--text-sm)',
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
-                {mode === 'signup' ? t('auth.alreadyHaveAccount', language) : t('auth.noAccount', language)}{' '}
-                <button
-                  type="button"
-                  onClick={() => switchMode(mode === 'signup' ? 'login' : 'signup')}
-                  style={{ color: '#d4af37', fontWeight: 500 }}
-                >
-                  {mode === 'signup' ? t('auth.signIn', language) : t('auth.signUp', language)}
-                </button>
-              </p>
-
-              {/* Terms */}
-              <p
-                className="text-center mt-6"
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'rgba(255, 255, 255, 0.35)',
-                  lineHeight: 1.6,
-                }}
-              >
-                {t('auth.terms', language)}{' '}
-                <a href="/terms" style={{ color: '#d4af37' }}>
-                  {t('auth.termsLink', language)}
-                </a>{' '}
-                {t('auth.and', language)}{' '}
-                <a href="/privacy" style={{ color: '#d4af37' }}>
-                  {t('auth.privacyLink', language)}
-                </a>
-              </p>
-            </>
-          )}
+          {/* Switch mode */}
+          <p
+            className="text-center mt-6"
+            style={{
+              fontSize: '0.9rem',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            {mode === 'signup' ? "Already have an account? " : "Don't have an account? "}
+            <button
+              type="button"
+              onClick={switchMode}
+              style={{ color: '#d4af37', fontWeight: 500 }}
+            >
+              {mode === 'signup' ? 'Sign In' : 'Create Account'}
+            </button>
+          </p>
         </div>
       </div>
     </div>

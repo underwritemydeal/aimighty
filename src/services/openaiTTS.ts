@@ -23,6 +23,22 @@ function setVoiceEnabledStorage(enabled: boolean): void {
 
 let voiceEnabled = getVoiceEnabled();
 let currentAudio: HTMLAudioElement | null = null;
+let preconnected = false;
+
+/**
+ * Preconnect to the worker for faster TTS requests
+ */
+export function preconnectWorker(): void {
+  if (preconnected || typeof document === 'undefined') return;
+  preconnected = true;
+
+  const link = document.createElement('link');
+  link.rel = 'preconnect';
+  link.href = WORKER_URL;
+  document.head.appendChild(link);
+
+  console.log('[TTS] Preconnected to worker');
+}
 
 /**
  * Speak text using OpenAI TTS
@@ -35,45 +51,62 @@ export async function speakWithOpenAI(
   language: string = 'en',
   onEnd?: () => void
 ): Promise<void> {
-  console.log('[OpenAI TTS] Speaking:', text.substring(0, 50) + '...', 'beliefSystem:', beliefSystem, 'character:', character, 'language:', language, 'voice enabled:', voiceEnabled);
+  console.log('[TTS] Requesting voice for:', beliefSystem, character, language);
+  console.log('[TTS] Text length:', text.length, 'chars');
 
   // Stop any current audio
   stop();
 
   if (!voiceEnabled) {
-    console.log('[OpenAI TTS] Voice disabled, skipping');
+    console.log('[TTS] Voice disabled, skipping');
     onEnd?.();
     return;
   }
 
   if (!text.trim()) {
-    console.log('[OpenAI TTS] Empty text, skipping');
+    console.log('[TTS] Empty text, skipping');
     onEnd?.();
     return;
   }
 
   try {
-    console.log('[OpenAI TTS] Fetching from worker...');
+    console.log('[TTS] Fetching from worker...');
+    const startTime = Date.now();
+
     const response = await fetch(`${WORKER_URL}/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, beliefSystem, character, language }),
     });
 
+    console.log('[TTS] Worker response status:', response.status, 'in', Date.now() - startTime, 'ms');
+
     if (!response.ok) {
-      throw new Error(`TTS request failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[TTS] Worker error response:', errorText);
+      throw new Error(`TTS request failed: ${response.status} - ${errorText}`);
     }
 
     const audioBlob = await response.blob();
+    console.log('[TTS] Audio blob size:', audioBlob.size, 'bytes, type:', audioBlob.type);
+
+    if (audioBlob.size < 100) {
+      console.error('[TTS] Audio blob too small, likely an error');
+      throw new Error('Audio blob too small');
+    }
+
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
+    audio.preload = 'auto';
     currentAudio = audio;
 
-    console.log('[OpenAI TTS] Audio loaded, playing...');
-
     return new Promise((resolve) => {
+      audio.oncanplaythrough = () => {
+        console.log('[TTS] Audio ready, playing...');
+      };
+
       audio.onended = () => {
-        console.log('[OpenAI TTS] Audio ended');
+        console.log('[TTS] Audio ended');
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
         onEnd?.();
@@ -81,30 +114,38 @@ export async function speakWithOpenAI(
       };
 
       audio.onerror = (e) => {
-        console.error('[OpenAI TTS] Audio error:', e);
+        console.error('[TTS] Audio playback error:', e);
         URL.revokeObjectURL(audioUrl);
         currentAudio = null;
         // Fall back to browser TTS
+        console.log('[TTS] Falling back to browser TTS');
         fallbackBrowserTTS(text, language).then(() => {
           onEnd?.();
           resolve();
         });
       };
 
-      audio.play().catch((e) => {
-        console.error('[OpenAI TTS] Play error:', e);
-        URL.revokeObjectURL(audioUrl);
-        currentAudio = null;
-        // Fall back to browser TTS
-        fallbackBrowserTTS(text, language).then(() => {
-          onEnd?.();
-          resolve();
+      console.log('[TTS] Calling audio.play()...');
+      audio.play()
+        .then(() => {
+          console.log('[TTS] Audio playing!');
+        })
+        .catch((e) => {
+          console.error('[TTS] Play error (likely autoplay blocked):', e);
+          URL.revokeObjectURL(audioUrl);
+          currentAudio = null;
+          // Fall back to browser TTS
+          console.log('[TTS] Falling back to browser TTS due to play error');
+          fallbackBrowserTTS(text, language).then(() => {
+            onEnd?.();
+            resolve();
+          });
         });
-      });
     });
   } catch (error) {
-    console.error('[OpenAI TTS] Error:', error);
+    console.error('[TTS] ERROR:', error);
     // Fall back to browser SpeechSynthesis
+    console.log('[TTS] Falling back to browser TTS due to fetch error');
     await fallbackBrowserTTS(text, language);
     onEnd?.();
   }
@@ -120,7 +161,7 @@ export function stop(): void {
     currentAudio = null;
   }
   // Also stop browser speech synthesis if active
-  if ('speechSynthesis' in window) {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     speechSynthesis.cancel();
   }
 }
@@ -129,7 +170,7 @@ export function stop(): void {
  * Enable or disable voice output
  */
 export function setVoiceEnabled(enabled: boolean): void {
-  console.log('[OpenAI TTS] setVoiceEnabled:', enabled);
+  console.log('[TTS] setVoiceEnabled:', enabled);
   voiceEnabled = enabled;
   setVoiceEnabledStorage(enabled);
   if (!enabled) {
@@ -148,8 +189,11 @@ export function isVoiceEnabled(): boolean {
  * Initialize audio context (for iOS requirements)
  */
 export function initAudio(): void {
+  // Preconnect on first interaction
+  preconnectWorker();
+
   // Create a silent audio context to unlock on user interaction
-  if ('AudioContext' in window || 'webkitAudioContext' in window) {
+  if (typeof window !== 'undefined' && ('AudioContext' in window || 'webkitAudioContext' in window)) {
     try {
       const AudioContextClass = window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -158,8 +202,9 @@ export function initAudio(): void {
         ctx.resume();
       }
       ctx.close();
+      console.log('[TTS] Audio context initialized');
     } catch (e) {
-      console.log('[OpenAI TTS] AudioContext init error:', e);
+      console.log('[TTS] AudioContext init error:', e);
     }
   }
 }
@@ -169,13 +214,13 @@ export function initAudio(): void {
  */
 function fallbackBrowserTTS(text: string, language: string): Promise<void> {
   return new Promise((resolve) => {
-    if (!('speechSynthesis' in window)) {
-      console.log('[OpenAI TTS] No SpeechSynthesis, resolving');
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      console.log('[TTS] No SpeechSynthesis available');
       resolve();
       return;
     }
 
-    console.log('[OpenAI TTS] Falling back to browser TTS');
+    console.log('[TTS] Browser TTS starting...');
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.82;
     utterance.pitch = 0.85;
@@ -188,22 +233,21 @@ function fallbackBrowserTTS(text: string, language: string): Promise<void> {
     };
     utterance.lang = langMap[language] || 'en-US';
 
-    utterance.onend = () => {
-      console.log('[OpenAI TTS] Browser TTS ended');
-      resolve();
-    };
-    utterance.onerror = () => {
-      console.log('[OpenAI TTS] Browser TTS error');
-      resolve();
-    };
-
     // Timeout fallback
     const timeout = setTimeout(() => {
+      console.log('[TTS] Browser TTS timeout');
       speechSynthesis.cancel();
       resolve();
     }, Math.max(10000, text.length * 100));
 
     utterance.onend = () => {
+      console.log('[TTS] Browser TTS ended');
+      clearTimeout(timeout);
+      resolve();
+    };
+
+    utterance.onerror = () => {
+      console.log('[TTS] Browser TTS error');
       clearTimeout(timeout);
       resolve();
     };
