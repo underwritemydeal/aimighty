@@ -11,69 +11,30 @@ interface AuthScreenProps {
 
 type AuthMode = 'signup' | 'login' | 'forgot';
 
-// Social sign-in button
-const SocialButton = memo(function SocialButton({
-  provider,
-  icon,
-  onClick,
-  language,
-}: {
-  provider: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-  language: LanguageCode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center justify-center gap-3 rounded-xl transition-all duration-200 hover:bg-white/[0.08]"
-      style={{
-        height: '48px',
-        background: 'transparent',
-        border: '1px solid rgba(255, 255, 255, 0.2)',
-      }}
-      aria-label={`${t('auth.continueWith', language)} ${provider}`}
-    >
-      {icon}
-      <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: 'var(--text-sm)',
-          fontWeight: 400,
-          color: 'var(--color-text-primary)',
-        }}
-      >
-        {t('auth.continueWith', language)} {provider}
-      </span>
-    </button>
-  );
-});
-
-// Divider
-const Divider = memo(function Divider({ text }: { text: string }) {
-  return (
-    <div className="flex items-center gap-4 my-6">
-      <div className="flex-1 h-[1px] bg-white/10" />
-      <span
-        style={{
-          fontSize: '0.65rem',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color: 'rgba(255,255,255,0.35)',
-        }}
-      >
-        {text}
-      </span>
-      <div className="flex-1 h-[1px] bg-white/10" />
-    </div>
-  );
-});
-
 // Back icon
 const BackIcon = memo(function BackIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+});
+
+// Eye icon for password toggle
+const EyeIcon = memo(function EyeIcon({ visible }: { visible: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {visible ? (
+        <>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </>
+      ) : (
+        <>
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </>
+      )}
     </svg>
   );
 });
@@ -84,7 +45,11 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -92,22 +57,47 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
     return () => clearTimeout(timer);
   }, []);
 
-  const emailError = email && !isValidEmail(email)
-    ? t('auth.invalidEmail', language)
-    : email && isDisposableEmail(email)
-    ? t('auth.disposableEmail', language)
-    : '';
+  // Validate email on blur
+  const handleEmailBlur = () => {
+    if (!email) {
+      setEmailError('');
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setEmailError(t('auth.invalidEmail', language));
+    } else if (isDisposableEmail(email)) {
+      setEmailError(t('auth.disposableEmail', language));
+    } else {
+      setEmailError('');
+    }
+  };
 
-  const passwordMatchError = mode === 'signup' && confirmPassword && password !== confirmPassword
-    ? t('auth.passwordsNoMatch', language)
-    : '';
+  // Validate confirm password
+  const handleConfirmPasswordBlur = () => {
+    if (mode === 'signup' && confirmPassword && password !== confirmPassword) {
+      setPasswordError(t('auth.passwordsNoMatch', language));
+    } else {
+      setPasswordError('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    // Validate email
+    if (!isValidEmail(email)) {
+      setEmailError(t('auth.invalidEmail', language));
+      return;
+    }
+    if (isDisposableEmail(email)) {
+      setEmailError(t('auth.disposableEmail', language));
+      return;
+    }
+
+    // Validate password match for signup
     if (mode === 'signup' && password !== confirmPassword) {
-      setError(t('auth.passwordsNoMatch', language));
+      setPasswordError(t('auth.passwordsNoMatch', language));
       return;
     }
 
@@ -136,20 +126,22 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
     }
   };
 
-  const handleSocialSignIn = (provider: string) => {
-    alert(`${provider} sign-in will be available soon. Please use email for now.`);
-  };
-
   const switchMode = (newMode: AuthMode) => {
     setMode(newMode);
     setError('');
+    setEmailError('');
+    setPasswordError('');
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
+
+  const isFormValid = email && password && (mode !== 'signup' || (confirmPassword && password === confirmPassword)) && !emailError;
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
+      className="relative min-h-screen overflow-hidden flex items-center justify-center"
       style={{ background: 'var(--color-void)' }}
       role="main"
       aria-labelledby="auth-heading"
@@ -161,8 +153,8 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
           backgroundImage: 'url(/images/avatars/hero-mashup-mobile.jpg)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          opacity: 0.4,
-          filter: 'blur(20px)',
+          opacity: 0.3,
+          filter: 'blur(30px)',
         }}
         aria-hidden="true"
       />
@@ -170,14 +162,16 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
       {/* Dark overlay */}
       <div
         className="fixed inset-0"
-        style={{ background: 'rgba(3, 3, 8, 0.8)' }}
+        style={{ background: 'rgba(3, 3, 8, 0.85)' }}
         aria-hidden="true"
       />
 
       {/* Back button */}
       <nav
-        className="fixed top-4 left-4 z-20"
+        className="fixed z-20"
         style={{
+          top: 'max(env(safe-area-inset-top, 16px), 16px)',
+          left: '16px',
           opacity: isVisible ? 1 : 0,
           transition: 'opacity 0.5s ease',
         }}
@@ -192,29 +186,33 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
         </button>
       </nav>
 
-      {/* Content */}
+      {/* Auth card */}
       <div
-        className="relative z-10 min-h-screen flex flex-col sm:justify-center"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        className="relative z-10 w-full max-w-[400px] mx-4"
+        style={{
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+          transition: 'all 0.6s ease',
+        }}
       >
-        <div className="flex-1 sm:hidden" />
-
         <div
-          className="w-full sm:max-w-sm sm:mx-auto"
           style={{
-            opacity: isVisible ? 1 : 0,
-            transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-            transition: 'all 0.6s ease',
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '20px',
+            padding: '40px 32px',
           }}
         >
-          {/* Logo on desktop */}
-          <div className="hidden sm:block text-center mb-8">
+          {/* Logo */}
+          <div className="text-center mb-6">
             <h1 className="flex items-baseline justify-center select-none">
               <span
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: 'var(--text-3xl)',
-                  fontWeight: 600,
+                  fontSize: '1.5rem',
+                  fontWeight: 700,
                   color: '#d4af37',
                 }}
               >
@@ -223,9 +221,9 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
               <span
                 style={{
                   fontFamily: 'var(--font-display)',
-                  fontSize: 'var(--text-3xl)',
+                  fontSize: '1.5rem',
                   fontWeight: 300,
-                  color: 'var(--color-text-primary)',
+                  color: 'rgba(255, 248, 240, 0.95)',
                 }}
               >
                 mighty
@@ -233,234 +231,266 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
             </h1>
           </div>
 
-          {/* Auth card */}
-          <div
-            className="glass-card rounded-t-3xl sm:rounded-2xl"
+          {/* Heading */}
+          <h2
+            id="auth-heading"
+            className="text-center mb-8"
             style={{
-              padding: '32px 24px 40px 24px',
-              borderBottom: 'none',
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.5rem',
+              fontWeight: 500,
+              color: 'var(--color-text-primary)',
             }}
           >
-            <h2
-              id="auth-heading"
-              className="text-center mb-7"
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-xl)',
-                fontWeight: 400,
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              {mode === 'forgot'
-                ? t('auth.forgotPassword', language)
-                : mode === 'signup'
-                ? t('auth.createAccount', language)
-                : t('auth.welcomeBack', language)}
-            </h2>
+            {mode === 'forgot'
+              ? t('auth.forgotPassword', language)
+              : mode === 'signup'
+              ? t('auth.createAccount', language)
+              : t('auth.signIn', language)}
+          </h2>
 
-            {mode === 'forgot' && (
-              <div className="mb-6">
-                <p
-                  className="text-center"
-                  style={{
-                    fontSize: 'var(--text-sm)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                >
-                  {t('auth.forgotPasswordMessage', language)}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => switchMode('login')}
-                  className="w-full mt-4 py-3 rounded-xl transition-colors hover:bg-white/[0.08]"
-                  style={{
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    color: 'var(--color-text-secondary)',
-                  }}
-                >
-                  {t('auth.backToSignIn', language)}
-                </button>
-              </div>
-            )}
+          {mode === 'forgot' ? (
+            <div>
+              <p
+                className="text-center mb-6"
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                {t('auth.forgotPasswordMessage', language)}
+              </p>
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="w-full py-3 rounded-xl transition-colors hover:bg-white/[0.08]"
+                style={{
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                {t('auth.backToSignIn', language)}
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div className="flex flex-col" style={{ gap: '16px' }}>
+                {/* Email field */}
+                <div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError('');
+                    }}
+                    onBlur={handleEmailBlur}
+                    placeholder={t('auth.email', language)}
+                    autoComplete="email"
+                    required
+                    style={{
+                      width: '100%',
+                      height: '52px',
+                      padding: '0 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: emailError ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: 0,
+                      color: 'rgba(255, 248, 240, 0.95)',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '1rem',
+                    }}
+                  />
+                  {emailError && (
+                    <p className="mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                      {emailError}
+                    </p>
+                  )}
+                </div>
 
-            {mode !== 'forgot' && (
-              <>
+                {/* Password field */}
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t('auth.password', language)}
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    minLength={8}
+                    required
+                    style={{
+                      width: '100%',
+                      height: '52px',
+                      padding: '0 48px 0 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: 0,
+                      color: 'rgba(255, 248, 240, 0.95)',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '1rem',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
+                    style={{ color: 'rgba(255, 255, 255, 0.35)' }}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    <EyeIcon visible={showPassword} />
+                  </button>
+                  {mode === 'signup' && (
+                    <p className="mt-2" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.35)' }}>
+                      {t('auth.minChars', language)}
+                    </p>
+                  )}
+                </div>
+
+                {/* Confirm password field (signup only) */}
                 {mode === 'signup' && (
-                  <>
-                    <div className="flex flex-col gap-3">
-                      <SocialButton
-                        provider="Google"
-                        onClick={() => handleSocialSignIn('Google')}
-                        language={language}
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                          </svg>
-                        }
-                      />
-                      <SocialButton
-                        provider="Apple"
-                        onClick={() => handleSocialSignIn('Apple')}
-                        language={language}
-                        icon={
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-                            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                          </svg>
-                        }
-                      />
-                    </div>
-                    <Divider text={t('auth.or', language)} />
-                  </>
-                )}
-
-                <form onSubmit={handleSubmit}>
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder={t('auth.email', language)}
-                        className="input"
-                        autoComplete="email"
-                        required
-                      />
-                      {emailError && (
-                        <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>
-                          {emailError}
-                        </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder={t('auth.password', language)}
-                        className="input"
-                        autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                        minLength={8}
-                        required
-                      />
-                      {mode === 'signup' && (
-                        <p className="mt-3 text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                          {t('auth.minChars', language)}
-                        </p>
-                      )}
-                    </div>
-
-                    {mode === 'signup' && (
-                      <div>
-                        <input
-                          type="password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder={t('auth.confirmPassword', language)}
-                          className="input"
-                          autoComplete="new-password"
-                          minLength={8}
-                          required
-                        />
-                        {passwordMatchError && (
-                          <p className="mt-2 text-xs" style={{ color: '#ef4444' }}>
-                            {passwordMatchError}
-                          </p>
-                        )}
-                      </div>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setPasswordError('');
+                      }}
+                      onBlur={handleConfirmPasswordBlur}
+                      placeholder={t('auth.confirmPassword', language)}
+                      autoComplete="new-password"
+                      minLength={8}
+                      required
+                      style={{
+                        width: '100%',
+                        height: '52px',
+                        padding: '0 48px 0 16px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: passwordError ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: 0,
+                        color: 'rgba(255, 248, 240, 0.95)',
+                        fontFamily: 'var(--font-display)',
+                        fontSize: '1rem',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1"
+                      style={{ color: 'rgba(255, 255, 255, 0.35)' }}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <EyeIcon visible={showConfirmPassword} />
+                    </button>
+                    {passwordError && (
+                      <p className="mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                        {passwordError}
+                      </p>
                     )}
                   </div>
-
-                  {error && (
-                    <div
-                      className="mt-4 p-3 rounded-xl text-center"
-                      style={{
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.2)',
-                      }}
-                    >
-                      <p style={{ fontSize: 'var(--text-sm)', color: '#ef4444' }}>
-                        {error}
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={isLoading || !!emailError || (mode === 'signup' && !!passwordMatchError)}
-                    className="w-full rounded-xl mt-5 transition-all duration-200 hover:opacity-90"
-                    style={{
-                      height: '52px',
-                      background: '#d4af37',
-                      color: '#0a0a0f',
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 'var(--text-base)',
-                      fontWeight: 500,
-                      opacity: isLoading ? 0.7 : 1,
-                    }}
-                  >
-                    {isLoading
-                      ? t('common.loading', language)
-                      : mode === 'signup'
-                      ? t('auth.createAccount', language)
-                      : t('auth.signIn', language)}
-                  </button>
-                </form>
-
-                {mode === 'login' && (
-                  <button
-                    type="button"
-                    onClick={() => switchMode('forgot')}
-                    className="w-full text-center mt-4"
-                    style={{
-                      fontSize: 'var(--text-sm)',
-                      color: 'rgba(255,255,255,0.5)',
-                    }}
-                  >
-                    {t('auth.forgotPassword', language)}
-                  </button>
                 )}
+              </div>
 
-                <p
-                  className="text-center mt-6"
+              {/* General error */}
+              {error && (
+                <div
+                  className="mt-4 p-3 rounded-xl text-center"
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                  }}
+                >
+                  <p style={{ fontSize: 'var(--text-sm)', color: '#ef4444' }}>
+                    {error}
+                  </p>
+                </div>
+              )}
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                disabled={isLoading || !isFormValid}
+                className="w-full mt-6 transition-all duration-200"
+                style={{
+                  height: '52px',
+                  background: '#d4af37',
+                  color: '#0a0a0f',
+                  borderRadius: '12px',
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1rem',
+                  fontWeight: 500,
+                  opacity: isLoading || !isFormValid ? 0.6 : 1,
+                  animation: isLoading ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                }}
+              >
+                {isLoading
+                  ? mode === 'signup'
+                    ? 'Creating Account...'
+                    : 'Signing In...'
+                  : mode === 'signup'
+                  ? t('auth.createAccount', language)
+                  : t('auth.signIn', language)}
+              </button>
+            </form>
+          )}
+
+          {mode !== 'forgot' && (
+            <>
+              {/* Forgot password */}
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => switchMode('forgot')}
+                  className="w-full text-center mt-4"
                   style={{
                     fontSize: 'var(--text-sm)',
-                    color: 'var(--color-text-secondary)',
+                    color: 'rgba(255, 255, 255, 0.5)',
                   }}
                 >
-                  {mode === 'signup' ? t('auth.alreadyHaveAccount', language) : t('auth.noAccount', language)}{' '}
-                  <button
-                    type="button"
-                    onClick={() => switchMode(mode === 'signup' ? 'login' : 'signup')}
-                    style={{ color: '#d4af37', fontWeight: 500 }}
-                  >
-                    {mode === 'signup' ? t('auth.signIn', language) : t('auth.signUp', language)}
-                  </button>
-                </p>
+                  {t('auth.forgotPassword', language)}?
+                </button>
+              )}
 
-                <p
-                  className="text-center mt-6"
-                  style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'rgba(255,255,255,0.35)',
-                    lineHeight: 1.6,
-                  }}
+              {/* Switch mode */}
+              <p
+                className="text-center mt-6"
+                style={{
+                  fontSize: 'var(--text-sm)',
+                  color: 'var(--color-text-secondary)',
+                }}
+              >
+                {mode === 'signup' ? t('auth.alreadyHaveAccount', language) : t('auth.noAccount', language)}{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode(mode === 'signup' ? 'login' : 'signup')}
+                  style={{ color: '#d4af37', fontWeight: 500 }}
                 >
-                  {t('auth.terms', language)}{' '}
-                  <a href="/terms" style={{ color: '#d4af37' }}>
-                    {t('auth.termsLink', language)}
-                  </a>{' '}
-                  {t('auth.and', language)}{' '}
-                  <a href="/privacy" style={{ color: '#d4af37' }}>
-                    {t('auth.privacyLink', language)}
-                  </a>
-                </p>
-              </>
-            )}
-          </div>
+                  {mode === 'signup' ? t('auth.signIn', language) : t('auth.signUp', language)}
+                </button>
+              </p>
+
+              {/* Terms */}
+              <p
+                className="text-center mt-6"
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'rgba(255, 255, 255, 0.35)',
+                  lineHeight: 1.6,
+                }}
+              >
+                {t('auth.terms', language)}{' '}
+                <a href="/terms" style={{ color: '#d4af37' }}>
+                  {t('auth.termsLink', language)}
+                </a>{' '}
+                {t('auth.and', language)}{' '}
+                <a href="/privacy" style={{ color: '#d4af37' }}>
+                  {t('auth.privacyLink', language)}
+                </a>
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>

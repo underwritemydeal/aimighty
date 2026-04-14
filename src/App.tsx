@@ -113,6 +113,14 @@ function App() {
     transitionTo('belief-welcome');
   };
 
+  // Handle belief change from conversation screen (skip welcome screen)
+  const handleChangeBelief = useCallback((belief: BeliefSystem) => {
+    setSelectedBelief(belief);
+    updateSessionBelief(belief.id);
+    // Stay on conversation screen - it will reset with new belief
+    setCurrentScreen('conversation');
+  }, []);
+
   const handleBeliefWelcomeComplete = () => {
     transitionTo('conversation');
   };
@@ -222,10 +230,13 @@ function App() {
 
         {currentScreen === 'conversation' && selectedBelief && user && (
           <ConversationScreen
+            key={selectedBelief.id}
             belief={selectedBelief}
             user={user}
             onBack={handleBackToBeliefSelector}
             onPaywall={handleShowPaywall}
+            onChangeBelief={handleChangeBelief}
+            onSignOut={handleSignOut}
             language={language}
           />
         )}

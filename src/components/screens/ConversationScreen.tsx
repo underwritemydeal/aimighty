@@ -4,7 +4,7 @@ import { speak, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
-import { type CategorizedBeliefSystem } from '../../data/beliefSystems';
+import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -16,6 +16,14 @@ type ConversationState =
   | 'sending'     // Waiting for Claude (shows thinking dots)
   | 'streaming'   // Text appearing
   | 'speaking';   // TTS playing
+
+// Message with metadata for display
+interface DisplayMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'greeting';
+  content: string;
+  timestamp: number;
+}
 
 // Thin line art icons
 const BackIcon = memo(function BackIcon() {
@@ -38,6 +46,32 @@ const SpeakerIcon = memo(function SpeakerIcon({ muted }: { muted: boolean }) {
       ) : (
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
       )}
+    </svg>
+  );
+});
+
+const GearIcon = memo(function GearIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+});
+
+const ChevronDownIcon = memo(function ChevronDownIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+});
+
+const ArrowDownIcon = memo(function ArrowDownIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <polyline points="19 12 12 19 5 12" />
     </svg>
   );
 });
@@ -107,43 +141,184 @@ const MicButton = memo(function MicButton({
         opacity: disabled ? 0.35 : 1,
       }}
     >
-      {/* Outer breathing ring */}
-      <div
-        className="mic-button-ring"
-        style={{ borderColor: accentColor }}
-      />
-
-      {/* Ripple effect when listening */}
-      {isListening && (
-        <div
-          className="mic-button-ripple"
-          style={{ borderColor: accentColor }}
-        />
-      )}
-
-      {/* Icon */}
+      <div className="mic-button-ring" style={{ borderColor: accentColor }} />
+      {isListening && <div className="mic-button-ripple" style={{ borderColor: accentColor }} />}
       <div style={{ color: isListening ? '#fff' : 'rgba(255,255,255,0.8)' }}>
         {isListening ? <StopIcon /> : <MicIcon />}
       </div>
-
-      {/* Listening label */}
       {isListening && (
-        <span
-          className="absolute"
-          style={{
-            bottom: '-24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: '0.65rem',
-            letterSpacing: '0.1em',
-            color: 'rgba(255,255,255,0.5)',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <span className="absolute" style={{ bottom: '-24px', left: '50%', transform: 'translateX(-50%)', fontSize: '0.65rem', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
           Listening...
         </span>
       )}
     </button>
+  );
+});
+
+// Parse and linkify scripture references
+function parseScriptureReferences(text: string, accentColor: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  // Combined pattern for all scripture types
+  const combinedPattern = /\b(\d?\s?[A-Z][a-z]+)\s+(\d+):(\d+)(?:-(\d+))?\b|\b(?:Surah|Al-[A-Za-z]+)\s+(\d+):(\d+)\b/gi;
+
+  let match;
+  while ((match = combinedPattern.exec(text)) !== null) {
+    // Add text before match
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    const fullMatch = match[0];
+    const isQuran = fullMatch.toLowerCase().includes('surah') || fullMatch.toLowerCase().startsWith('al-');
+
+    // Create link
+    const url = isQuran
+      ? `https://quran.com/${match[5] || match[1]}/${match[6] || match[2]}`
+      : `https://www.biblegateway.com/passage/?search=${encodeURIComponent(fullMatch)}&version=NIV`;
+
+    parts.push(
+      <a
+        key={match.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: accentColor,
+          textDecoration: 'underline',
+          textDecorationColor: `${accentColor}50`,
+          textUnderlineOffset: '2px',
+        }}
+      >
+        {fullMatch}
+      </a>
+    );
+
+    lastIndex = match.index + fullMatch.length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : [text];
+}
+
+// Belief selector modal
+const BeliefSelectorModal = memo(function BeliefSelectorModal({
+  isOpen,
+  onClose,
+  onSelect,
+  currentBeliefId,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (belief: CategorizedBeliefSystem) => void;
+  currentBeliefId: string;
+}) {
+  if (!isOpen) return null;
+
+  const categories: BeliefCategory[] = ['religious', 'spiritual', 'philosophical'];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md max-h-[80vh] overflow-hidden"
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '20px',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-5 border-b border-white/5">
+          <h2 className="text-center" style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 500, color: 'var(--color-text-primary)' }}>
+            Switch Belief System
+          </h2>
+        </div>
+        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 80px)' }}>
+          {categories.map((category) => (
+            <div key={category} className="mb-4">
+              <h3 className="mb-2 px-2" style={{ fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>
+                {categoryLabels[category]}
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {beliefSystems.filter((b) => b.category === category).map((belief) => (
+                  <button
+                    key={belief.id}
+                    onClick={() => { onSelect(belief); onClose(); }}
+                    className="px-3 py-2.5 rounded-xl text-left transition-all"
+                    style={{
+                      background: belief.id === currentBeliefId ? `linear-gradient(135deg, ${belief.accentColor}30 0%, ${belief.accentColor}10 100%)` : 'rgba(255, 255, 255, 0.03)',
+                      border: belief.id === currentBeliefId ? `1px solid ${belief.accentColor}60` : '1px solid rgba(255, 255, 255, 0.06)',
+                    }}
+                  >
+                    <span className="block" style={{ fontSize: '0.9rem', fontWeight: belief.id === currentBeliefId ? 500 : 400, color: belief.id === currentBeliefId ? belief.accentColor : 'var(--color-text-primary)' }}>
+                      {belief.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// Settings dropdown
+const SettingsDropdown = memo(function SettingsDropdown({
+  isOpen,
+  onClose,
+  onSwitchBelief,
+  onSignOut,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSwitchBelief: () => void;
+  onSignOut: () => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div
+        className="absolute right-0 top-full mt-2 z-50"
+        style={{
+          background: 'rgba(20, 20, 25, 0.95)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '12px',
+          minWidth: '180px',
+          overflow: 'hidden',
+        }}
+      >
+        <button
+          onClick={() => { onSwitchBelief(); onClose(); }}
+          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
+          style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}
+        >
+          Switch Belief System
+        </button>
+        <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+        <button
+          onClick={() => { onSignOut(); onClose(); }}
+          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
+          style={{ fontSize: '0.9rem', color: '#ef4444' }}
+        >
+          Sign Out
+        </button>
+      </div>
+    </>
   );
 });
 
@@ -152,14 +327,27 @@ interface ConversationScreenProps {
   user: User;
   onBack: () => void;
   onPaywall: () => void;
+  onChangeBelief?: (belief: BeliefSystem) => void;
+  onSignOut?: () => void;
   language: LanguageCode;
 }
 
-export function ConversationScreen({ belief, user, onBack, onPaywall, language }: ConversationScreenProps) {
-  // Get accent color and image path
+export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBelief, onSignOut, language }: ConversationScreenProps) {
   const categorizedBelief = belief as CategorizedBeliefSystem;
   const accentColor = categorizedBelief.accentColor || belief.themeColor;
-  const imagePath = categorizedBelief.imagePath || `/images/avatars/${belief.id}.jpg`;
+
+  // Responsive image path - desktop version if available
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const imagePath = isMobile
+    ? categorizedBelief.imagePath || `/images/avatars/${belief.id}.jpg`
+    : `/images/avatars/${belief.id}-desktop.jpg`;
+  const fallbackImagePath = categorizedBelief.imagePath || `/images/avatars/${belief.id}.jpg`;
 
   // State machine
   const [state, setState] = useState<ConversationState>('idle');
@@ -167,16 +355,22 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
   // UI state
   const [isVisible, setIsVisible] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [currentCaption, setCurrentCaption] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([]);
+  const [apiMessages, setApiMessages] = useState<Message[]>([]);
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(isVoiceEnabled());
+  const [showBeliefModal, setShowBeliefModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const hasGreeted = useRef(false);
   const fullResponseRef = useRef('');
+  const streamingMessageId = useRef<string | null>(null);
 
-  // Input enabled only in idle state
   const isInputEnabled = state === 'idle';
 
   // Handle voice toggle
@@ -207,48 +401,58 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     return () => clearTimeout(timer);
   }, []);
 
-  /**
-   * SPEAK THE RESPONSE
-   * Called AFTER streaming is complete
-   */
+  // Auto-scroll to bottom
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  // Track scroll position for "scroll to bottom" button
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      setShowScrollButton(!isNearBottom && displayMessages.length > 2);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [displayMessages.length]);
+
+  // Speak response
   const speakResponse = useCallback((text: string) => {
+    if (!voiceEnabled) {
+      setState('idle');
+      return;
+    }
     setState('speaking');
-
-    speak(
-      text,
-      language,
-      () => {
-        setState('idle');
-      },
-      () => {} // audio level callback - not used with image background
-    );
-
-    // Fallback timeout
+    speak(text, language, () => setState('idle'), () => {});
     setTimeout(() => {
-      setState(current => current === 'speaking' ? 'idle' : current);
+      setState((current) => (current === 'speaking' ? 'idle' : current));
     }, Math.max(2000, text.length * 100));
-  }, [language]);
+  }, [language, voiceEnabled]);
 
-  /**
-   * GREETING ON LOAD
-   * Text only — no TTS. User controls voice from there.
-   */
+  // Greeting on load - TEXT ONLY, no TTS
   useEffect(() => {
     if (hasGreeted.current) return;
     hasGreeted.current = true;
 
     const greetingTimer = setTimeout(() => {
       const greeting = getGreeting(belief.id);
-      setCurrentCaption(greeting);
-      // No TTS for greeting — stays silent. User speaks first.
-    }, 1500);
+      const greetingMessage: DisplayMessage = {
+        id: `greeting-${Date.now()}`,
+        role: 'greeting',
+        content: greeting,
+        timestamp: Date.now(),
+      };
+      setDisplayMessages([greetingMessage]);
+    }, 800);
 
     return () => clearTimeout(greetingTimer);
   }, [belief.id]);
 
-  /**
-   * SEND MESSAGE TO CLAUDE
-   */
+  // Send message to Claude
   const sendToAI = useCallback(async (userMessage: string) => {
     if (hasReachedFreeLimit() && !user.isPremium) {
       onPaywall();
@@ -257,31 +461,61 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
 
     initAudio();
     setState('sending');
-    setCurrentCaption('');
     fullResponseRef.current = '';
 
-    const newMessages: Message[] = [...messages, { role: 'user', content: userMessage }];
-    setMessages(newMessages);
+    // Add user message to display
+    const userDisplayMessage: DisplayMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userMessage,
+      timestamp: Date.now(),
+    };
+    setDisplayMessages((prev) => [...prev, userDisplayMessage]);
+
+    // Add to API messages
+    const newApiMessages: Message[] = [...apiMessages, { role: 'user', content: userMessage }];
+    setApiMessages(newApiMessages);
     incrementMessageCount();
 
+    // Create placeholder for streaming response
+    const assistantMessageId = `assistant-${Date.now()}`;
+    streamingMessageId.current = assistantMessageId;
+
+    setTimeout(scrollToBottom, 100);
+
     await sendMessage(
-      newMessages,
+      newApiMessages,
       belief.id,
       user.id,
       {
         onToken: (token) => {
           if (fullResponseRef.current === '') {
             setState('streaming');
+            // Add initial empty assistant message
+            setDisplayMessages((prev) => [
+              ...prev,
+              { id: assistantMessageId, role: 'assistant', content: '', timestamp: Date.now() },
+            ]);
           }
           fullResponseRef.current += token;
-          setCurrentCaption(fullResponseRef.current);
+          // Update the streaming message
+          setDisplayMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMessageId ? { ...m, content: fullResponseRef.current } : m
+            )
+          );
         },
         onSentence: () => {},
         onComplete: (text) => {
           fullResponseRef.current = text;
-          setCurrentCaption(text);
-          setMessages([...newMessages, { role: 'assistant', content: text }]);
+          streamingMessageId.current = null;
+          // Final update
+          setDisplayMessages((prev) =>
+            prev.map((m) => (m.id === assistantMessageId ? { ...m, content: text } : m))
+          );
+          setApiMessages([...newApiMessages, { role: 'assistant', content: text }]);
           speakResponse(text);
+          setTimeout(scrollToBottom, 100);
 
           if (hasReachedFreeLimit() && !user.isPremium) {
             setTimeout(onPaywall, 3000);
@@ -289,14 +523,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
         },
         onError: (error) => {
           console.error('[Conversation] Error:', error);
-          const errorMessage = "I am still here. Please try speaking to me again.";
-          setCurrentCaption(errorMessage);
+          const errorMessage = 'I am still here. Please try speaking to me again.';
+          setDisplayMessages((prev) =>
+            prev.map((m) => (m.id === assistantMessageId ? { ...m, content: errorMessage } : m))
+          );
           speakResponse(errorMessage);
         },
       },
       language
     );
-  }, [messages, belief.id, user.id, user.isPremium, speakResponse, onPaywall, language]);
+  }, [apiMessages, belief.id, user.id, user.isPremium, speakResponse, onPaywall, language, scrollToBottom]);
 
   // Handle send
   const handleSend = useCallback(() => {
@@ -314,12 +550,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
     }
   };
 
-  /**
-   * MIC TOGGLE
-   */
+  // Mic toggle
   const handleMicToggle = useCallback(() => {
     setSpeechError(null);
-
     if (state === 'listening') {
       stopListening();
       setState('idle');
@@ -329,29 +562,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
         setTimeout(() => setSpeechError(null), 3000);
         return;
       }
-
       initAudio();
-
       startListening({
         language,
-        onStart: () => {
-          setState('listening');
-          setInputText('');
-        },
-        onResult: (transcript) => {
-          setInputText(transcript);
-        },
-        onEnd: () => {
-          setState('idle');
-        },
-        onError: (error) => {
-          setState('idle');
-          setSpeechError(error);
-          setTimeout(() => setSpeechError(null), 3000);
-        },
+        onStart: () => { setState('listening'); setInputText(''); },
+        onResult: (transcript) => setInputText(transcript),
+        onEnd: () => setState('idle'),
+        onError: (error) => { setState('idle'); setSpeechError(error); setTimeout(() => setSpeechError(null), 3000); },
       });
     }
   }, [state, language]);
+
+  // Handle belief change
+  const handleBeliefChange = useCallback((newBelief: CategorizedBeliefSystem) => {
+    if (onChangeBelief) {
+      onChangeBelief(newBelief);
+    }
+  }, [onChangeBelief]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -362,35 +589,41 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
   }, []);
 
   const remainingMessages = getRemainingFreeMessages();
+  const actualImagePath = imageError ? fallbackImagePath : imagePath;
 
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{
-        background: '#000',
-        height: '100dvh',
-        minHeight: '-webkit-fill-available',
-      }}
+      style={{ background: '#000', height: '100dvh', minHeight: '-webkit-fill-available' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
     >
-      {/* Background image */}
+      {/* Background image with fallback */}
       <div
         className="fixed inset-0"
         style={{
-          backgroundImage: `url(${imagePath})`,
+          backgroundImage: `url(${actualImagePath})`,
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           backgroundRepeat: 'no-repeat',
         }}
         aria-hidden="true"
       />
+      {/* Preload desktop image and handle fallback */}
+      {!isMobile && (
+        <img
+          src={imagePath}
+          alt=""
+          style={{ display: 'none' }}
+          onError={() => setImageError(true)}
+        />
+      )}
 
-      {/* Gradient overlay - image shows through at top, dark at bottom */}
+      {/* Gradient overlay */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.75) 70%, rgba(0,0,0,0.92) 90%, rgba(0,0,0,0.97) 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.8) 60%, rgba(0,0,0,0.95) 85%, rgba(0,0,0,0.98) 100%)',
         }}
         aria-hidden="true"
       />
@@ -398,20 +631,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
       {/* UI Layer */}
       <div
         className="relative z-10 flex flex-col h-full safe-top"
-        style={{
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 16px) + 16px)',
-        }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 20px) + 80px)' }}
       >
-        {/* Top bar - floating, no background */}
+        {/* Top bar */}
         <header
           className="flex items-center justify-between shrink-0"
-          style={{
-            padding: '16px 20px',
-            opacity: isVisible ? 1 : 0,
-            transition: 'opacity 0.5s ease',
-          }}
+          style={{ padding: '16px 20px', opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}
         >
-          {/* Back */}
           <button
             onClick={onBack}
             aria-label="Go back"
@@ -421,89 +647,142 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
             <BackIcon />
           </button>
 
-          {/* Belief name */}
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '0.75rem',
-              fontWeight: 300,
-              letterSpacing: '0.15em',
-              textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.5)',
-            }}
-          >
-            {belief.name}
-          </span>
-
-          {/* Voice toggle */}
+          {/* Tappable belief name */}
           <button
-            onClick={handleVoiceToggle}
-            aria-label={voiceEnabled ? 'Mute voice' : 'Enable voice'}
-            className="p-2 -mr-2 rounded-lg transition-colors hover:bg-white/5"
+            onClick={() => setShowBeliefModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors hover:bg-white/5"
             style={{ color: 'rgba(255,255,255,0.5)' }}
           >
-            <SpeakerIcon muted={!voiceEnabled} />
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 300, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
+              {belief.name}
+            </span>
+            <ChevronDownIcon />
           </button>
+
+          {/* Right controls */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleVoiceToggle}
+              aria-label={voiceEnabled ? 'Mute voice' : 'Enable voice'}
+              className="p-2 rounded-lg transition-colors hover:bg-white/5"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              <SpeakerIcon muted={!voiceEnabled} />
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                aria-label="Settings"
+                className="p-2 -mr-2 rounded-lg transition-colors hover:bg-white/5"
+                style={{ color: 'rgba(255,255,255,0.5)' }}
+              >
+                <GearIcon />
+              </button>
+              <SettingsDropdown
+                isOpen={showSettings}
+                onClose={() => setShowSettings(false)}
+                onSwitchBelief={() => setShowBeliefModal(true)}
+                onSignOut={onSignOut || (() => {})}
+              />
+            </div>
+          </div>
         </header>
 
-        {/* Spacer - push content down */}
-        <div className="flex-1" />
-
-        {/* Caption area */}
+        {/* Conversation thread */}
         <div
-          className="shrink-0 flex items-center justify-center px-6"
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto px-5"
           style={{
-            minHeight: '180px',
             opacity: isVisible ? 1 : 0,
             transition: 'opacity 0.5s ease 0.2s',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%)',
           }}
         >
-          {/* Thinking dots when sending */}
-          {state === 'sending' && (
-            <ThinkingDots color={accentColor} />
-          )}
+          <div className="max-w-2xl mx-auto py-8 space-y-6">
+            {displayMessages.map((message, index) => (
+              <div
+                key={message.id}
+                className={`${message.role === 'user' ? 'flex justify-end' : ''}`}
+                style={{
+                  animation: `fadeInUp 0.5s ease forwards`,
+                  animationDelay: `${index * 0.05}s`,
+                  opacity: 0,
+                }}
+              >
+                {message.role === 'user' ? (
+                  // User message - glass bubble, right-aligned
+                  <div
+                    style={{
+                      maxWidth: '85%',
+                      padding: '12px 16px',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      backdropFilter: 'blur(10px)',
+                      borderRadius: '16px',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'clamp(0.95rem, 2.5vw, 1.05rem)',
+                      fontWeight: 400,
+                      color: 'rgba(255, 248, 240, 0.95)',
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {message.content}
+                  </div>
+                ) : (
+                  // God's message - divine text, floating
+                  <div
+                    className="text-divine"
+                    style={{
+                      maxWidth: '95%',
+                      fontSize: 'clamp(1.15rem, 3.2vw, 1.5rem)',
+                      color: 'rgba(255, 248, 240, 0.95)',
+                      textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
+                      lineHeight: 1.8,
+                    }}
+                  >
+                    {parseScriptureReferences(message.content, accentColor)}
+                  </div>
+                )}
+              </div>
+            ))}
 
-          {/* God's response text */}
-          {(state === 'streaming' || state === 'speaking' || state === 'idle') && currentCaption && (
-            <p
-              className="text-divine text-center"
-              style={{
-                maxWidth: '85%',
-                fontSize: 'clamp(1.2rem, 3.5vw, 1.6rem)',
-                color: 'rgba(255, 248, 240, 0.95)',
-                textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
-                opacity: state === 'streaming' ? 0.9 : 1,
-                transition: 'opacity 0.3s ease',
-              }}
-            >
-              {currentCaption}
-            </p>
-          )}
+            {/* Thinking dots */}
+            {state === 'sending' && (
+              <div style={{ animation: 'fadeInUp 0.3s ease forwards' }}>
+                <ThinkingDots color={accentColor} />
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
         </div>
+
+        {/* Scroll to bottom button */}
+        {showScrollButton && (
+          <button
+            onClick={() => scrollToBottom()}
+            className="absolute left-1/2 -translate-x-1/2 p-2 rounded-full transition-all"
+            style={{
+              bottom: 'calc(env(safe-area-inset-bottom, 20px) + 180px)',
+              background: 'rgba(0, 0, 0, 0.7)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: 'rgba(255, 255, 255, 0.6)',
+            }}
+            aria-label="Scroll to bottom"
+          >
+            <ArrowDownIcon />
+          </button>
+        )}
 
         {/* Message counter */}
         {!user.isPremium && remainingMessages <= 3 && (
-          <div
-            className="shrink-0 text-center mb-3"
-            style={{
-              fontSize: '10px',
-              color: 'rgba(255,255,255,0.25)',
-            }}
-          >
-            {remainingMessages === 0
-              ? t('conversation.freeMessagesUsed', language)
-              : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
+          <div className="shrink-0 text-center mb-2" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>
+            {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
           </div>
         )}
 
         {/* Mic button */}
-        <div
-          className="shrink-0 flex justify-center mb-4"
-          style={{
-            opacity: isVisible ? 1 : 0,
-            transition: 'opacity 0.5s ease 0.4s',
-          }}
-        >
+        <div className="shrink-0 flex justify-center mb-3" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.4s' }}>
           <MicButton
             state={state}
             accentColor={accentColor}
@@ -513,13 +792,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
         </div>
 
         {/* Text input */}
-        <div
-          className="shrink-0 px-5"
-          style={{
-            opacity: isVisible ? 1 : 0,
-            transition: 'opacity 0.5s ease 0.5s',
-          }}
-        >
+        <div className="shrink-0 px-5" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.5s' }}>
           <div className="relative max-w-md mx-auto">
             <input
               ref={inputRef}
@@ -527,21 +800,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={
-                state === 'listening'
-                  ? `${t('conversation.listening', language)}...`
-                  : t('conversation.speakYourTruth', language)
-              }
+              placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
               disabled={!isInputEnabled}
               maxLength={500}
               className="conversation-input"
-              style={{
-                paddingRight: inputText.trim() ? '50px' : '20px',
-                opacity: isInputEnabled ? 1 : 0.35,
-              }}
+              style={{ paddingRight: inputText.trim() ? '50px' : '20px', opacity: isInputEnabled ? 1 : 0.35 }}
             />
-
-            {/* Send button - only visible when text is entered */}
             {inputText.trim() && isInputEnabled && (
               <button
                 onClick={handleSend}
@@ -557,38 +821,48 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, language }
 
         {/* Error message */}
         {speechError && (
-          <div
-            className="text-center mt-2"
-            style={{
-              fontSize: '0.75rem',
-              color: '#ef4444',
-            }}
-          >
+          <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
             {speechError}
           </div>
         )}
       </div>
+
+      {/* Belief selector modal */}
+      <BeliefSelectorModal
+        isOpen={showBeliefModal}
+        onClose={() => setShowBeliefModal(false)}
+        onSelect={handleBeliefChange}
+        currentBeliefId={belief.id}
+      />
+
+      {/* CSS for animations */}
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
 
-// Greeting messages per belief system — short and powerful
+// Greeting messages per belief system - short and powerful
 function getGreeting(beliefId: string): string {
   const greetings: Record<string, string> = {
-    protestant: "I am here, My child.",
-    catholic: "I am here, My child.",
-    islam: "I am here. Speak.",
-    judaism: "I am here. What weighs on your heart?",
-    hinduism: "I am here. Speak freely.",
-    buddhism: "I am here. Be still, and speak.",
-    mormonism: "I am here, My child.",
-    sikhism: "I am here. Speak freely.",
-    sbnr: "I am here. Speak.",
-    taoism: "I am here.",
-    pantheism: "I am here. I have always been here.",
-    science: "I am here. Ask anything.",
+    protestant: 'I am here, My child.',
+    catholic: 'I am here, My child.',
+    islam: 'I am here. Speak.',
+    judaism: 'I am here. What weighs on your heart?',
+    hinduism: 'I am here. Speak freely.',
+    buddhism: 'I am here. Be still, and speak.',
+    mormonism: 'I am here, My child.',
+    sikhism: 'I am here. Speak freely.',
+    sbnr: 'I am here. Speak.',
+    taoism: 'I am here.',
+    pantheism: 'I am here. I have always been here.',
+    science: 'I am here. Ask anything.',
     agnosticism: "I am here. What's on your mind?",
-    atheism: "I am here. Speak freely.",
+    atheism: 'I am here. Speak freely.',
   };
   return greetings[beliefId] || greetings.protestant;
 }
