@@ -223,6 +223,21 @@ Never give medical/legal/financial advice. If someone is in crisis, direct them 
   return prompts[beliefSystem] || prompts.protestant;
 }
 
+// Prepare text for speech - convert scripture references to spoken format
+// "John 3:16" → "John chapter 3 verse 16" (sounds natural when spoken)
+function prepareTextForSpeech(text: string): string {
+  // Handle Quran references first: "Surah 2:286" → "Surah 2 ayah 286"
+  text = text.replace(/Surah\s+(\d+):(\d+)/gi, 'Surah $1 ayah $2');
+
+  // Handle verse ranges first: "3:16-17" → "chapter 3 verses 16 through 17"
+  text = text.replace(/(\d+):(\d+)-(\d+)/g, 'chapter $1 verses $2 through $3');
+
+  // Handle single verses: "3:16" → "chapter 3 verse 16"
+  text = text.replace(/(\d+):(\d+)/g, 'chapter $1 verse $2');
+
+  return text;
+}
+
 // TTS character voices and instructions
 const TTS_CHARACTERS: Record<string, { voice: string; instructions: string }> = {
   god: {
@@ -316,6 +331,9 @@ export default {
           finalInstructions += ` Speak entirely in ${langName}. Maintain the same tone, warmth, and emotion in ${langName}.`;
         }
 
+        // Prepare text for speech - convert "John 3:16" to "John chapter 3 verse 16"
+        const spokenText = prepareTextForSpeech(text);
+
         // Call OpenAI TTS API
         const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
           method: 'POST',
@@ -326,7 +344,7 @@ export default {
           body: JSON.stringify({
             model: 'gpt-4o-mini-tts',
             voice: selectedChar.voice,
-            input: text.substring(0, 4096),
+            input: spokenText.substring(0, 4096),
             instructions: finalInstructions,
             response_format: 'mp3',
             speed: 1.0,
