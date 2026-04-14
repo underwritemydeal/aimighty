@@ -934,8 +934,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         </div>
 
         {/* Text input */}
-        <div className="shrink-0" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.5s', padding: '0 20px' }}>
-          <div className="relative max-w-md mx-auto">
+        <div className="shrink-0 w-full" style={{ opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease 0.5s', padding: '0 20px' }}>
+          <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
             <input
               ref={inputRef}
               type="text"
