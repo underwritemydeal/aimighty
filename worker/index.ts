@@ -6,6 +6,107 @@
 interface Env {
   ANTHROPIC_API_KEY: string;
   OPENAI_API_KEY: string;
+  ARTICLES?: KVNamespace; // For article generation history
+}
+
+// ═══════════════════════════════════════
+// SMART TOPIC SELECTION
+// ═══════════════════════════════════════
+
+const ALL_TOPICS = [
+  'forgiveness', 'death', 'suffering', 'purpose', 'anxiety',
+  'loneliness', 'anger', 'gratitude', 'love', 'betrayal',
+  'grief', 'hope', 'fear', 'doubt', 'prayer',
+  'morality', 'jealousy', 'patience', 'pride', 'humility',
+  'temptation', 'free_will', 'justice', 'mercy', 'shame',
+  'guilt', 'joy', 'peace', 'faith', 'trust',
+  'marriage', 'parenting', 'money', 'work', 'addiction',
+  'healing', 'friendship', 'enemies', 'aging', 'identity',
+  'truth', 'wisdom', 'courage', 'change', 'loss',
+  'sacrifice', 'community', 'solitude', 'dreams', 'destiny'
+];
+
+// Heavy topics - don't do two in a row
+const HEAVY_TOPICS = ['death', 'suffering', 'grief', 'loss', 'betrayal', 'addiction', 'shame', 'guilt', 'enemies', 'sacrifice'];
+
+// Article title templates per belief system
+const ARTICLE_TITLE_TEMPLATES: Record<string, (topic: string) => string> = {
+  protestant: (t) => `What Does the Bible Say About ${capitalize(t)}?`,
+  catholic: (t) => `What Does the Catholic Church Teach About ${capitalize(t)}?`,
+  islam: (t) => `What Does the Quran Teach About ${capitalize(t)}?`,
+  judaism: (t) => `Jewish Wisdom on ${capitalize(t)}`,
+  hinduism: (t) => `Hindu Teachings on ${capitalize(t)}`,
+  buddhism: (t) => `Buddhist Wisdom on ${capitalize(t)}`,
+  mormonism: (t) => `Latter-day Saint Teachings on ${capitalize(t)}`,
+  sikhism: (t) => `Sikh Teachings on ${capitalize(t)}`,
+  taoism: (t) => `Taoist Wisdom on ${capitalize(t)}`,
+  sbnr: (t) => `Spiritual Insights on ${capitalize(t)}`,
+  pantheism: (t) => `Nature's Wisdom on ${capitalize(t)}`,
+  science: (t) => `The Science of ${capitalize(t)}: What Research Tells Us`,
+  agnosticism: (t) => `${capitalize(t)} Without Certainty: A Philosophical Perspective`,
+  atheism: (t) => `${capitalize(t)} Through Reason: A Secular Perspective`,
+};
+
+function capitalize(str: string): string {
+  return str.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+/**
+ * Pick today's topic intelligently - avoid heavy topics back-to-back
+ */
+async function pickTodaysTopic(env: Env): Promise<string> {
+  if (!env.ARTICLES) {
+    console.log('[TOPICS] No KV binding, returning first topic');
+    return ALL_TOPICS[0];
+  }
+
+  const historyKey = 'generation:history';
+  const historyJson = await env.ARTICLES.get(historyKey);
+  const history: string[] = historyJson ? JSON.parse(historyJson) : [];
+
+  console.log('[TOPICS] History length:', history.length, 'Last topic:', history[history.length - 1]);
+
+  // Filter out topics already covered
+  const remaining = ALL_TOPICS.filter(t => !history.includes(t));
+
+  // If all topics used, reset cycle
+  if (remaining.length === 0) {
+    console.log('[TOPICS] All topics covered, resetting cycle');
+    await env.ARTICLES.put(historyKey, '[]');
+    return ALL_TOPICS[0];
+  }
+
+  // Don't pick a heavy topic if yesterday was heavy
+  const lastTopic = history[history.length - 1];
+  const lastWasHeavy = HEAVY_TOPICS.includes(lastTopic);
+
+  let candidates = remaining;
+  if (lastWasHeavy) {
+    // Filter out heavy topics - pick something uplifting or practical
+    const nonHeavy = remaining.filter(t => !HEAVY_TOPICS.includes(t));
+    if (nonHeavy.length > 0) {
+      candidates = nonHeavy;
+      console.log('[TOPICS] Last was heavy, filtering to non-heavy:', candidates.length, 'options');
+    }
+  }
+
+  // Pick the first available candidate
+  const todaysTopic = candidates[0];
+  console.log('[TOPICS] Selected:', todaysTopic);
+
+  // Save to history
+  history.push(todaysTopic);
+  await env.ARTICLES.put(historyKey, JSON.stringify(history));
+
+  return todaysTopic;
+}
+
+/**
+ * Get article title for a belief system and topic
+ */
+function getArticleTitle(beliefSystem: string, topic: string): string {
+  const templateFn = ARTICLE_TITLE_TEMPLATES[beliefSystem] || ARTICLE_TITLE_TEMPLATES.sbnr;
+  return templateFn(topic);
 }
 
 // Rate limiting storage (in production, use KV or Durable Objects)
@@ -490,6 +591,106 @@ export default {
         console.error('TTS error:', error);
         return new Response(
           JSON.stringify({ error: 'TTS internal error' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Daily topic endpoint - returns today's topic and titles for all beliefs
+    if (request.method === 'GET' && url.pathname === '/daily-topic') {
+      try {
+        const topic = await pickTodaysTopic(env);
+
+        // Generate titles for all belief systems
+        const titles: Record<string, string> = {};
+        const beliefs = ['protestant', 'catholic', 'islam', 'judaism', 'hinduism', 'buddhism',
+                        'mormonism', 'sikhism', 'taoism', 'sbnr', 'pantheism', 'science',
+                        'agnosticism', 'atheism'];
+
+        for (const belief of beliefs) {
+          titles[belief] = getArticleTitle(belief, topic);
+        }
+
+        return new Response(
+          JSON.stringify({
+            topic,
+            topicDisplay: capitalize(topic),
+            titles,
+            date: new Date().toISOString().split('T')[0],
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        console.error('Daily topic error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to get daily topic' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Topic history endpoint - for debugging
+    if (request.method === 'GET' && url.pathname === '/topic-history') {
+      try {
+        if (!env.ARTICLES) {
+          return new Response(
+            JSON.stringify({ error: 'ARTICLES KV not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const historyJson = await env.ARTICLES.get('generation:history');
+        const history = historyJson ? JSON.parse(historyJson) : [];
+        const remaining = ALL_TOPICS.filter(t => !history.includes(t));
+
+        return new Response(
+          JSON.stringify({
+            covered: history,
+            remaining,
+            totalTopics: ALL_TOPICS.length,
+            coveredCount: history.length,
+            remainingCount: remaining.length,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        console.error('Topic history error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to get topic history' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Reset topic history endpoint (admin use)
+    if (request.method === 'POST' && url.pathname === '/reset-topics') {
+      try {
+        if (!env.ARTICLES) {
+          return new Response(
+            JSON.stringify({ error: 'ARTICLES KV not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        await env.ARTICLES.put('generation:history', '[]');
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Topic history reset' }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } catch (error) {
+        console.error('Reset topics error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Failed to reset topics' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

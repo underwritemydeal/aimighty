@@ -934,8 +934,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             {displayMessages.map((message, index) => (
               <div
                 key={message.id}
-                className={`${message.role === 'user' ? 'flex justify-end md:justify-center' : 'flex justify-center'}`}
+                className="flex"
                 style={{
+                  justifyContent: message.role === 'user' ? 'flex-end' : 'center',
                   animation: `fadeInUp 0.5s ease forwards`,
                   animationDelay: `${index * 0.05}s`,
                   opacity: 0,
@@ -944,11 +945,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 {message.role === 'user' ? (
                   // User message - glass bubble
                   // Mobile: right-aligned, max 85%
-                  // Desktop: centered container, right-aligned text, max 50%
+                  // Desktop: max 50%, positioned to the right
                   <div
-                    className="user-message-bubble"
                     style={{
-                      maxWidth: 'min(85%, 400px)',
+                      maxWidth: isMobile ? '85%' : '50%',
                       padding: '12px 16px',
                       background: 'rgba(255, 255, 255, 0.08)',
                       backdropFilter: 'blur(10px)',
@@ -959,6 +959,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                       color: 'rgba(255, 248, 240, 0.95)',
                       lineHeight: 1.6,
                       textAlign: 'right',
+                      marginLeft: isMobile ? 'auto' : 'auto',
+                      marginRight: isMobile ? '0' : '10%',
                     }}
                   >
                     {message.content}
@@ -966,15 +968,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 ) : (
                   // God's message - divine text, centered
                   // Mobile: max 85%, smaller font
-                  // Desktop: max 65%, larger font, more line-height
+                  // Desktop: max 65%, larger font, more line-height, centered
                   <div
-                    className="text-divine text-center divine-message"
+                    className="text-divine"
                     style={{
-                      maxWidth: '85%',
-                      fontSize: 'clamp(1.15rem, 3.2vw, 1.5rem)',
+                      maxWidth: isMobile ? '85%' : '65%',
+                      fontSize: isMobile ? 'clamp(1.15rem, 3.2vw, 1.5rem)' : 'clamp(1.3rem, 2.5vw, 1.8rem)',
                       color: 'rgba(255, 248, 240, 0.95)',
                       textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
-                      lineHeight: 1.8,
+                      lineHeight: isMobile ? 1.8 : 1.9,
+                      textAlign: 'center',
+                      marginLeft: 'auto',
+                      marginRight: 'auto',
                     }}
                   >
                     {parseScriptureReferences(message.content, accentColor)}
