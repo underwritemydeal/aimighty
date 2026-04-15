@@ -155,8 +155,10 @@ html,
 body,
 #root {
   width: 100%;
+  margin: 0;
+  padding: 0;
+  background: #030308;
   overflow-x: hidden;
-  background: var(--color-void);
 }
 
 /* iOS Safari dynamic viewport — 100dvh tracks URL-bar collapse/expand. */

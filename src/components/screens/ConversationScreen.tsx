@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { sendMessage, summarizeConversation, type Message } from '../../services/claudeApi';
-import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue } from '../../services/openaiTTS';
+import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue, prewarmTts } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import {
@@ -82,7 +82,7 @@ const BackIcon = memo(function BackIcon() {
 
 const SpeakerIcon = memo(function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       {muted ? (
         <>
@@ -96,11 +96,21 @@ const SpeakerIcon = memo(function SpeakerIcon({ muted }: { muted: boolean }) {
   );
 });
 
-const GearIcon = memo(function GearIcon() {
+// Elegant three-line hamburger — replaces the gear icon for a more spiritual feel
+const MenuIcon = memo(function MenuIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="8" x2="20" y2="8" />
+      <line x1="4" y1="14" x2="20" y2="14" />
+      <line x1="4" y1="20" x2="20" y2="20" />
+    </svg>
+  );
+});
+// Gold flame SVG for the streak row — replaces the 🔥 emoji
+const FlameIcon = memo(function FlameIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
     </svg>
   );
 });
@@ -482,8 +492,6 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onDailyPrayer,
   onSacredText,
   onReflection,
-  onToggleMute,
-  voiceEnabled,
   onSignOut,
   onNavigate,
   tier,
@@ -497,8 +505,6 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onDailyPrayer: () => void;
   onSacredText: () => void;
   onReflection: () => void;
-  onToggleMute: () => void;
-  voiceEnabled: boolean;
   onSignOut: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
   tier: 'free' | 'believer' | 'divine';
@@ -507,18 +513,30 @@ const SettingsDropdown = memo(function SettingsDropdown({
 }) {
   if (!isOpen) return null;
 
-  const itemStyle = { fontSize: '0.9rem', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body, Outfit)' };
-  const lockedStyle = { ...itemStyle, opacity: 0.45 };
   const isFree = tier === 'free';
 
-  const contentItem = (icon: string, label: string, action: () => void) => (
+  const baseItemStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-body, Outfit)',
+    fontWeight: 400,
+    fontSize: '15px',
+    color: 'rgba(255,255,255,0.95)',
+    padding: '12px 20px',
+    width: '100%',
+    textAlign: 'left',
+    background: 'transparent',
+    border: 'none',
+    borderLeft: '2px solid transparent',
+    cursor: 'pointer',
+    transition: 'background 0.15s ease, border-color 0.15s ease',
+  };
+
+  const item = (label: string, action: () => void, locked = false) => (
     <button
-      onClick={() => { if (isFree) { onUpgrade(); onClose(); return; } action(); onClose(); }}
-      className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
-      style={isFree ? lockedStyle : itemStyle}
+      onClick={() => { if (locked || isFree) { onUpgrade(); onClose(); return; } action(); onClose(); }}
+      className="menu-item"
+      style={{ ...baseItemStyle, opacity: locked || isFree ? 0.45 : 1 }}
     >
-      <span>{isFree ? '🔒' : icon}</span>
-      <span>{label}</span>
+      {label}
     </button>
   );
 
@@ -528,62 +546,95 @@ const SettingsDropdown = memo(function SettingsDropdown({
       <div
         className="absolute right-0 top-full mt-2 z-50"
         style={{
-          background: 'rgba(3, 3, 8, 0.9)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(212, 175, 55, 0.2)',
-          borderRadius: '12px',
-          minWidth: '240px',
+          background: 'rgba(8, 8, 16, 0.96)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(212, 175, 55, 0.25)',
+          borderRadius: '16px',
+          minWidth: '220px',
+          padding: '8px 0',
           overflow: 'hidden',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          boxShadow: '0 8px 40px rgba(0, 0, 0, 0.6)',
         }}
       >
-        {contentItem('📖', 'Daily Wisdom', onDailyWisdom)}
-        {contentItem('🙏', 'Daily Prayer', onDailyPrayer)}
-        {contentItem('✨', 'Sacred Text of the Day', onSacredText)}
-        {contentItem('💭', 'Reflection Prompt', onReflection)}
-        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
-        <div className="w-full px-4 py-3 flex items-center gap-3" style={{ ...itemStyle, opacity: 0.9 }}>
-          <span>🔥</span><span>{streakText}</span>
+        {item('Daily Wisdom', onDailyWisdom)}
+        {item('Daily Prayer', onDailyPrayer)}
+        {item('Sacred Text', onSacredText)}
+        {item('Reflection', onReflection)}
+
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+
+        <div
+          className="flex items-center gap-2"
+          style={{
+            ...baseItemStyle,
+            padding: '12px 20px',
+            opacity: 0.9,
+            cursor: 'default',
+          }}
+        >
+          <FlameIcon />
+          <span>{streakText}</span>
         </div>
-        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+
         <button
           onClick={() => { onSwitchBelief(); onClose(); }}
-          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
-          style={itemStyle}
+          className="menu-item"
+          style={baseItemStyle}
         >
-          <span>🌍</span><span>Switch Belief</span>
+          Switch Belief
         </button>
-        <button
-          onClick={() => { onToggleMute(); }}
-          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
-          style={itemStyle}
-        >
-          <span>{voiceEnabled ? '🔊' : '🔇'}</span><span>{voiceEnabled ? 'Mute' : 'Unmute'}</span>
-        </button>
-        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+
         <button
           onClick={() => { onNavigate?.('terms'); onClose(); }}
-          className="w-full px-4 py-2.5 text-left transition-colors hover:bg-white/5"
-          style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.5)' }}
+          className="menu-item"
+          style={{
+            ...baseItemStyle,
+            fontWeight: 300,
+            fontSize: '13px',
+            color: 'rgba(255,255,255,0.5)',
+            paddingTop: '14px',
+            paddingBottom: '10px',
+          }}
         >
           Terms of Service
         </button>
         <button
           onClick={() => { onNavigate?.('privacy'); onClose(); }}
-          className="w-full px-4 py-2.5 text-left transition-colors hover:bg-white/5"
-          style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.5)' }}
+          className="menu-item"
+          style={{
+            ...baseItemStyle,
+            fontWeight: 300,
+            fontSize: '13px',
+            color: 'rgba(255,255,255,0.5)',
+            paddingTop: '10px',
+            paddingBottom: '14px',
+          }}
         >
           Privacy Policy
         </button>
-        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+
         <button
           onClick={() => { onSignOut(); onClose(); }}
-          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
-          style={{ fontSize: '0.85rem', color: '#ef4444' }}
+          className="menu-item"
+          style={{
+            ...baseItemStyle,
+            color: 'rgba(220, 60, 60, 0.85)',
+          }}
         >
           Sign Out
         </button>
+
+        <style>{`
+          .menu-item:hover {
+            background: rgba(212, 175, 55, 0.08) !important;
+            border-left-color: #d4af37 !important;
+          }
+        `}</style>
       </div>
     </>
   );
@@ -595,12 +646,13 @@ interface ConversationScreenProps {
   onBack: () => void;
   onPaywall: () => void;
   onChangeBelief?: (belief: BeliefSystem) => void;
+  onSwitchBelief?: () => void; // exit to BeliefSelector, clears last-belief memory
   onSignOut?: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
   language: LanguageCode;
 }
 
-export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBelief, onSignOut, onNavigate, language }: ConversationScreenProps) {
+export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBelief, onSwitchBelief, onSignOut, onNavigate, language }: ConversationScreenProps) {
   const categorizedBelief = belief as CategorizedBeliefSystem;
   const accentColor = categorizedBelief.accentColor || belief.themeColor;
 
@@ -631,6 +683,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showSettings, setShowSettings] = useState(false);
   const [showDailyWisdom, setShowDailyWisdom] = useState(false);
   const [dailyLimitMessage, setDailyLimitMessage] = useState<string | null>(null);
+  const [showFreeLimitBanner, setShowFreeLimitBanner] = useState(false);
   const [streakMilestoneText, setStreakMilestoneText] = useState<string | null>(null);
   const [tier] = useState(() => getTier());
   const [streak] = useState(() => getStreak());
@@ -715,6 +768,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     const timer = setTimeout(() => setIsVisible(true), 150);
     return () => clearTimeout(timer);
   }, []);
+
+  // Pre-warm the /tts endpoint so the first real sentence doesn't pay
+  // cold-start latency. Only Divine tier uses OpenAI TTS.
+  useEffect(() => {
+    if (getTier() === 'divine' && isVoiceEnabled()) {
+      prewarmTts(normalizeBeliefId(belief.id), character, language);
+    }
+  }, [belief.id, character, language]);
 
   // Auto-scroll to bottom
   const scrollToBottom = useCallback((smooth = true) => {
@@ -1064,8 +1125,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           }
           setTimeout(scrollToBottom, 100);
 
-          if (hasReachedFreeLimit() && !user.isPremium) {
-            setTimeout(onPaywall, 3000);
+          // Paywall timing fix: never cut God off mid-response. After the free
+          // user's 3rd response completes, show an inline banner and let them
+          // dismiss or upgrade. The 4th send attempt is the hard redirect.
+          if (getTier() === 'free' && hasReachedFreeLimit() && !user.isPremium) {
+            setShowFreeLimitBanner(true);
           }
         },
         onError: (error) => {
@@ -1224,26 +1288,28 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ background: 'var(--color-void)', height: '100dvh', minHeight: '100dvh' }}
+      style={{ background: '#030308', height: '100dvh', minHeight: '100dvh' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
       onClick={handleScreenTap}
       onTouchStart={handleScreenTap}
     >
-      {/* Background image — full bleed, explicit dvh so it grows with iOS URL-bar collapse */}
+      {/* Background image — uses 100vh (large viewport) so the image bleeds
+          behind iOS status bar AND Safari browser chrome — no black bars.
+          The overlaying content uses 100dvh so it tracks the visible area. */}
       <div
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
           width: '100vw',
-          height: '100dvh',
-          minHeight: '100dvh',
+          height: '100vh',
           zIndex: 0,
           backgroundImage: `url(${actualImagePath})`,
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           backgroundRepeat: 'no-repeat',
+          backgroundAttachment: 'scroll',
           transform: 'scale(1.02)',
           transformOrigin: 'center top',
           filter: 'saturate(0.7) brightness(0.85)',
@@ -1319,35 +1385,41 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             />
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center gap-1">
+          {/* Right controls — mute + menu icons, generous gap */}
+          <div className="flex items-center" style={{ gap: '16px' }}>
             <button
               onClick={handleVoiceToggle}
               aria-label={voiceEnabled ? 'Mute voice' : 'Enable voice'}
-              className="p-2 rounded-lg transition-colors hover:bg-white/5"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 active:bg-white/10"
+              style={{
+                width: '40px',
+                height: '40px',
+                color: voiceEnabled ? 'rgba(255,255,255,0.7)' : '#d4af37',
+              }}
             >
               <SpeakerIcon muted={!voiceEnabled} />
             </button>
             <div className="relative">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                aria-label="Settings"
-                className="p-2 -mr-2 rounded-lg transition-colors hover:bg-white/5"
-                style={{ color: 'rgba(255,255,255,0.5)' }}
+                aria-label="Menu"
+                className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 active:bg-white/10"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  color: 'rgba(255,255,255,0.7)',
+                }}
               >
-                <GearIcon />
+                <MenuIcon />
               </button>
               <SettingsDropdown
                 isOpen={showSettings}
                 onClose={() => setShowSettings(false)}
-                onSwitchBelief={() => setShowBeliefModal(true)}
+                onSwitchBelief={() => { onSwitchBelief?.(); }}
                 onDailyWisdom={() => setShowDailyWisdom(true)}
                 onDailyPrayer={() => setShowPrayerModal(true)}
                 onSacredText={() => setShowSacredTextModal(true)}
                 onReflection={() => setShowReflectionModal(true)}
-                onToggleMute={handleVoiceToggle}
-                voiceEnabled={voiceEnabled}
                 onSignOut={onSignOut || (() => {})}
                 onNavigate={onNavigate}
                 tier={tier}
@@ -1476,23 +1548,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               </div>
             ))}
 
-            {/* AI disclosure — shown only while the greeting is the only message */}
-            {displayMessages.length === 1 && displayMessages[0].role === 'greeting' && (
-              <div
-                className="text-center"
-                style={{
-                  fontFamily: 'var(--font-body, Outfit)',
-                  fontSize: '0.72rem',
-                  fontWeight: 300,
-                  color: 'rgba(255,255,255,0.6)',
-                  letterSpacing: '0.05em',
-                  animation: 'fadeInUp 0.8s ease 0.5s both',
-                }}
-              >
-                Powered by AI — with deep respect for your tradition
-              </div>
-            )}
-
             {/* Thinking dots */}
             {state === 'sending' && (
               <div className="flex justify-center" style={{ animation: 'fadeInUp 0.3s ease forwards' }}>
@@ -1519,6 +1574,29 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           >
             <ArrowDownIcon />
           </button>
+        )}
+
+        {/* AI disclosure — fades out after first user message. Sits above the input bar. */}
+        {displayMessages.length === 1 && displayMessages[0].role === 'greeting' && !controlsHidden && (
+          <div
+            className="text-center"
+            style={{
+              position: 'fixed',
+              left: 0,
+              right: 0,
+              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 158px)',
+              zIndex: 19,
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '11px',
+              fontWeight: 200,
+              color: 'rgba(255,255,255,0.35)',
+              letterSpacing: '0.05em',
+              pointerEvents: 'none',
+              animation: 'fadeInUp 0.8s ease 0.5s both',
+            }}
+          >
+            Powered by AI — with deep respect for your tradition
+          </div>
         )}
 
         {/* Input controls - fixed at bottom, slides off during TTS for clean cinematic view */}
@@ -1800,6 +1878,68 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             }}
           >
             {streakMilestoneText}
+          </div>
+        </div>
+      )}
+
+      {/* Free-limit banner — shown after God's 3rd response completes.
+          Next send attempt triggers the real paywall. */}
+      {showFreeLimitBanner && (
+        <div
+          className="fixed left-0 right-0 z-40 px-6"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 180px)' }}
+        >
+          <div
+            className="mx-auto text-center"
+            style={{
+              maxWidth: '520px',
+              padding: '18px 24px',
+              background: 'rgba(8,8,16,0.96)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(212,175,55,0.35)',
+              borderRadius: '16px',
+              color: 'rgba(255,248,240,0.95)',
+              fontSize: '0.9rem',
+              fontFamily: 'var(--font-body, Outfit)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+            }}
+          >
+            <p style={{ margin: 0, lineHeight: 1.5 }}>
+              You've used your 3 free messages. Upgrade to continue the conversation.
+            </p>
+            <div className="flex justify-center" style={{ gap: '12px', marginTop: '14px' }}>
+              <button
+                onClick={() => { setShowFreeLimitBanner(false); onPaywall(); }}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '8px',
+                  background: '#d4af37',
+                  color: '#0a0a0f',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Upgrade
+              </button>
+              <button
+                onClick={() => setShowFreeLimitBanner(false)}
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '8px',
+                  background: 'transparent',
+                  color: 'rgba(255,255,255,0.75)',
+                  fontSize: '0.85rem',
+                  fontWeight: 400,
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  cursor: 'pointer',
+                }}
+              >
+                Maybe Later
+              </button>
+            </div>
           </div>
         </div>
       )}

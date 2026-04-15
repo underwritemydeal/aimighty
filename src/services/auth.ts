@@ -330,10 +330,17 @@ export function incrementMessageCount(): void {
   }
 }
 
+// Admin bypass — these emails always return Infinity remaining / never hit free limit
+const AUTH_ADMIN_EMAILS = ['robby.hess@gmail.com'];
+function isAdminEmail(email?: string): boolean {
+  return !!email && AUTH_ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 // Check if user has reached free message limit
 export function hasReachedFreeLimit(): boolean {
   const user = getCurrentUser();
   if (!user) return true;
+  if (isAdminEmail(user.email)) return false;
   if (user.isPremium) return false;
   return user.messageCount >= 3;
 }
@@ -342,6 +349,7 @@ export function hasReachedFreeLimit(): boolean {
 export function getRemainingFreeMessages(): number {
   const user = getCurrentUser();
   if (!user) return 0;
+  if (isAdminEmail(user.email)) return Infinity;
   if (user.isPremium) return Infinity;
   return Math.max(0, 3 - user.messageCount);
 }

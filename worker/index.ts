@@ -765,7 +765,10 @@ export default {
         console.log('[TTS] Using voice:', selectedChar.voice);
 
         // Build instructions
+        // Instructions are currently unused — tts-1 doesn't accept an `instructions`
+        // field. Kept for logging + future migration back to gpt-4o-mini-tts.
         let finalInstructions = selectedChar.instructions + (BELIEF_INSTRUCTIONS[beliefSystem] || '');
+        void finalInstructions;
 
         // Add language instruction if not English
         if (language && language !== 'en') {
@@ -789,10 +792,12 @@ export default {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini-tts',
+            // tts-1 has lower TTFB than gpt-4o-mini-tts for short sentences —
+            // critical for sentence-queue streaming playback. Use tts-1-hd if
+            // quality becomes an issue.
+            model: 'tts-1',
             voice: selectedChar.voice,
             input: spokenText.substring(0, 4096),
-            instructions: finalInstructions,
             response_format: 'opus',
             speed: 1.0,
           }),

@@ -9,12 +9,40 @@ const TIER_KEY = 'aimighty_tier';
 const DAILY_KEY = 'aimighty_daily';
 const STREAK_KEY = 'aimighty_streak';
 const MEMORY_PREFIX = 'aimighty_memory_';
+const LAST_BELIEF_KEY = 'aimighty_last_belief';
+
+// ───── Last belief memory ─────
+// Returning users skip BeliefSelector and land directly in their last conversation.
+// Cleared via "Switch Belief" in the dropdown menu.
+export function getLastBelief(): string | null {
+  try { return localStorage.getItem(LAST_BELIEF_KEY); } catch { return null; }
+}
+export function setLastBelief(beliefId: string): void {
+  try { localStorage.setItem(LAST_BELIEF_KEY, beliefId); } catch { /* ignore */ }
+}
+export function clearLastBelief(): void {
+  try { localStorage.removeItem(LAST_BELIEF_KEY); } catch { /* ignore */ }
+}
+
+// ───── Admin bypass ─────
+// Admins get unlimited Divine access regardless of tier flags or free limits.
+const ADMIN_EMAILS = ['robby.hess@gmail.com'];
+
+export function isAdmin(email?: string | null): boolean {
+  if (!email) {
+    const user = getCurrentUser();
+    email = user?.email;
+  }
+  if (!email) return false;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+}
 
 export const DAILY_LIMITS: Record<Tier, number> = {
   free: 3,
   believer: 10,
   divine: 20,
 };
+const ADMIN_DAILY_LIMIT = 999;
 
 /** Promote local "I am Divine" flag — MVP. Real payment wiring replaces this. */
 export function setDivine(isDivine: boolean): void {
@@ -32,6 +60,8 @@ export function getTier(): Tier {
   if (!isLoggedIn()) return 'free';
   const user = getCurrentUser();
   if (!user) return 'free';
+  // Admins always get Divine, no matter what
+  if (isAdmin(user.email)) return 'divine';
   const override = localStorage.getItem(TIER_KEY);
   if (override === 'divine') return 'divine';
   // Free tier has a lifetime cap; once hit, downgrade to free for UI gating
@@ -69,6 +99,7 @@ export function getDailyRecord(): DailyRecord {
 }
 
 export function getMessagesRemainingToday(): number {
+  if (isAdmin()) return ADMIN_DAILY_LIMIT;
   const tier = getTier();
   if (tier === 'free') {
     // Free is a LIFETIME counter, handled via hasReachedFreeLimit in auth.ts
@@ -81,6 +112,7 @@ export function getMessagesRemainingToday(): number {
 }
 
 export function hasReachedDailyLimit(): boolean {
+  if (isAdmin()) return false;
   return getMessagesRemainingToday() <= 0;
 }
 

@@ -351,13 +351,21 @@ export function enqueueSentence(
     fetchPromise: Promise.resolve(),
   };
 
+  const fetchStart = Date.now();
+  const snippet = text.slice(0, 32).replace(/\n/g, ' ');
+  console.log(`[TTS-TIMING] sentence FIRED (t=0) "${snippet}…" (${text.length}ch)`);
+
   entry.fetchPromise = fetch(`${WORKER_URL}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, beliefSystem, character, language }),
   })
-    .then((r) => r.ok ? r.blob() : Promise.reject(new Error(`TTS ${r.status}`)))
+    .then((r) => {
+      console.log(`[TTS-TIMING] sentence HEADERS t+${Date.now() - fetchStart}ms "${snippet}…"`);
+      return r.ok ? r.blob() : Promise.reject(new Error(`TTS ${r.status}`));
+    })
     .then((blob) => {
+      console.log(`[TTS-TIMING] sentence BLOB t+${Date.now() - fetchStart}ms (${blob.size}B) "${snippet}…"`);
       if (blob.size < 100) throw new Error('Audio too small');
       entry.audioUrl = URL.createObjectURL(blob);
     })
@@ -372,13 +380,39 @@ export function enqueueSentence(
   }
 }
 
+/**
+ * Pre-warm the /tts endpoint. Call on conversation screen mount to establish
+ * the connection + keep worker warm before the user's first message.
+ */
+export function prewarmTts(beliefSystem: string, character: string, language: string): void {
+  if (typeof window === 'undefined') return;
+  console.log('[TTS-TIMING] prewarm firing');
+  const t0 = Date.now();
+  fetch(`${WORKER_URL}/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: 'Welcome.', beliefSystem, character, language }),
+  })
+    .then((r) => {
+      console.log(`[TTS-TIMING] prewarm headers t+${Date.now() - t0}ms status=${r.status}`);
+      return r.ok ? r.blob() : null;
+    })
+    .then((blob) => {
+      if (blob) console.log(`[TTS-TIMING] prewarm blob t+${Date.now() - t0}ms (${blob.size}B)`);
+    })
+    .catch((e) => console.warn('[TTS-TIMING] prewarm failed:', e));
+}
+
 async function playNextInQueue(): Promise<void> {
   if (queuePlaying) return;
   const entry = sentenceQueue.shift();
   if (!entry) return;
   queuePlaying = true;
 
+  const waitStart = Date.now();
   await entry.fetchPromise;
+  const waitMs = Date.now() - waitStart;
+  console.log(`[TTS-TIMING] playNextInQueue waited ${waitMs}ms for fetch "${entry.text.slice(0, 32)}…"`);
 
   if (!entry.audioUrl) {
     queuePlaying = false;
@@ -422,7 +456,10 @@ async function playNextInQueue(): Promise<void> {
     playNextInQueue();
   };
 
-  audio.play().catch((e) => {
+  const playStart = Date.now();
+  audio.play()
+    .then(() => console.log(`[TTS-TIMING] audio PLAYING t+${Date.now() - playStart}ms "${entry.text.slice(0, 32)}…"`))
+    .catch((e) => {
     console.error('[TTS-Queue] Play failed:', e);
     queuePlaying = false;
     entry.onEnd?.();

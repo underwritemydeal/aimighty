@@ -11,6 +11,7 @@ import { PrivacyScreen } from './components/screens/PrivacyScreen';
 import { TermsScreen } from './components/screens/TermsScreen';
 import { ArticlePage } from './components/screens/ArticlePage';
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
+import { getLastBelief, setLastBelief, clearLastBelief } from './services/tierService';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -85,19 +86,20 @@ function App() {
       if (existingUser) {
         setUser(existingUser);
 
-        // If session has a saved belief system, restore it
-        if (session?.beliefSystemId) {
-          const savedBelief = beliefSystems.find(b => b.id === session.beliefSystemId);
+        // Prefer `aimighty_last_belief` (set on every conversation start).
+        // Fall back to legacy session.beliefSystemId for backward compat.
+        const lastBeliefId = getLastBelief() || session?.beliefSystemId;
+        if (lastBeliefId) {
+          const savedBelief = beliefSystems.find(b => b.id === lastBeliefId);
           if (savedBelief) {
             setSelectedBelief(savedBelief);
-            // Go directly to conversation screen
+            // Go directly to conversation screen — skip BeliefSelector
             setCurrentScreen('conversation');
           } else {
-            // Belief not found, go to selector
             setCurrentScreen('belief-selector');
           }
         } else {
-          // No saved belief, go to selector
+          // First-time login — show BeliefSelector
           setCurrentScreen('belief-selector');
         }
       }
@@ -142,8 +144,9 @@ function App() {
 
   const handleSelectBelief = (belief: BeliefSystem) => {
     setSelectedBelief(belief);
-    // Save belief to session for persistence
+    // Save belief to session for persistence + last-belief memory
     updateSessionBelief(belief.id);
+    setLastBelief(belief.id);
     transitionTo('belief-welcome');
   };
 
@@ -151,8 +154,16 @@ function App() {
   const handleChangeBelief = useCallback((belief: BeliefSystem) => {
     setSelectedBelief(belief);
     updateSessionBelief(belief.id);
+    setLastBelief(belief.id);
     // Stay on conversation screen - it will reset with new belief
     setCurrentScreen('conversation');
+  }, []);
+
+  // Explicit "Switch Belief" from the dropdown clears last-belief memory
+  // so BeliefSelector gets shown again
+  const handleSwitchBelief = useCallback(() => {
+    clearLastBelief();
+    transitionTo('belief-selector');
   }, []);
 
   const handleBeliefWelcomeComplete = () => {
@@ -306,6 +317,7 @@ function App() {
             onBack={handleBackToBeliefSelector}
             onPaywall={handleShowPaywall}
             onChangeBelief={handleChangeBelief}
+            onSwitchBelief={handleSwitchBelief}
             onSignOut={handleSignOut}
             onNavigate={(screen) => transitionTo(screen)}
             language={language}
