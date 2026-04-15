@@ -40,6 +40,7 @@ export interface User {
 
 export type Screen =
   | 'landing'
+  | 'article'
   | 'welcome'
   | 'auth'
   | 'belief-selector'

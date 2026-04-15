@@ -227,8 +227,8 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
-      style={{ background: 'var(--color-void)' }}
+      className="relative overflow-hidden"
+      style={{ background: 'var(--color-void)', minHeight: '100dvh' }}
       role="main"
       aria-labelledby="belief-heading"
     >
@@ -253,7 +253,7 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
       />
 
       {/* Scrollable content */}
-      <div className="relative z-10 min-h-screen overflow-y-auto">
+      <div className="relative z-10 overflow-y-auto" style={{ minHeight: '100dvh' }}>
         <div
           style={{
             maxWidth: '640px',

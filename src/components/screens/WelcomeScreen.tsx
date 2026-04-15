@@ -191,8 +191,12 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
 
   return (
     <div
-      className="relative w-full h-screen overflow-hidden"
-      style={{ background: '#000' }}
+      className="relative w-full overflow-hidden"
+      style={{
+        background: 'var(--color-void)',
+        height: '100dvh',
+        minHeight: '100dvh',
+      }}
       role="main"
       aria-labelledby="welcome-heading"
     >
@@ -207,14 +211,21 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
         aria-hidden="true"
       />
 
-      {/* Hero background image */}
+      {/* Hero background image — explicit 100dvh so it grows with URL-bar collapse */}
       <div
-        className="fixed inset-0 bg-image-cover"
         style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100dvh',
           backgroundImage: `url(${bgImage})`,
-          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+          backgroundPosition: 'top center',
+          backgroundRepeat: 'no-repeat',
           opacity: phase >= 2 ? 1 : 0,
           transition: 'opacity 1.5s ease-out',
+          zIndex: 0,
         }}
         aria-hidden="true"
       />
@@ -254,8 +265,9 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
 
       {/* Content container - logo at top, BEGIN at bottom, middle clear for divine figure */}
       <div
-        className="relative z-10 flex flex-col items-center justify-between h-full px-6"
+        className="relative z-10 flex flex-col items-center justify-between px-6"
         style={{
+          height: '100dvh',
           paddingTop: 'max(env(safe-area-inset-top, 20px), 20px)',
           paddingBottom: 'max(env(safe-area-inset-bottom, 20px), 20px)',
         }}

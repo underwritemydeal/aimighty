@@ -1224,26 +1224,28 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ background: '#000', height: '100dvh', minHeight: '100dvh' }}
+      style={{ background: 'var(--color-void)', height: '100dvh', minHeight: '100dvh' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
       onClick={handleScreenTap}
       onTouchStart={handleScreenTap}
     >
-      {/* Background image - full bleed, no black bars */}
+      {/* Background image — full bleed, explicit dvh so it grows with iOS URL-bar collapse */}
       <div
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100dvh',
           minHeight: '100dvh',
           zIndex: 0,
           backgroundImage: `url(${actualImagePath})`,
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
           backgroundRepeat: 'no-repeat',
+          transform: 'scale(1.02)',
+          transformOrigin: 'center top',
           filter: 'saturate(0.7) brightness(0.85)',
         }}
         aria-hidden="true"
@@ -1268,10 +1270,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         aria-hidden="true"
       />
 
-      {/* UI Layer */}
+      {/* UI Layer — dvh-sized so it matches the background, not 100vh */}
       <div
-        className="relative z-10 flex flex-col h-full safe-top"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 24px) + 100px)' }}
+        className="relative z-10 flex flex-col"
+        style={{
+          height: '100dvh',
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 110px)',
+        }}
       >
         {/* Top bar */}
         <header
@@ -1422,14 +1428,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   <div
                     className="text-divine relative group"
                     style={{
-                      maxWidth: isMobile ? '85%' : '65%',
+                      maxWidth: isMobile ? '90%' : '65%',
                       fontSize: isMobile ? 'clamp(1.15rem, 3.2vw, 1.5rem)' : 'clamp(1.3rem, 2.5vw, 1.8rem)',
                       color: 'rgba(255, 248, 240, 0.95)',
                       textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
                       lineHeight: isMobile ? 1.8 : 1.9,
-                      textAlign: 'center',
+                      // Desktop: center text. Mobile: left-align for easier reading.
+                      textAlign: isMobile ? 'left' : 'center',
                       marginLeft: 'auto',
                       marginRight: 'auto',
+                      width: isMobile ? '100%' : 'auto',
                     }}
                   >
                     {renderDivineContent(message, accentColor)}

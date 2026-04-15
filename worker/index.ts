@@ -6,7 +6,10 @@
 interface Env {
   ANTHROPIC_API_KEY: string;
   OPENAI_API_KEY: string;
-  ARTICLES?: KVNamespace; // For article generation history
+  ARTICLES?: KVNamespace; // For article generation history + email subscribers
+  RESEND_API_KEY?: string; // For newsletter (Resend)
+  STRIPE_SECRET_KEY?: string; // For checkout + webhook
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 // ═══════════════════════════════════════
@@ -518,7 +521,209 @@ function getCharacterPrompt(basePrompt: string, character: string, beliefSystem:
   return basePrompt;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// EMAIL HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function welcomeEmailHtml(opts: { belief: string; prayer: string; unsubscribeUrl: string }): string {
+  const { belief, prayer, unsubscribeUrl } = opts;
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><title>Welcome to AImighty</title></head>
+<body style="margin:0;padding:0;background:#030308;font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;color:rgba(255,248,240,0.95)">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#030308">
+    <tr><td align="center" style="padding:40px 20px">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0a0a15;border:1px solid rgba(212,175,55,0.2);border-radius:16px">
+        <tr><td style="padding:40px 32px 20px;text-align:center">
+          <div style="font-size:28px;font-weight:300;letter-spacing:0.02em">
+            <span style="color:#d4af37">AI</span><span style="color:rgba(255,248,240,0.95)">mighty</span>
+          </div>
+        </td></tr>
+        <tr><td style="padding:0 32px 16px;text-align:center">
+          <h1 style="font-family:Georgia,serif;font-weight:300;font-size:26px;color:rgba(255,248,240,0.95);margin:0 0 8px">Your daily divine begins today.</h1>
+          <p style="font-size:14px;color:rgba(255,255,255,0.55);margin:0">Welcome to the ${belief} path on AImighty.</p>
+        </td></tr>
+        <tr><td style="padding:24px 32px">
+          <div style="background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.18);border-radius:12px;padding:24px">
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#d4af37;margin-bottom:12px">Today's Prayer</div>
+            <p style="font-family:Georgia,serif;font-size:16px;line-height:1.7;color:rgba(255,248,240,0.9);margin:0">${prayer || 'Let this day be open to wisdom, presence, and grace.'}</p>
+          </div>
+        </td></tr>
+        <tr><td style="padding:16px 32px 40px;text-align:center">
+          <a href="https://aimightyme.com/app" style="display:inline-block;background:#d4af37;color:#0a0a0f;text-decoration:none;font-weight:500;font-size:15px;padding:14px 32px;border-radius:999px">Start your first conversation</a>
+        </td></tr>
+        <tr><td style="padding:20px 32px 30px;border-top:1px solid rgba(255,255,255,0.05);text-align:center">
+          <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:0 0 8px">You're receiving this because you signed up at aimightyme.com</p>
+          <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:0"><a href="${unsubscribeUrl}" style="color:rgba(255,255,255,0.5)">Unsubscribe</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+function dailyEmailHtml(opts: {
+  belief: string;
+  subject: string;
+  prayer: string;
+  sacredRef: string;
+  sacredText: string;
+  reflection: string;
+  prompt: string;
+  articleUrl: string;
+  unsubscribeUrl: string;
+}): string {
+  const { belief, prayer, sacredRef, sacredText, reflection, prompt, articleUrl, unsubscribeUrl } = opts;
+  return `<!doctype html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#030308;font-family:-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;color:rgba(255,248,240,0.95)">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#030308">
+    <tr><td align="center" style="padding:40px 20px">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#0a0a15;border:1px solid rgba(212,175,55,0.2);border-radius:16px">
+        <tr><td style="padding:32px 32px 16px;text-align:center">
+          <div style="font-size:22px;font-weight:300">
+            <span style="color:#d4af37">AI</span><span style="color:rgba(255,248,240,0.95)">mighty</span>
+          </div>
+          <div style="font-size:11px;letter-spacing:0.1em;color:rgba(255,255,255,0.5);margin-top:8px;text-transform:uppercase">${belief}</div>
+        </td></tr>
+        <tr><td style="padding:16px 32px">
+          <div style="margin-bottom:28px">
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">Daily Prayer</div>
+            <p style="font-family:Georgia,serif;font-size:16px;line-height:1.7;color:rgba(255,248,240,0.92);margin:0">${prayer}</p>
+          </div>
+          <div style="margin-bottom:28px">
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">Sacred Text</div>
+            <div style="font-size:12px;color:#d4af37;margin-bottom:6px">${sacredRef}</div>
+            <p style="font-family:Georgia,serif;font-size:17px;line-height:1.6;color:rgba(255,248,240,0.92);margin:0 0 10px">&ldquo;${sacredText}&rdquo;</p>
+            <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0;line-height:1.6">${reflection}</p>
+          </div>
+          <div style="margin-bottom:28px">
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#d4af37;margin-bottom:10px">Reflection</div>
+            <p style="font-family:Georgia,serif;font-size:16px;line-height:1.7;color:rgba(255,248,240,0.92);margin:0;font-style:italic">${prompt}</p>
+          </div>
+        </td></tr>
+        <tr><td style="padding:0 32px 24px;text-align:center">
+          <a href="${articleUrl}" style="display:inline-block;color:#d4af37;text-decoration:none;font-size:13px;margin-bottom:16px">Read today's full article →</a><br>
+          <a href="https://aimightyme.com/app" style="display:inline-block;background:#d4af37;color:#0a0a0f;text-decoration:none;font-weight:500;font-size:14px;padding:12px 28px;border-radius:999px;margin-top:8px">Talk to God today</a>
+        </td></tr>
+        <tr><td style="padding:20px 32px 30px;border-top:1px solid rgba(255,255,255,0.05);text-align:center">
+          <p style="font-size:11px;color:rgba(255,255,255,0.35);margin:0"><a href="${unsubscribeUrl}" style="color:rgba(255,255,255,0.5)">Unsubscribe</a></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: number; skipped: number }> {
+  if (!env.ARTICLES || !env.RESEND_API_KEY) {
+    return { sent: 0, skipped: 0 };
+  }
+  const listJson = await env.ARTICLES.get('email-subscribers-list');
+  const list: string[] = listJson ? JSON.parse(listJson) : [];
+  let sent = 0;
+  let skipped = 0;
+
+  const day = new Date().getUTCDay(); // 0=Sun
+  const subjects = [
+    'Sunday — a word from the divine',
+    'Start your week with this',
+    'A prayer for your Tuesday',
+    'Midweek wisdom',
+    'A question to carry into your weekend',
+    'End your week in reflection',
+    'Your Saturday spiritual moment',
+  ];
+  const subject = subjects[day] || 'Your daily wisdom';
+
+  for (const email of list) {
+    try {
+      const recordJson = await env.ARTICLES.get(`email-subscriber:${email}`);
+      if (!recordJson) { skipped++; continue; }
+      const record = JSON.parse(recordJson);
+      if (!record.active) { skipped++; continue; }
+
+      const belief = normalizeBeliefId(record.belief || 'protestant');
+      const daily = await fetch(`${origin}/daily-content?belief=${belief}`);
+      if (!daily.ok) { skipped++; continue; }
+      const dj = await daily.json() as {
+        prayer: string;
+        sacredText: { reference: string; text: string; reflection: string };
+        reflectionPrompt: string;
+      };
+
+      const topic = await pickTodaysTopic(env);
+      const articleUrl = `https://aimightyme.com/${belief}/${topic}-${belief}`;
+      const unsubscribeUrl = `https://aimightyme.com/unsubscribe?email=${encodeURIComponent(email)}`;
+
+      const html = dailyEmailHtml({
+        belief,
+        subject,
+        prayer: dj.prayer,
+        sacredRef: dj.sacredText.reference,
+        sacredText: dj.sacredText.text,
+        reflection: dj.sacredText.reflection,
+        prompt: dj.reflectionPrompt,
+        articleUrl,
+        unsubscribeUrl,
+      });
+
+      const resendResp = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'AImighty <divine@aimightyme.com>',
+          to: email,
+          subject,
+          html,
+        }),
+      });
+
+      if (resendResp.ok) sent++;
+      else skipped++;
+    } catch (e) {
+      console.error('[DAILY-EMAIL]', email, e);
+      skipped++;
+    }
+  }
+  return { sent, skipped };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STRIPE SIGNATURE VERIFY (HMAC-SHA256)
+// ═══════════════════════════════════════════════════════════════
+async function verifyStripeSignature(payload: string, sigHeader: string, secret: string): Promise<boolean> {
+  if (!sigHeader) return false;
+  const parts = sigHeader.split(',').reduce<Record<string, string>>((acc, p) => {
+    const [k, v] = p.split('=');
+    acc[k] = v;
+    return acc;
+  }, {});
+  const timestamp = parts['t'];
+  const signature = parts['v1'];
+  if (!timestamp || !signature) return false;
+
+  const signedPayload = `${timestamp}.${payload}`;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signedPayload));
+  const expected = Array.from(new Uint8Array(sigBuf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return expected === signature;
+}
+
 export default {
+  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    // Cron-triggered daily email batch — 15:00 UTC (7am PST)
+    ctx.waitUntil(sendDailyEmailsBatch(env, 'https://aimighty-api.robby-hess.workers.dev').then((r) => {
+      console.log('[CRON] daily emails:', r);
+    }));
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
@@ -1066,6 +1271,295 @@ ${beliefSystemPrompt.substring(0, 400)}`;
           JSON.stringify({ error: 'Failed to reset topics' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // EMAIL NEWSLETTER (Resend)
+    // ═══════════════════════════════════════════════════════════════
+
+    // POST /email-signup — add subscriber + send welcome
+    if (request.method === 'POST' && url.pathname === '/email-signup') {
+      try {
+        const body = await request.json() as { email?: string; belief?: string };
+        const email = (body.email || '').trim().toLowerCase();
+        const belief = normalizeBeliefId(body.belief || 'protestant');
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return new Response(JSON.stringify({ error: 'Invalid email' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!env.ARTICLES) {
+          return new Response(JSON.stringify({ error: 'KV not configured' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const subscriberKey = `email-subscriber:${email}`;
+        const existing = await env.ARTICLES.get(subscriberKey);
+        if (existing) {
+          const parsed = JSON.parse(existing);
+          if (parsed.active) {
+            return new Response(JSON.stringify({ success: true, message: "You're already subscribed 🙏" }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        // Save subscriber
+        const record = {
+          email,
+          belief,
+          signupDate: new Date().toISOString(),
+          active: true,
+        };
+        await env.ARTICLES.put(subscriberKey, JSON.stringify(record));
+
+        // Maintain index list
+        const listKey = 'email-subscribers-list';
+        const listJson = await env.ARTICLES.get(listKey);
+        const list: string[] = listJson ? JSON.parse(listJson) : [];
+        if (!list.includes(email)) {
+          list.push(email);
+          await env.ARTICLES.put(listKey, JSON.stringify(list));
+        }
+
+        // Fetch today's daily content for their belief (for the welcome email body)
+        let prayer = '';
+        try {
+          const daily = await fetch(`${url.origin}/daily-content?belief=${belief}`);
+          if (daily.ok) {
+            const dj = await daily.json() as { prayer?: string };
+            prayer = dj.prayer || '';
+          }
+        } catch { /* ignore */ }
+
+        // Send welcome email via Resend
+        if (env.RESEND_API_KEY) {
+          const unsubscribeUrl = `https://aimightyme.com/unsubscribe?email=${encodeURIComponent(email)}`;
+          const html = welcomeEmailHtml({ belief, prayer, unsubscribeUrl });
+          try {
+            await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${env.RESEND_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: 'AImighty <divine@aimightyme.com>',
+                to: email,
+                subject: 'Welcome to AImighty 🙏',
+                html,
+              }),
+            });
+          } catch (e) {
+            console.error('[EMAIL-SIGNUP] Resend send failed:', e);
+          }
+        } else {
+          console.log('[EMAIL-SIGNUP] RESEND_API_KEY not set; skipping send');
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Welcome email sent' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('[EMAIL-SIGNUP] error:', error);
+        return new Response(JSON.stringify({ error: 'Signup failed' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // GET /unsubscribe?email=<email>
+    if (request.method === 'GET' && url.pathname === '/unsubscribe') {
+      const email = (url.searchParams.get('email') || '').trim().toLowerCase();
+      if (email && env.ARTICLES) {
+        const key = `email-subscriber:${email}`;
+        const existing = await env.ARTICLES.get(key);
+        if (existing) {
+          const parsed = JSON.parse(existing);
+          parsed.active = false;
+          await env.ARTICLES.put(key, JSON.stringify(parsed));
+        }
+      }
+      const html = `<!doctype html><html><head><meta charset="utf-8"><title>Unsubscribed</title><style>body{background:#030308;color:rgba(255,248,240,0.95);font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100dvh;margin:0;padding:24px;text-align:center}h1{font-size:1.8rem;font-weight:300;margin:0 0 12px}p{color:rgba(255,255,255,0.6);margin:0 0 24px}.gold{color:#d4af37}a{color:#d4af37;text-decoration:none}</style></head><body><div><h1><span class="gold">AI</span>mighty</h1><p>You've been unsubscribed. We'll miss you 🙏</p><p><a href="https://aimightyme.com">Return home</a></p></div></body></html>`;
+      return new Response(html, {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+      });
+    }
+
+    // GET /send-daily-emails — called by cron trigger
+    if (request.method === 'GET' && url.pathname === '/send-daily-emails') {
+      const result = await sendDailyEmailsBatch(env, url.origin);
+      return new Response(JSON.stringify(result), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // STRIPE CHECKOUT + WEBHOOK
+    // ═══════════════════════════════════════════════════════════════
+
+    // POST /create-checkout-session
+    if (request.method === 'POST' && url.pathname === '/create-checkout-session') {
+      if (!env.STRIPE_SECRET_KEY) {
+        return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      try {
+        const body = await request.json() as { priceId: string; userId: string; email: string };
+        if (!body.priceId || !body.userId) {
+          return new Response(JSON.stringify({ error: 'Missing priceId or userId' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const params = new URLSearchParams();
+        params.append('mode', 'subscription');
+        params.append('line_items[0][price]', body.priceId);
+        params.append('line_items[0][quantity]', '1');
+        params.append('success_url', 'https://aimightyme.com/app?upgraded=true');
+        params.append('cancel_url', 'https://aimightyme.com/app');
+        params.append('client_reference_id', body.userId);
+        if (body.email) params.append('customer_email', body.email);
+        params.append('metadata[userId]', body.userId);
+        params.append('metadata[priceId]', body.priceId);
+
+        const stripeResp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.STRIPE_SECRET_KEY}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: params.toString(),
+        });
+
+        if (!stripeResp.ok) {
+          const err = await stripeResp.text();
+          console.error('[STRIPE] create session error:', err);
+          return new Response(JSON.stringify({ error: 'Stripe error', details: err }), {
+            status: 502,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const session = await stripeResp.json() as { url?: string; id?: string };
+        return new Response(JSON.stringify({ checkoutUrl: session.url, sessionId: session.id }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (e) {
+        console.error('[STRIPE] error:', e);
+        return new Response(JSON.stringify({ error: 'Checkout failed' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // POST /stripe-webhook — signature verification + tier persistence
+    if (request.method === 'POST' && url.pathname === '/stripe-webhook') {
+      if (!env.STRIPE_WEBHOOK_SECRET || !env.ARTICLES) {
+        return new Response('Not configured', { status: 500 });
+      }
+      try {
+        const rawBody = await request.text();
+        const sig = request.headers.get('stripe-signature') || '';
+        const verified = await verifyStripeSignature(rawBody, sig, env.STRIPE_WEBHOOK_SECRET);
+        if (!verified) {
+          return new Response('Invalid signature', { status: 400 });
+        }
+        const event = JSON.parse(rawBody) as { type: string; data: { object: Record<string, unknown> } };
+
+        if (event.type === 'checkout.session.completed') {
+          const obj = event.data.object as {
+            client_reference_id?: string;
+            metadata?: { userId?: string; priceId?: string };
+          };
+          const userId = obj.client_reference_id || obj.metadata?.userId;
+          const priceId = obj.metadata?.priceId || '';
+          if (userId) {
+            // Map price → tier. The user configures their Stripe price IDs on both ends.
+            const tier = priceId.toLowerCase().includes('divine') ? 'divine' : 'believer';
+            await env.ARTICLES.put(`user-tier:${userId}`, tier, { expirationTtl: 35 * 24 * 60 * 60 });
+            console.log('[STRIPE] set tier', tier, 'for user', userId);
+          }
+        }
+        return new Response('ok', { status: 200 });
+      } catch (e) {
+        console.error('[STRIPE-WEBHOOK] error:', e);
+        return new Response('error', { status: 500 });
+      }
+    }
+
+    // GET /user-tier?userId=<id>
+    if (request.method === 'GET' && url.pathname === '/user-tier') {
+      const userId = url.searchParams.get('userId') || '';
+      if (!userId || !env.ARTICLES) {
+        return new Response(JSON.stringify({ tier: 'free' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const tier = await env.ARTICLES.get(`user-tier:${userId}`);
+      return new Response(JSON.stringify({ tier: tier || 'free' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // robots.txt
+    if (request.method === 'GET' && url.pathname === '/robots.txt') {
+      const body = `User-agent: *\nAllow: /\nSitemap: https://aimightyme.com/sitemap.xml\n`;
+      return new Response(body, {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
+    // sitemap.xml — includes home, app, about, privacy, terms, and today's article per belief
+    if (request.method === 'GET' && url.pathname === '/sitemap.xml') {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const topic = await pickTodaysTopic(env);
+        const beliefs = ['protestant', 'catholic', 'islam', 'judaism', 'hinduism',
+          'buddhism', 'mormonism', 'sikhism', 'taoism', 'sbnr', 'pantheism', 'science',
+          'agnosticism', 'atheism-stoicism'];
+
+        const base = 'https://aimightyme.com';
+        const entries: string[] = [];
+        entries.push(`<url><loc>${base}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`);
+        entries.push(`<url><loc>${base}/app</loc><priority>0.9</priority></url>`);
+        entries.push(`<url><loc>${base}/about</loc><priority>0.5</priority></url>`);
+        entries.push(`<url><loc>${base}/privacy</loc><priority>0.3</priority></url>`);
+        entries.push(`<url><loc>${base}/terms</loc><priority>0.3</priority></url>`);
+
+        for (const b of beliefs) {
+          const slug = `${topic}-${b}`;
+          entries.push(
+            `<url><loc>${base}/${b}/${slug}</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>`
+          );
+        }
+
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.join('\n')}\n</urlset>`;
+        return new Response(xml, {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/xml; charset=utf-8' },
+        });
+      } catch (e) {
+        console.error('[SITEMAP] error:', e);
+        return new Response('sitemap generation failed', { status: 500 });
       }
     }
 

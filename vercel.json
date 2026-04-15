@@ -1,5 +1,16 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://aimighty-api.robby-hess.workers.dev/sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "https://aimighty-api.robby-hess.workers.dev/robots.txt"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
   ]
 }

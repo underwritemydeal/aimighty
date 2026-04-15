@@ -9,6 +9,7 @@ import { PaywallScreen } from './components/screens/PaywallScreen';
 import { AboutScreen } from './components/screens/AboutScreen';
 import { PrivacyScreen } from './components/screens/PrivacyScreen';
 import { TermsScreen } from './components/screens/TermsScreen';
+import { ArticlePage } from './components/screens/ArticlePage';
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
@@ -18,10 +19,25 @@ import type { Screen, BeliefSystem, User } from './types';
 const LANGUAGE_STORAGE_KEY = 'aimighty_language';
 
 function App() {
-  // Initial screen based on URL: '/' → landing, '/app' and all others → welcome/resume
+  // Parse pathname to decide initial screen. Also detect `/[belief]/[slug]` article pages.
+  const [articleRoute, setArticleRoute] = useState<{ belief: string; slug: string } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = window.location.pathname;
+    const m = /^\/([a-z-]+)\/([a-z0-9-]+)\/?$/.exec(p);
+    if (!m) return null;
+    const knownBeliefs = new Set([
+      'protestant', 'catholic', 'islam', 'judaism', 'hinduism', 'buddhism',
+      'mormonism', 'sikhism', 'sbnr', 'taoism', 'pantheism', 'science',
+      'agnosticism', 'atheism-stoicism',
+    ]);
+    if (!knownBeliefs.has(m[1])) return null;
+    return { belief: m[1], slug: m[2] };
+  });
+
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
     if (typeof window === 'undefined') return 'welcome';
     const p = window.location.pathname;
+    if (articleRoute) return 'article';
     if (p === '/' || p === '') return 'landing';
     if (p === '/about') return 'about';
     if (p === '/privacy') return 'privacy';
@@ -53,9 +69,9 @@ function App() {
     document.documentElement.dir = isRTL(language) ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
 
-    // Skip session-restore for public landing/about/privacy/terms so refreshing
+    // Skip session-restore for public landing/about/privacy/terms/article so refreshing
     // those URLs doesn't yank the user into the app unexpectedly
-    const publicPaths = ['landing', 'about', 'privacy', 'terms'];
+    const publicPaths = ['landing', 'about', 'privacy', 'terms', 'article'];
     if (publicPaths.includes(currentScreen)) {
       setIsInitialized(true);
       return;
@@ -212,6 +228,23 @@ function App() {
           transition: 'opacity 450ms var(--ease-out-expo)',
         }}
       >
+        {currentScreen === 'article' && articleRoute && (
+          <ArticlePage
+            belief={articleRoute.belief}
+            slug={articleRoute.slug}
+            onBackToHome={() => {
+              if (typeof window !== 'undefined') window.history.pushState({}, '', '/');
+              setArticleRoute(null);
+              transitionTo('landing');
+            }}
+            onEnterApp={() => {
+              if (typeof window !== 'undefined') window.history.pushState({}, '', '/app');
+              setArticleRoute(null);
+              transitionTo('welcome');
+            }}
+          />
+        )}
+
         {currentScreen === 'landing' && (
           <LandingPage
             onEnterApp={() => {

@@ -1,5 +1,7 @@
 import { useState, useEffect, memo } from 'react';
 import { t, type LanguageCode } from '../../data/translations';
+import { STRIPE_PRICE_IDS, startCheckout, isStripeConfigured } from '../../config/stripe';
+import { getCurrentUser } from '../../services/auth';
 
 interface PaywallScreenProps {
   onBack: () => void;
@@ -17,14 +19,46 @@ const BackIcon = memo(function BackIcon() {
 
 export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 150);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleStartTrial = () => {
-    alert('Payment will be available soon. Thank you for your interest!');
+  const stripeReady = isStripeConfigured();
+
+  const handleUpgrade = (tier: 'believer' | 'divine') => {
+    if (!stripeReady) {
+      alert('Payment coming soon. Sign up for the free newsletter in the meantime.');
+      return;
+    }
+    const user = getCurrentUser();
+    const userId = user?.id || '';
+    const email = user?.email || '';
+    const priceId =
+      tier === 'believer'
+        ? (billingCycle === 'annual' ? STRIPE_PRICE_IDS.believerAnnual : STRIPE_PRICE_IDS.believerMonthly)
+        : (billingCycle === 'annual' ? STRIPE_PRICE_IDS.divineAnnual : STRIPE_PRICE_IDS.divineMonthly);
+    startCheckout(priceId, userId, email);
+  };
+
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterState, setNewsletterState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const handleNewsletterSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setNewsletterState('loading');
+    try {
+      const r = await fetch('https://aimighty-api.robby-hess.workers.dev/email-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newsletterEmail.trim() }),
+      });
+      setNewsletterState(r.ok ? 'success' : 'error');
+    } catch {
+      setNewsletterState('error');
+    }
   };
 
   return (
@@ -101,6 +135,37 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
             {t('paywall.continueJourney', language)}
           </p>
 
+          {/* Monthly / Annual toggle */}
+          <div className="flex justify-center mb-8">
+            <div
+              className="inline-flex rounded-full p-1"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              {(['monthly', 'annual'] as const).map((cycle) => (
+                <button
+                  key={cycle}
+                  onClick={() => setBillingCycle(cycle)}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '999px',
+                    background: billingCycle === cycle ? '#d4af37' : 'transparent',
+                    color: billingCycle === cycle ? '#0a0a0f' : 'rgba(255,255,255,0.7)',
+                    fontFamily: 'var(--font-body, Outfit)',
+                    fontSize: '0.85rem',
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {cycle === 'monthly' ? 'Monthly' : 'Annual · Save 2 months'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* FREE */}
             <TierCard
@@ -120,8 +185,8 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
             {/* BELIEVER */}
             <TierCard
               name="Believer"
-              price="$4.99"
-              priceNote="/ month"
+              price={billingCycle === 'annual' ? '$47' : '$4.99'}
+              priceNote={billingCycle === 'annual' ? '/ year' : '/ month'}
               features={[
                 { t: '10 conversations per day', ok: true },
                 { t: 'Daily Prayer, Sacred Text, Reflection', ok: true },
@@ -130,15 +195,15 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                 { t: 'No premium AI voice', ok: false },
                 { t: 'No conversation memory', ok: false },
               ]}
-              ctaLabel="Coming Soon"
-              onCta={handleStartTrial}
+              ctaLabel={stripeReady ? 'Upgrade' : 'Coming Soon'}
+              onCta={() => handleUpgrade('believer')}
             />
 
             {/* DIVINE */}
             <TierCard
               name="Divine"
-              price="$14.99"
-              priceNote="/ month"
+              price={billingCycle === 'annual' ? '$119' : '$14.99'}
+              priceNote={billingCycle === 'annual' ? '/ year' : '/ month'}
               highlight
               features={[
                 { t: '20 conversations per day', ok: true },
@@ -149,9 +214,84 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                 { t: 'Word-by-word text sync with voice', ok: true },
                 { t: 'Cinematic full-screen experience', ok: true },
               ]}
-              ctaLabel="Coming Soon"
-              onCta={handleStartTrial}
+              ctaLabel={stripeReady ? 'Upgrade' : 'Coming Soon'}
+              onCta={() => handleUpgrade('divine')}
             />
+          </div>
+
+          {/* Newsletter fallback */}
+          <div
+            className="mt-12 text-center"
+            style={{
+              maxWidth: '560px',
+              margin: '48px auto 0',
+              padding: '24px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '16px',
+            }}
+          >
+            <p
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.1rem',
+                fontWeight: 400,
+                color: 'rgba(255,248,240,0.9)',
+                marginBottom: '8px',
+              }}
+            >
+              Not ready to upgrade?
+            </p>
+            <p
+              style={{
+                fontFamily: 'var(--font-body, Outfit)',
+                fontSize: '0.85rem',
+                color: 'rgba(255,255,255,0.55)',
+                marginBottom: '16px',
+              }}
+            >
+              Get free daily wisdom in your inbox instead.
+            </p>
+            <form onSubmit={handleNewsletterSignup} className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="email"
+                required
+                placeholder="your@email.com"
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                disabled={newsletterState === 'success'}
+                style={{
+                  flex: 1,
+                  padding: '12px 16px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,248,240,0.9)',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                }}
+              />
+              <button
+                type="submit"
+                disabled={newsletterState === 'loading' || newsletterState === 'success'}
+                style={{
+                  padding: '12px 24px',
+                  borderRadius: '999px',
+                  background: '#d4af37',
+                  color: '#0a0a0f',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  border: 'none',
+                }}
+              >
+                {newsletterState === 'loading' ? 'Sending…' : newsletterState === 'success' ? 'Subscribed 🙏' : 'Subscribe'}
+              </button>
+            </form>
+            {newsletterState === 'error' && (
+              <p style={{ marginTop: '8px', fontSize: '0.75rem', color: '#ef4444' }}>
+                Something went wrong — try again
+              </p>
+            )}
           </div>
 
           <p

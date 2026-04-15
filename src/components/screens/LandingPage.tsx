@@ -6,9 +6,40 @@ interface LandingPageProps {
   onNavigate: (screen: 'about' | 'privacy' | 'terms') => void;
 }
 
+const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
+
 export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
   const [isVisible, setIsVisible] = useState(false);
   const howRef = useRef<HTMLDivElement>(null);
+
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupBelief, setSignupBelief] = useState('protestant');
+  const [signupState, setSignupState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [signupMessage, setSignupMessage] = useState('');
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signupEmail.trim()) return;
+    setSignupState('loading');
+    try {
+      const r = await fetch(`${WORKER_URL}/email-signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: signupEmail.trim(), belief: signupBelief }),
+      });
+      const data = await r.json();
+      if (r.ok && data.success) {
+        setSignupState('success');
+        setSignupMessage(data.message || 'Check your inbox 🙏');
+      } else {
+        setSignupState('error');
+        setSignupMessage(data.error || 'Something went wrong — try again');
+      }
+    } catch {
+      setSignupState('error');
+      setSignupMessage('Something went wrong — try again');
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => setIsVisible(true), 150);
@@ -48,7 +79,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
       style={{
         background: '#030308',
         color: 'rgba(255, 248, 240, 0.9)',
-        minHeight: '100vh',
+        minHeight: '100dvh',
         opacity: isVisible ? 1 : 0,
         transition: 'opacity 0.6s ease',
       }}
@@ -67,7 +98,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
         {/* HERO */}
         <section
           className="flex flex-col items-center justify-center text-center"
-          style={{ minHeight: '100vh', padding: '80px 24px 60px' }}
+          style={{ minHeight: '100dvh', padding: '80px 24px 60px' }}
         >
           <h1
             style={{
@@ -294,6 +325,98 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
                 </button>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* NEWSLETTER */}
+        <section style={sectionStyle}>
+          <div className="text-center" style={{ maxWidth: '640px', margin: '0 auto' }}>
+            <h2 style={{ ...h2Style, marginBottom: '16px' }}>Daily wisdom, delivered.</h2>
+            <p
+              style={{
+                fontFamily: 'var(--font-body, Outfit)',
+                fontSize: '1rem',
+                color: 'rgba(255,255,255,0.6)',
+                marginBottom: '32px',
+                lineHeight: 1.6,
+              }}
+            >
+              Prayer, sacred texts, and reflection prompts for your belief — every morning in your inbox. Free.
+            </p>
+            <form
+              onSubmit={handleSignup}
+              className="flex flex-col sm:flex-row gap-3"
+              style={{ maxWidth: '560px', margin: '0 auto' }}
+            >
+              <input
+                type="email"
+                required
+                placeholder="your@email.com"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                disabled={signupState === 'loading' || signupState === 'success'}
+                style={{
+                  flex: 1,
+                  padding: '14px 18px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(255,248,240,0.95)',
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontSize: '0.95rem',
+                  outline: 'none',
+                }}
+              />
+              <select
+                value={signupBelief}
+                onChange={(e) => setSignupBelief(e.target.value)}
+                disabled={signupState === 'loading' || signupState === 'success'}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(255,248,240,0.9)',
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontSize: '0.9rem',
+                  outline: 'none',
+                }}
+              >
+                {beliefSystems.map((b) => (
+                  <option key={b.id} value={b.id} style={{ background: '#0a0a15' }}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="submit"
+                disabled={signupState === 'loading' || signupState === 'success'}
+                style={{
+                  padding: '14px 28px',
+                  borderRadius: '999px',
+                  background: signupState === 'success' ? 'rgba(212,175,55,0.4)' : '#d4af37',
+                  color: '#0a0a0f',
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontSize: '0.95rem',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: signupState === 'loading' ? 'wait' : 'pointer',
+                }}
+              >
+                {signupState === 'loading' ? 'Sending…' : signupState === 'success' ? 'Subscribed' : 'Subscribe'}
+              </button>
+            </form>
+            {signupMessage && (
+              <p
+                style={{
+                  marginTop: '16px',
+                  fontSize: '0.85rem',
+                  color: signupState === 'success' ? '#d4af37' : signupState === 'error' ? '#ef4444' : 'rgba(255,255,255,0.5)',
+                }}
+              >
+                {signupMessage}
+              </p>
+            )}
           </div>
         </section>
 

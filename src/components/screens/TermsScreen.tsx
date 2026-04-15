@@ -22,11 +22,28 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
   return (
     <div
-      className="relative min-h-screen"
-      style={{ background: 'var(--color-void)' }}
+      className="relative"
+      style={{
+        background: 'var(--color-void)',
+        minHeight: '100dvh',
+        color: 'rgba(255,248,240,0.95)',
+      }}
       role="main"
       aria-labelledby="terms-heading"
     >
+      <div
+        className="fixed top-5 left-1/2 z-20"
+        style={{
+          transform: 'translateX(-50%)',
+          fontFamily: 'var(--font-display)',
+          fontSize: '1.1rem',
+          fontWeight: 300,
+          letterSpacing: '0.05em',
+        }}
+      >
+        <span style={{ color: '#d4af37' }}>AI</span>
+        <span style={{ color: 'rgba(255,248,240,0.95)' }}>mighty</span>
+      </div>
       {/* Back button */}
       <nav
         className="fixed top-4 left-4 z-20"
@@ -47,7 +64,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
       </nav>
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen overflow-y-auto">
+      <div className="relative z-10 overflow-y-auto" style={{ minHeight: '100dvh' }}>
         <div
           className="max-w-[800px] mx-auto px-6 py-20"
           style={{
