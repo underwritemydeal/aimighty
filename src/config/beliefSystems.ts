@@ -111,11 +111,11 @@ export const BELIEF_SYSTEMS: Record<string, BeliefSystemConfig> = {
     greeting: "I am here. What's on your mind?",
     characters: ['god', 'mary'],
   },
-  stoicism: {
-    id: 'stoicism',
+  'atheism-stoicism': {
+    id: 'atheism-stoicism',
     label: 'Stoicism',
     image: 'stoicism',
-    greeting: 'I am here. Speak freely.',
+    greeting: 'I am here.',
     characters: ['god', 'mary'],
   },
 };
@@ -127,7 +127,8 @@ export const BELIEF_SYSTEMS: Record<string, BeliefSystemConfig> = {
 const BELIEF_ALIASES: Record<string, string> = {
   'earth': 'pantheism',
   'spiritual': 'sbnr',
-  'atheism': 'stoicism',
+  'atheism': 'atheism-stoicism',
+  'stoicism': 'atheism-stoicism',
   'lds': 'mormonism',
   'mormon': 'mormonism',
   'christianity': 'protestant',

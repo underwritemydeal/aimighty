@@ -191,7 +191,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     imagePath: '/images/avatars/agnosticism.jpg',
   },
   {
-    id: 'atheism',
+    id: 'atheism-stoicism',
     name: 'Stoicism',
     subtitle: 'Atheist / Stoic',
     icon: '🏛️',

@@ -25,7 +25,7 @@ const welcomeMessages: Record<string, string> = {
   pantheism: "You are the Earth breathing, the stars thinking. What's on your mind?",
   science: "You are the cosmos made conscious. Let's explore what that means.",
   agnosticism: "The honest answer is: we don't know. Let's explore that together.",
-  atheism: "You are the author of your own meaning. What would you like to examine?",
+  'atheism-stoicism': "You are the author of your own meaning. What would you like to examine?",
 };
 
 export function BeliefWelcomeScreen({ belief, userName: _userName, onContinue, language }: BeliefWelcomeScreenProps) {

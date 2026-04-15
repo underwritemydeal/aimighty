@@ -44,7 +44,7 @@ const CHARACTER_LABELS: Record<string, { god: string; jesus?: string; mary: stri
   pantheism: { god: 'The Earth', mary: 'Gaia' },
   science: { god: 'The Cosmos', mary: 'The Universe' },
   agnosticism: { god: 'Wisdom', mary: 'Inner Voice' },
-  atheism: { god: 'Reason', mary: 'Wisdom' },
+  'atheism-stoicism': { god: 'Reason', mary: 'Wisdom' },
 };
 
 // Message with metadata for display

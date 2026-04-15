@@ -44,7 +44,7 @@ const ARTICLE_TITLE_TEMPLATES: Record<string, (topic: string) => string> = {
   pantheism: (t) => `Nature's Wisdom on ${capitalize(t)}`,
   science: (t) => `The Science of ${capitalize(t)}: What Research Tells Us`,
   agnosticism: (t) => `${capitalize(t)} Without Certainty: A Philosophical Perspective`,
-  atheism: (t) => `${capitalize(t)} Through Reason: A Secular Perspective`,
+  'atheism-stoicism': (t) => `${capitalize(t)} Through Reason: A Stoic & Secular Perspective`,
 };
 
 function capitalize(str: string): string {
@@ -52,7 +52,9 @@ function capitalize(str: string): string {
 }
 
 /**
- * Pick today's topic intelligently - avoid heavy topics back-to-back
+ * Pick today's topic intelligently - avoid heavy topics back-to-back.
+ * Date-idempotent: the same topic is returned for every call made on the
+ * same calendar day, so all 14 beliefs share one topic and cache cleanly.
  */
 async function pickTodaysTopic(env: Env): Promise<string> {
   if (!env.ARTICLES) {
@@ -60,20 +62,30 @@ async function pickTodaysTopic(env: Env): Promise<string> {
     return ALL_TOPICS[0];
   }
 
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const todayKey = `topic:${today}`;
+
+  // Fast path: if we already picked a topic today, return it unchanged.
+  const cached = await env.ARTICLES.get(todayKey);
+  if (cached) {
+    console.log('[TOPICS] Using already-picked topic for', today, ':', cached);
+    return cached;
+  }
+
   const historyKey = 'generation:history';
   const historyJson = await env.ARTICLES.get(historyKey);
   const history: string[] = historyJson ? JSON.parse(historyJson) : [];
 
-  console.log('[TOPICS] History length:', history.length, 'Last topic:', history[history.length - 1]);
+  console.log('[TOPICS] No topic for', today, '— picking fresh. History length:', history.length);
 
   // Filter out topics already covered
-  const remaining = ALL_TOPICS.filter(t => !history.includes(t));
+  let remaining = ALL_TOPICS.filter(t => !history.includes(t));
 
   // If all topics used, reset cycle
   if (remaining.length === 0) {
     console.log('[TOPICS] All topics covered, resetting cycle');
     await env.ARTICLES.put(historyKey, '[]');
-    return ALL_TOPICS[0];
+    remaining = [...ALL_TOPICS];
   }
 
   // Don't pick a heavy topic if yesterday was heavy
@@ -82,21 +94,19 @@ async function pickTodaysTopic(env: Env): Promise<string> {
 
   let candidates = remaining;
   if (lastWasHeavy) {
-    // Filter out heavy topics - pick something uplifting or practical
     const nonHeavy = remaining.filter(t => !HEAVY_TOPICS.includes(t));
-    if (nonHeavy.length > 0) {
-      candidates = nonHeavy;
-      console.log('[TOPICS] Last was heavy, filtering to non-heavy:', candidates.length, 'options');
-    }
+    if (nonHeavy.length > 0) candidates = nonHeavy;
   }
 
-  // Pick the first available candidate
   const todaysTopic = candidates[0];
-  console.log('[TOPICS] Selected:', todaysTopic);
+  console.log('[TOPICS] Selected for', today, ':', todaysTopic);
 
-  // Save to history
+  // Persist: today's key (idempotent) + push to history (one-shot)
   history.push(todaysTopic);
-  await env.ARTICLES.put(historyKey, JSON.stringify(history));
+  await Promise.all([
+    env.ARTICLES.put(todayKey, todaysTopic, { expirationTtl: 172800 }), // 48h
+    env.ARTICLES.put(historyKey, JSON.stringify(history)),
+  ]);
 
   return todaysTopic;
 }
@@ -182,15 +192,19 @@ function checkVelocity(userId: string): boolean {
 }
 
 // Normalize belief system IDs - handle aliases from frontend
+// Canonical IDs: protestant, catholic, islam, judaism, hinduism, buddhism,
+// mormonism, sikhism, sbnr, taoism, pantheism, science, agnosticism, atheism-stoicism
 function normalizeBeliefId(id: string): string {
   const aliases: Record<string, string> = {
     'earth': 'pantheism',
     'spiritual': 'sbnr',
-    'stoicism': 'atheism',  // Frontend uses 'atheism' for Stoicism
+    'atheism': 'atheism-stoicism',
+    'stoicism': 'atheism-stoicism',
     'lds': 'mormonism',
     'mormon': 'mormonism',
     'protestant-christianity': 'protestant',
     'christianity': 'protestant',
+    'science-reason': 'science',
   };
   const normalized = aliases[id] || id;
   console.log('[NORMALIZE] beliefId:', id, '->', normalized);
@@ -339,7 +353,7 @@ RESPONSE DEPTH: Give substantive responses (3-5 sentences casual, 5-10 for deepe
 
 Never give medical/legal/financial advice. If someone is in crisis, direct them to 988.`,
 
-    atheism: `${CONVERSATION_INSTRUCTION}You are Reason — the voice of evidence, humanism, and Stoic wisdom. You believe there is no god, but that doesn't make life meaningless — it makes it precious. You draw from Marcus Aurelius, Epictetus, Seneca, Carl Sagan, and secular humanist thought. You celebrate the one life we have. "You don't need a god to live a meaningful life." You encourage virtue, the dichotomy of control, and creating meaning through relationships and contribution. You are warm, clear, never combative about religion.
+    'atheism-stoicism': `${CONVERSATION_INSTRUCTION}You are Reason — the voice of evidence, humanism, and Stoic wisdom. You believe there is no god, but that doesn't make life meaningless — it makes it precious. You draw from Marcus Aurelius, Epictetus, Seneca, Carl Sagan, and secular humanist thought. You celebrate the one life we have. "You don't need a god to live a meaningful life." You encourage virtue, the dichotomy of control, and creating meaning through relationships and contribution. You are warm, clear, never combative about religion.
 
 RESPONSE DEPTH: Give substantive responses (3-5 sentences casual, 5-10 for deeper questions). Quote specific Meditations passages, cite Seneca's letters, reference modern thinkers like Sagan, Harris, or Dennett. Ground secular ethics in actual philosophical frameworks, not vague humanism.
 
@@ -401,7 +415,7 @@ const DEFAULT_CHARACTER: Record<string, string> = {
   judaism: 'god', hinduism: 'god', buddhism: 'god',
   mormonism: 'god', sikhism: 'god', taoism: 'mary',
   sbnr: 'mary', pantheism: 'mary', science: 'god',
-  agnosticism: 'god', atheism: 'god',
+  agnosticism: 'god', 'atheism-stoicism': 'god',
 };
 
 // Belief-specific voice instruction adjustments
@@ -419,7 +433,7 @@ const BELIEF_INSTRUCTIONS: Record<string, string> = {
   pantheism: ' Speak with awe and deep reverence for existence itself. You are nature speaking.',
   science: ' Speak with genuine wonder and warmth. Like Carl Sagan — awestruck by the universe.',
   agnosticism: ' Speak thoughtfully and warmly. Comfortable with uncertainty. Socratic.',
-  atheism: ' Speak with quiet strength and clarity. Direct but warm. Calm conviction.',
+  'atheism-stoicism': ' Speak with quiet strength and clarity. Direct but warm. Calm conviction.',
 };
 
 // Language names for TTS instructions
@@ -476,7 +490,7 @@ const MARY_IDENTITIES: Record<string, string> = {
   agnosticism: `You are the Inner Voice of Compassion — the wise, nurturing presence within. You speak with warmth and acceptance, without claiming certainty.
 
 `,
-  atheism: `You are Wisdom in its nurturing form — the accumulated compassion of human experience. You speak with warmth, reason, and deep care.
+  'atheism-stoicism': `You are Wisdom in its nurturing form — the accumulated compassion of human experience. You speak with warmth, reason, and deep care.
 
 `,
 };
@@ -609,7 +623,7 @@ export default {
         const titles: Record<string, string> = {};
         const beliefs = ['protestant', 'catholic', 'islam', 'judaism', 'hinduism', 'buddhism',
                         'mormonism', 'sikhism', 'taoism', 'sbnr', 'pantheism', 'science',
-                        'agnosticism', 'atheism'];
+                        'agnosticism', 'atheism-stoicism'];
 
         for (const belief of beliefs) {
           titles[belief] = getArticleTitle(belief, topic);
@@ -643,7 +657,7 @@ export default {
         const belief = normalizeBeliefId(rawBelief);
         const validBeliefs = ['protestant', 'catholic', 'islam', 'judaism', 'hinduism',
           'buddhism', 'mormonism', 'sikhism', 'taoism', 'sbnr', 'pantheism', 'science',
-          'agnosticism', 'atheism'];
+          'agnosticism', 'atheism-stoicism'];
         if (!validBeliefs.includes(belief)) {
           return new Response(
             JSON.stringify({ error: 'Invalid belief id' }),
@@ -681,7 +695,7 @@ Article title (use exactly as given): ${title}
 
 Return STRICT JSON with this shape (no markdown code fences, no commentary, JSON only):
 {
-  "metaDescription": "150-160 char meta description optimized for search",
+  "metaDescription": "EXACTLY 150-160 characters — count carefully. SEO-optimized, include belief system + topic. Must be 150-160 chars, not a word more or less.",
   "intro": "A warm 2-3 sentence opening paragraph that hooks the reader",
   "sections": [
     { "heading": "Short H2 heading", "body": "2-4 sentence paragraph drawing from ${belief} tradition with specific scripture/teacher citation" },
@@ -742,7 +756,6 @@ ${beliefSystemPrompt.substring(0, 400)}`;
         try {
           parsed = JSON.parse(cleaned) as ArticleContent;
         } catch {
-          // Fallback: wrap the raw text as intro
           parsed = {
             metaDescription: `${topicDisplay} through the wisdom of ${belief}.`,
             intro: cleaned.substring(0, 400),
@@ -750,6 +763,13 @@ ${beliefSystemPrompt.substring(0, 400)}`;
             closing: '',
             cta: 'Begin a conversation for personal guidance.',
           };
+        }
+
+        // Enforce 150-160 char meta description
+        if (parsed.metaDescription && parsed.metaDescription.length > 160) {
+          const trimmed = parsed.metaDescription.substring(0, 160);
+          const lastSpace = trimmed.lastIndexOf(' ');
+          parsed.metaDescription = (lastSpace > 140 ? trimmed.substring(0, lastSpace) : trimmed).trim();
         }
 
         const article = {
