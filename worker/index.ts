@@ -5,7 +5,8 @@
 
 interface Env {
   ANTHROPIC_API_KEY: string;
-  OPENAI_API_KEY: string;
+  SMALLEST_AI_API_KEY: string; // Smallest AI Lightning V3.1 + V2 (TTS)
+  OPENAI_API_KEY?: string; // legacy — kept for fallback only, no longer used by /tts
   ARTICLES?: KVNamespace; // For article generation history + email subscribers
   RESEND_API_KEY?: string; // For newsletter (Resend)
   STRIPE_SECRET_KEY?: string; // For checkout + webhook
@@ -400,7 +401,93 @@ function capTextForTTS(text: string, maxChars = 1500): string {
   return truncated;
 }
 
-// TTS character voices and instructions
+// ═══════════════════════════════════════════════════════════════
+// SMALLEST AI LIGHTNING V3.1 + V2 — TTS VOICE MAP
+// ═══════════════════════════════════════════════════════════════
+// Five characters, each pinned to its model + voice + speed.
+// god uses a cloned voice (V3.1). sophia/ethan are V3.1 stock voices.
+// walter/blofeld only exist in lightning-v2, so we use that endpoint
+// for them. The frontend doesn't care — the worker hides this.
+
+const SMALLEST_V3_1 = 'https://waves-api.smallest.ai/api/v1/lightning-v3.1/get_speech';
+const SMALLEST_V2 = 'https://waves-api.smallest.ai/api/v1/lightning-v2/get_speech';
+
+interface SmallestVoiceConfig {
+  voice_id: string;
+  speed: number;
+  endpoint: string;
+  description: string;
+}
+
+const SMALLEST_AI_VOICES: Record<string, SmallestVoiceConfig> = {
+  god: {
+    voice_id: 'voice_Hv9szTBA4K', // cloned AImighty voice
+    speed: 0.8,
+    endpoint: SMALLEST_V3_1,
+    description: 'AImighty cloned voice — protestant/catholic/mormonism/judaism/science',
+  },
+  universe: {
+    voice_id: 'sophia',           // V3.1 stock
+    speed: 1.0,
+    endpoint: SMALLEST_V3_1,
+    description: 'Sophia (American female, warm) — sbnr/taoism/pantheism',
+  },
+  buddha: {
+    voice_id: 'walter',           // V2 stock — Walter exists only in V2
+    speed: 0.9,
+    endpoint: SMALLEST_V2,
+    description: 'Walter (American male, calm) — buddhism/agnosticism/atheism-stoicism',
+  },
+  islam: {
+    voice_id: 'blofeld',          // V2 stock — Blofeld exists only in V2
+    speed: 0.8,
+    endpoint: SMALLEST_V2,
+    description: 'Blofeld (American male, dignified authority) — islam',
+  },
+  hinduism: {
+    voice_id: 'ethan',            // V3.1 stock
+    speed: 0.8,
+    endpoint: SMALLEST_V3_1,
+    description: 'Ethan (American male, gentle wisdom) — hinduism/sikhism',
+  },
+};
+
+// Belief system → character key
+const BELIEF_CHARACTER_MAP: Record<string, keyof typeof SMALLEST_AI_VOICES> = {
+  protestant: 'god',
+  catholic: 'god',
+  mormonism: 'god',
+  judaism: 'god',
+  science: 'god',
+  islam: 'islam',
+  hinduism: 'hinduism',
+  sikhism: 'hinduism',
+  buddhism: 'buddha',
+  agnosticism: 'buddha',
+  'atheism-stoicism': 'buddha',
+  sbnr: 'universe',
+  taoism: 'universe',
+  pantheism: 'universe',
+};
+
+// App language code → Smallest AI language code
+const SMALLEST_AI_LANGUAGE_MAP: Record<string, string> = {
+  en: 'en',
+  es: 'es',
+  fr: 'fr',
+  ar: 'ar',
+  hi: 'hi',
+  pt: 'pt',
+  de: 'de',
+  it: 'it',
+  nl: 'nl',
+  pl: 'pl',
+  tr: 'tr',
+  // Anything else falls back to 'en'
+};
+
+// Legacy OpenAI character voice instructions — kept only because old typings
+// reference TTS_CHARACTERS. Not used by the new /tts endpoint.
 const TTS_CHARACTERS: Record<string, { voice: string; instructions: string }> = {
   god: {
     voice: 'onyx',
@@ -732,7 +819,7 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // TTS endpoint
+    // TTS endpoint — Smallest AI Lightning V3.1 + V2
     if (request.method === 'POST' && url.pathname === '/tts') {
       try {
         const body = await request.json() as {
@@ -742,7 +829,7 @@ export default {
           language?: string;
         };
 
-        const { text, beliefSystem: rawBeliefSystem, character, language = 'en' } = body;
+        const { text, beliefSystem: rawBeliefSystem, language = 'en' } = body;
 
         if (!text || !rawBeliefSystem) {
           return new Response(
@@ -750,75 +837,62 @@ export default {
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
-        // Normalize belief system ID
-        const beliefSystem = normalizeBeliefId(rawBeliefSystem);
-
-        // Log incoming request
-        console.log('[TTS] Request - raw:', rawBeliefSystem, 'normalized:', beliefSystem, 'character:', character, 'language:', language, 'text_length:', text.length);
-
-        // Select character and voice
-        const selectedChar = TTS_CHARACTERS[character || ''] ||
-          TTS_CHARACTERS[DEFAULT_CHARACTER[beliefSystem] || 'god'] ||
-          TTS_CHARACTERS.god;
-
-        console.log('[TTS] Using voice:', selectedChar.voice);
-
-        // Build instructions
-        // Instructions are currently unused — tts-1 doesn't accept an `instructions`
-        // field. Kept for logging + future migration back to gpt-4o-mini-tts.
-        let finalInstructions = selectedChar.instructions + (BELIEF_INSTRUCTIONS[beliefSystem] || '');
-        void finalInstructions;
-
-        // Add language instruction if not English
-        if (language && language !== 'en') {
-          const langName = TTS_LANGUAGE_NAMES[language] || language;
-          finalInstructions += ` Speak entirely in ${langName}. Maintain the same tone, warmth, and emotion in ${langName}.`;
-        }
-
-        // Prepare text for speech - convert "John 3:16" to "John chapter 3 verse 16"
-        // Then cap at 1500 chars (~30 seconds of speech)
-        const preparedText = prepareTextForSpeech(text);
-        const spokenText = capTextForTTS(preparedText, 1500);
-
-        // Cost logging
-        console.log('[COST] TTS call - original_chars:', text.length, 'spoken_chars:', spokenText.length, 'estimated_cost: $' + (spokenText.length / 1000 * 0.015).toFixed(4));
-
-        // Call OpenAI TTS API with opus for faster loading
-        const ttsResponse = await fetch('https://api.openai.com/v1/audio/speech', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            // tts-1 has lower TTFB than gpt-4o-mini-tts for short sentences —
-            // critical for sentence-queue streaming playback. Use tts-1-hd if
-            // quality becomes an issue.
-            model: 'tts-1',
-            voice: selectedChar.voice,
-            input: spokenText.substring(0, 4096),
-            response_format: 'opus',
-            speed: 1.0,
-          }),
-        });
-
-        if (!ttsResponse.ok) {
-          const errorText = await ttsResponse.text();
-          console.error('[TTS] OpenAI API error:', ttsResponse.status, errorText);
+        if (!env.SMALLEST_AI_API_KEY) {
           return new Response(
-            JSON.stringify({ error: 'TTS failed', details: errorText }),
+            JSON.stringify({ error: 'Smallest AI not configured' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        console.log('[TTS] OpenAI responded OK, streaming audio');
+        const beliefSystem = normalizeBeliefId(rawBeliefSystem);
+        const characterKey = BELIEF_CHARACTER_MAP[beliefSystem] || 'god';
+        const voiceConfig = SMALLEST_AI_VOICES[characterKey];
+        const smallestLang = SMALLEST_AI_LANGUAGE_MAP[language] || 'en';
 
-        // Return audio stream (opus format)
+        console.log('[TTS] Request - belief:', beliefSystem, 'character:', characterKey, 'voice:', voiceConfig.voice_id, 'model:', voiceConfig.endpoint, 'lang:', smallestLang, 'text_length:', text.length);
+
+        // Prepare text and cap it
+        const preparedText = prepareTextForSpeech(text);
+        const spokenText = capTextForTTS(preparedText, 1500);
+
+        // Cost logging — Smallest AI charges per character (~$0.005/1k chars, much cheaper than OpenAI)
+        console.log('[COST] TTS call - chars:', spokenText.length, 'est: $' + (spokenText.length / 1000 * 0.005).toFixed(5));
+
+        const t0 = Date.now();
+        const ttsResponse = await fetch(voiceConfig.endpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.SMALLEST_AI_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: spokenText,
+            voice_id: voiceConfig.voice_id,
+            sample_rate: 24000,
+            speed: voiceConfig.speed,
+            language: smallestLang,
+            output_format: 'mp3',
+            add_wav_header: false,
+          }),
+        });
+
+        console.log(`[TTS-TIMING] worker→smallest headers t+${Date.now() - t0}ms status=${ttsResponse.status}`);
+
+        if (!ttsResponse.ok) {
+          const errorText = await ttsResponse.text();
+          console.error('[TTS] Smallest AI error:', ttsResponse.status, errorText);
+          return new Response(
+            JSON.stringify({ error: 'TTS failed', details: errorText }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Smallest AI returns raw audio bytes directly
         return new Response(ttsResponse.body, {
           headers: {
             ...corsHeaders,
-            'Content-Type': 'audio/ogg',
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'no-store',
           },
         });
       } catch (error) {
