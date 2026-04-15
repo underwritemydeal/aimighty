@@ -147,6 +147,8 @@ html {
   scroll-behavior: smooth;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 html,
@@ -157,13 +159,7 @@ body,
   background: var(--color-void);
 }
 
-/* iOS Safari dynamic viewport — 100dvh tracks URL-bar collapse/expand.
-   Using min-height lets inner content grow without creating black bars
-   between #root and children that use 100dvh. */
-html {
-  min-height: 100%;
-  min-height: 100dvh;
-}
+/* iOS Safari dynamic viewport — 100dvh tracks URL-bar collapse/expand. */
 body,
 #root {
   min-height: 100dvh;
