@@ -1,7 +1,7 @@
 # AImighty Project Instructions
 
 **Voice AI for spiritual guidance across 14 belief systems.**
-**Last Updated: April 15, 2026**
+**Last Updated: April 15, 2026 (post landing-redesign + hero bg fix)**
 
 ## What This Is
 
@@ -40,11 +40,16 @@ Aimighty/
 └── aimighty/              # Main app
     ├── index.html         # viewport-fit=cover
     ├── vercel.json        # SPA rewrites + robots/sitemap proxy to worker
-    ├── public/images/avatars/   # 16 Midjourney divine figure images
+    ├── public/images/
+    │   ├── hero-mobile.jpg        # 9:16 cosmic hero for landing mobile
+    │   ├── hero-desktop.jpg       # 16:9 cosmic hero for landing desktop
+    │   └── avatars/               # 14 belief portraits (mobile 9:16 + desktop 16:9)
     ├── src/
     │   ├── App.tsx              # Pathname-based routing
+    │   ├── styles/
+    │   │   └── designSystem.ts        # Single source of truth: colors/fonts/radii/shadows
     │   ├── components/screens/
-    │   │   ├── LandingPage.tsx        # Public /
+    │   │   ├── LandingPage.tsx        # Public / — full redesign (hero → steps → beliefs → pricing → email → FAQ → CTA → footer)
     │   │   ├── ArticlePage.tsx        # Public /[belief]/[slug] (SEO)
     │   │   ├── WelcomeScreen.tsx      # App entry /app
     │   │   ├── BeliefSelector.tsx     # 14 belief cards with selfDescription
@@ -262,23 +267,47 @@ Applied to all 14 belief prompts via string interpolation. Contains:
 
 ## Design System
 
+### Single source of truth: `src/styles/designSystem.ts`
+All color, font, radius, shadow, and spacing tokens live here. New components should import from this file, not hardcode hex values. LandingPage is the reference implementation — other screens still have literal hex strings that should be migrated as they get touched.
+
+```ts
+import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designSystem';
+```
+
 ### Colors
-- **Primary Gold:** `#d4af37`
-- **Void (background):** `#030308`
-- **Text Primary:** `rgba(255, 248, 240, 0.95)`
+- **Primary Gold:** `colors.gold` = `#d4af37`
+- **Void (background):** `colors.void` = `#030308`
+- **Void soft (pricing section):** `colors.voidSoft` = `rgba(10, 10, 18, 1)`
+- **Text Primary:** `colors.textPrimary` = `rgba(255, 248, 240, 0.95)`
+- **Gold border subtle:** `colors.goldBorder` = `rgba(212, 175, 55, 0.2)`
+- **Gold border active:** `colors.goldBorderActive` = `rgba(212, 175, 55, 0.6)`
+- **Gold glow shadow:** `shadows.goldGlow` = `0 0 30px rgba(212, 175, 55, 0.15)`
 
 ### Typography
-- **Divine text:** Cormorant Garamond (300 weight)
-- **UI / body:** Outfit (200–600 weights)
+- **Divine / headings:** Cormorant Garamond (300–500 weight) via `fonts.display`
+- **UI / body:** Outfit (200–600 weights) via `fonts.body`
+- **Logo wordmark (standardized):** "AI" in `colors.gold` + "mighty" in `colors.textPrimary`, always Cormorant Garamond. Consistent across all screens. Use the `Logo` component pattern from `LandingPage.tsx` when surfacing the wordmark.
 
 ### Viewport Rules — CRITICAL for mobile
 - `viewport-fit=cover` in `index.html`
 - Global CSS: `html, body, #root { min-height: 100dvh; -webkit-fill-available; }`
 - **Every screen root** uses `minHeight: '100dvh'` or `height: '100dvh'` — NOT `100vh` or `h-screen` (those cause iOS black bars when URL bar collapses)
-- Fixed background image divs use `width: '100vw', height: '100dvh'` + `backgroundSize: 'cover'` + `backgroundPosition: 'top center'`
+- **Never use `backgroundAttachment: 'fixed'`** — iOS Safari disables it and renders the background incorrectly (zoom/clip bug). Always `scroll`.
+- ConversationScreen / belief card background divs use `backgroundSize: 'cover'` + `backgroundPosition: 'top center'`
+- **LandingPage mobile hero** is the exception: `backgroundSize: 'contain'` + `backgroundColor: colors.void` so the full 9:16 cosmic image renders without cropping on narrow iPhones
 - ConversationScreen input bar: `position: fixed; bottom: 0; padding-bottom: env(safe-area-inset-bottom)` — slides off during TTS
 - Safe-area padding on content wrappers, NOT on the background image
 - God's text: **desktop centered**, **mobile left-aligned** (easier to read on narrow screens)
+
+### LandingPage sections (top to bottom)
+1. **Hero** — 100dvh, cosmic bg (mobile contain / desktop cover), floating logo, tagline, Begin + Learn More CTAs, animated scroll chevron
+2. **How It Works** — 3 steps with 120px watermark numbers, pure SVG icons (hand / speak / star), "The Divine Speaks" as step 3
+3. **Belief Showcase** — 14 cards, 16:9 aspect, real belief images with gradient overlay, name + selfDescription, no emoji
+4. **Pricing** — slightly lighter bg, 3 tier cards via `PricingCard` subcomponent, Divine has gold glow + "Most Popular"
+5. **Email signup** — deep gold gradient bg, wired to `/email-signup` worker endpoint
+6. **FAQ** — accordion with thin gold dividers, chevron rotation, no cards
+7. **Final CTA** — hero mobile image at 20% opacity bg, "You've always wanted to talk. / Now you can."
+8. **Footer** — pure black, logo + tagline + Privacy/Terms/About links + copyright
 
 ## Auth System
 - Email + password (minimum 8 characters, uppercase + lowercase + number)
