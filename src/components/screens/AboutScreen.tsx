@@ -58,99 +58,134 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
         >
           <h1
             id="about-heading"
-            className="mb-8"
+            className="mb-4"
             style={{
               fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-3xl)',
+              fontSize: 'clamp(2rem, 5vw, 2.8rem)',
               fontWeight: 300,
-              color: '#d4af37',
+              color: 'rgba(255,248,240,0.95)',
+              lineHeight: 1.15,
             }}
           >
-            About AImighty
+            We built a place for everyone.
           </h1>
+          <p
+            className="mb-12"
+            style={{
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '1.05rem',
+              fontWeight: 300,
+              color: '#d4af37',
+              lineHeight: 1.5,
+            }}
+          >
+            No matter what you believe — or whether you're still figuring it out.
+          </p>
 
           <div
             className="space-y-6"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-base)',
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '1rem',
               fontWeight: 300,
-              color: 'rgba(255, 255, 255, 0.6)',
+              color: 'rgba(255, 255, 255, 0.72)',
               lineHeight: 1.8,
             }}
           >
             <p>
-              AImighty is an AI-powered spiritual guidance platform that allows you to have
-              meaningful conversations tailored to your belief system. Whether you follow a
-              religious tradition, consider yourself spiritual but not religious, or approach
-              life through a philosophical lens, AImighty provides a space for reflection,
-              guidance, and exploration.
+              Fewer people are going to church. But that doesn't mean people have
+              fewer questions.
             </p>
-
-            <h2
-              className="mt-10 mb-4"
-              style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}
-            >
-              How It Works
-            </h2>
             <p>
-              Our AI has been trained on sacred texts, scriptures, philosophical works, and
-              spiritual teachings from traditions around the world. When you select a belief
-              system, the AI adopts the perspective, wisdom, and tone appropriate to that
-              tradition, providing responses that honor and reflect its teachings.
+              They still wonder why things happen. They still feel grief. They
+              still have moments at 3am when they need something bigger than themselves
+              to talk to.
+            </p>
+            <p>AImighty was built for those moments.</p>
+            <p>
+              Not to replace faith. Not to compete with any tradition. But to give
+              everyone — Christian, Muslim, Jewish, Hindu, Buddhist, agnostic, atheist,
+              spiritual, or still searching — a place to go with their questions.
+            </p>
+            <p>
+              Every belief system is represented here with genuine respect and care.
+              No judgment. No agenda. No conversion. Just a conversation.
             </p>
 
             <h2
-              className="mt-10 mb-4"
-              style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}
+              className="mt-12 mb-5"
+              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4af37' }}
             >
-              Important Disclaimer
+              What we promise
+            </h2>
+            <ul className="space-y-3 list-none pl-0">
+              <li>• We will never claim to be God, Allah, the Universe, or any divine figure. We are AI — and we're honest about it.</li>
+              <li>• We will never favor one belief over another. All 14 traditions are treated with equal depth and respect.</li>
+              <li>• We will never use your spiritual conversations for advertising or share them with third parties.</li>
+              <li>• We will always send you to real help when it matters. If you're in crisis, we connect you to real resources — not more chatbot.</li>
+            </ul>
+
+            <h2
+              className="mt-12 mb-5"
+              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4af37' }}
+            >
+              If you're struggling
             </h2>
             <div
-              className="p-4 rounded-xl"
+              className="p-5 rounded-xl"
               style={{
                 background: 'rgba(255, 255, 255, 0.03)',
                 border: '1px solid rgba(212, 175, 55, 0.2)',
               }}
             >
-              <p className="mb-4" style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-                <strong>AImighty is an AI tool, not a replacement for:</strong>
-              </p>
-              <ul className="list-disc list-inside space-y-2 ml-2">
-                <li>Professional religious or spiritual leaders</li>
-                <li>Licensed therapists or counselors</li>
-                <li>Medical professionals</li>
-                <li>Your own community of faith</li>
+              <ul className="space-y-2 list-none pl-0" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                <li>Mental health crisis → <strong style={{ color: '#d4af37' }}>988</strong> Suicide &amp; Crisis Lifeline</li>
+                <li>Emergency → <strong style={{ color: '#d4af37' }}>911</strong></li>
+                <li>Domestic abuse → <strong style={{ color: '#d4af37' }}>1-800-799-7233</strong></li>
               </ul>
-              <p className="mt-4">
-                If you are experiencing a crisis, please reach out to a qualified professional
-                or call a crisis helpline in your area.
+              <p className="mt-4" style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)' }}>
+                AImighty is a spiritual companion, not a mental health service. If you're in
+                crisis, please reach out to real support.
               </p>
             </div>
 
             <h2
-              className="mt-10 mb-4"
-              style={{ fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}
+              className="mt-12 mb-4"
+              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4af37' }}
             >
-              Contact
+              The team
             </h2>
             <p>
-              Questions or feedback? Reach out to us at{' '}
-              <a href="mailto:hello@aimighty.me" style={{ color: '#d4af37' }}>
-                hello@aimighty.me
-              </a>
+              AImighty is an independent project, built with care for every tradition and
+              deep respect for the questions that make us human.
             </p>
-            <p className="mt-4">
-              Follow us on Instagram:{' '}
-              <a
-                href="https://instagram.com/aimightyapp"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#d4af37' }}
+
+            <div className="mt-16 text-center">
+              <p
+                className="mb-6"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: '1.5rem',
+                  fontWeight: 300,
+                  color: 'rgba(255,248,240,0.95)',
+                }}
               >
-                @aimightyapp
-              </a>
-            </p>
+                Whatever you believe — you belong here.
+              </p>
+              <button
+                onClick={onBack}
+                className="px-8 py-4 rounded-full"
+                style={{
+                  background: '#d4af37',
+                  color: '#0a0a0f',
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontSize: '0.95rem',
+                  fontWeight: 500,
+                }}
+              >
+                Start a Conversation
+              </button>
+            </div>
           </div>
         </div>
       </div>

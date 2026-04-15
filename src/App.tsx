@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { LandingPage } from './components/screens/LandingPage';
 import { WelcomeScreen } from './components/screens/WelcomeScreen';
 import { AuthScreen } from './components/screens/AuthScreen';
 import { BeliefSelector } from './components/screens/BeliefSelector';
@@ -17,7 +18,16 @@ import type { Screen, BeliefSystem, User } from './types';
 const LANGUAGE_STORAGE_KEY = 'aimighty_language';
 
 function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
+  // Initial screen based on URL: '/' → landing, '/app' and all others → welcome/resume
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    if (typeof window === 'undefined') return 'welcome';
+    const p = window.location.pathname;
+    if (p === '/' || p === '') return 'landing';
+    if (p === '/about') return 'about';
+    if (p === '/privacy') return 'privacy';
+    if (p === '/terms') return 'terms';
+    return 'welcome';
+  });
   const [selectedBelief, setSelectedBelief] = useState<BeliefSystem | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -42,6 +52,14 @@ function App() {
   useEffect(() => {
     document.documentElement.dir = isRTL(language) ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
+
+    // Skip session-restore for public landing/about/privacy/terms so refreshing
+    // those URLs doesn't yank the user into the app unexpectedly
+    const publicPaths = ['landing', 'about', 'privacy', 'terms'];
+    if (publicPaths.includes(currentScreen)) {
+      setIsInitialized(true);
+      return;
+    }
 
     // Check for existing session
     if (isLoggedIn()) {
@@ -194,6 +212,23 @@ function App() {
           transition: 'opacity 450ms var(--ease-out-expo)',
         }}
       >
+        {currentScreen === 'landing' && (
+          <LandingPage
+            onEnterApp={() => {
+              if (typeof window !== 'undefined') {
+                window.history.pushState({}, '', '/app');
+              }
+              transitionTo('welcome');
+            }}
+            onNavigate={(screen) => {
+              if (typeof window !== 'undefined') {
+                window.history.pushState({}, '', `/${screen}`);
+              }
+              transitionTo(screen as Screen);
+            }}
+          />
+        )}
+
         {currentScreen === 'welcome' && (
           <WelcomeScreen
             onBegin={handleBegin}
