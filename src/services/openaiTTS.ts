@@ -109,8 +109,10 @@ export function unlockMobileAudio(): void {
 
 /**
  * Play audio from a blob URL using the persistent audio element
+ * @param url - The blob URL of the audio
+ * @param revokeOnEnd - If true, revoke the URL after playback (default: false to allow replay)
  */
-function playAudioUrl(url: string): Promise<void> {
+function playAudioUrl(url: string, revokeOnEnd = false): Promise<void> {
   return new Promise((resolve) => {
     const audio = getPersistentAudio();
 
@@ -121,13 +123,13 @@ function playAudioUrl(url: string): Promise<void> {
 
     audio.onended = () => {
       console.log('[TTS] Audio playback ended');
-      URL.revokeObjectURL(url);
+      if (revokeOnEnd) URL.revokeObjectURL(url);
       resolve();
     };
 
     audio.onerror = (e) => {
       console.error('[TTS] Audio error:', e);
-      URL.revokeObjectURL(url);
+      if (revokeOnEnd) URL.revokeObjectURL(url);
       resolve();
     };
 
@@ -141,9 +143,36 @@ function playAudioUrl(url: string): Promise<void> {
       })
       .catch((e) => {
         console.error('[TTS] Play failed:', e);
-        URL.revokeObjectURL(url);
+        if (revokeOnEnd) URL.revokeObjectURL(url);
         resolve();
       });
+  });
+}
+
+/**
+ * Replay audio from a stored blob URL
+ * Creates a new Audio element for replay to avoid conflicts with the main playback
+ */
+export function replayAudio(audioUrl: string): Promise<void> {
+  return new Promise((resolve) => {
+    console.log('[TTS] Replaying audio from stored URL');
+    const audio = new Audio(audioUrl);
+    audio.volume = 1.0;
+
+    audio.onended = () => {
+      console.log('[TTS] Replay ended');
+      resolve();
+    };
+
+    audio.onerror = (e) => {
+      console.error('[TTS] Replay error:', e);
+      resolve();
+    };
+
+    audio.play().catch((e) => {
+      console.error('[TTS] Replay play failed:', e);
+      resolve();
+    });
   });
 }
 
@@ -164,15 +193,16 @@ export function preconnectWorker(): void {
 
 /**
  * Speak text using OpenAI TTS
- * Returns a promise that resolves when speech ends
+ * Returns a promise that resolves with the audio URL when speech ends
+ * The audio URL can be stored for replay functionality
  */
 export async function speakWithOpenAI(
   text: string,
   beliefSystem: string,
   character: string = 'god',
   language: string = 'en',
-  onEnd?: () => void
-): Promise<void> {
+  onEnd?: (audioUrl?: string) => void
+): Promise<string | undefined> {
   const ttsStartTime = Date.now();
   console.log('[TTS] === TTS REQUEST START ===');
   console.log('[TTS] Audio unlocked:', audioUnlocked);
@@ -185,13 +215,13 @@ export async function speakWithOpenAI(
   if (!voiceEnabled) {
     console.log('[TTS] Voice disabled, skipping');
     onEnd?.();
-    return;
+    return undefined;
   }
 
   if (!text.trim()) {
     console.log('[TTS] Empty text, skipping');
     onEnd?.();
-    return;
+    return undefined;
   }
 
   try {
@@ -224,7 +254,9 @@ export async function speakWithOpenAI(
     if (audioUnlocked) {
       console.log('[TTS] Audio unlocked, playing directly (t+%dms)', Date.now() - ttsStartTime);
       await playAudioUrl(audioUrl);
-      onEnd?.();
+      // Return the audioUrl so it can be stored for replay (don't revoke it)
+      onEnd?.(audioUrl);
+      return audioUrl;
     } else {
       // Store for later - will play when unlocked
       console.log('[TTS] Audio not unlocked, queuing for next interaction');
@@ -232,7 +264,8 @@ export async function speakWithOpenAI(
       // Try fallback browser TTS immediately
       console.log('[TTS] Trying browser TTS as fallback');
       await fallbackBrowserTTS(text, language);
-      onEnd?.();
+      onEnd?.(audioUrl);
+      return audioUrl;
     }
   } catch (error) {
     console.error('[TTS] ERROR (t+%dms):', Date.now() - ttsStartTime, error);
@@ -240,6 +273,7 @@ export async function speakWithOpenAI(
     console.log('[TTS] Falling back to browser TTS');
     await fallbackBrowserTTS(text, language);
     onEnd?.();
+    return undefined;
   }
 }
 
@@ -251,10 +285,149 @@ export function stop(): void {
     persistentAudio.pause();
     persistentAudio.currentTime = 0;
   }
-  // Also stop browser speech synthesis if active
+  // Clear sentence queue
+  sentenceQueue.length = 0;
+  queuePlaying = false;
+  if (persistentAudio) {
+    persistentAudio.ontimeupdate = null;
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     speechSynthesis.cancel();
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SENTENCE-LEVEL STREAMING TTS QUEUE
+// Fetches and queues audio per sentence so first sentence plays fast,
+// and subsequent sentences play back-to-back with no gap.
+// ═══════════════════════════════════════════════════════════════
+
+interface QueuedSentence {
+  text: string;
+  audioUrl: string | null;   // null = still fetching
+  words: string[];
+  onStart?: (wordCount: number) => void;
+  onWord?: (wordIndex: number) => void;
+  onEnd?: () => void;
+  fetchPromise: Promise<void>;
+}
+
+const sentenceQueue: QueuedSentence[] = [];
+let queuePlaying = false;
+
+export function clearSentenceQueue(): void {
+  sentenceQueue.length = 0;
+  queuePlaying = false;
+}
+
+/**
+ * Enqueue a sentence for TTS. Starts fetching immediately and will play
+ * as soon as it's this sentence's turn in the queue.
+ */
+export function enqueueSentence(
+  text: string,
+  beliefSystem: string,
+  character: string,
+  language: string,
+  callbacks?: {
+    onStart?: (wordCount: number) => void;
+    onWord?: (wordIndex: number) => void;
+    onEnd?: () => void;
+  }
+): void {
+  if (!voiceEnabled || !text.trim()) {
+    callbacks?.onEnd?.();
+    return;
+  }
+
+  const words = text.trim().split(/\s+/);
+  const entry: QueuedSentence = {
+    text,
+    audioUrl: null,
+    words,
+    onStart: callbacks?.onStart,
+    onWord: callbacks?.onWord,
+    onEnd: callbacks?.onEnd,
+    fetchPromise: Promise.resolve(),
+  };
+
+  entry.fetchPromise = fetch(`${WORKER_URL}/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, beliefSystem, character, language }),
+  })
+    .then((r) => r.ok ? r.blob() : Promise.reject(new Error(`TTS ${r.status}`)))
+    .then((blob) => {
+      if (blob.size < 100) throw new Error('Audio too small');
+      entry.audioUrl = URL.createObjectURL(blob);
+    })
+    .catch((e) => {
+      console.error('[TTS-Queue] Fetch failed for sentence:', e);
+      entry.audioUrl = '';
+    });
+
+  sentenceQueue.push(entry);
+  if (!queuePlaying) {
+    playNextInQueue();
+  }
+}
+
+async function playNextInQueue(): Promise<void> {
+  if (queuePlaying) return;
+  const entry = sentenceQueue.shift();
+  if (!entry) return;
+  queuePlaying = true;
+
+  await entry.fetchPromise;
+
+  if (!entry.audioUrl) {
+    queuePlaying = false;
+    entry.onEnd?.();
+    playNextInQueue();
+    return;
+  }
+
+  const audio = getPersistentAudio();
+  audio.onended = null;
+  audio.onerror = null;
+  audio.ontimeupdate = null;
+  audio.src = entry.audioUrl;
+  audio.volume = 1.0;
+
+  // Word highlighting via time progression
+  entry.onStart?.(entry.words.length);
+
+  let lastWordIdx = -1;
+  audio.ontimeupdate = () => {
+    if (!audio.duration || isNaN(audio.duration)) return;
+    const progress = audio.currentTime / audio.duration;
+    const idx = Math.min(entry.words.length - 1, Math.floor(progress * entry.words.length));
+    if (idx !== lastWordIdx) {
+      lastWordIdx = idx;
+      entry.onWord?.(idx);
+    }
+  };
+
+  audio.onended = () => {
+    audio.ontimeupdate = null;
+    entry.onEnd?.();
+    queuePlaying = false;
+    playNextInQueue();
+  };
+
+  audio.onerror = () => {
+    audio.ontimeupdate = null;
+    entry.onEnd?.();
+    queuePlaying = false;
+    playNextInQueue();
+  };
+
+  audio.play().catch((e) => {
+    console.error('[TTS-Queue] Play failed:', e);
+    queuePlaying = false;
+    entry.onEnd?.();
+    playNextInQueue();
+  });
 }
 
 /**

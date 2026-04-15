@@ -57,7 +57,12 @@ export interface Session {
   beliefSystemId?: string;
   language?: LanguageCode;
   lastActive: number;
+  expiresAt?: number; // ms timestamp; undefined = never expires (legacy)
+  rememberMe?: boolean;
 }
+
+// 30 days in ms, for "remember me" sessions
+const SESSION_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Check if email is from a disposable domain
 export function isDisposableEmail(email: string): boolean {
@@ -139,7 +144,7 @@ function saveUser(user: User, rememberMe?: boolean): void {
   storage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
 }
 
-// Get current session
+// Get current session — honors expiry for "remember me" sessions
 export function getSession(): Session | null {
   try {
     // Check localStorage first (remembered), then sessionStorage
@@ -148,18 +153,29 @@ export function getSession(): Session | null {
       stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
     }
     if (!stored) return null;
-    return JSON.parse(stored) as Session;
+    const session = JSON.parse(stored) as Session;
+    // Enforce expiry for persisted "remember me" sessions
+    if (session.expiresAt && Date.now() > session.expiresAt) {
+      signOut();
+      return null;
+    }
+    return session;
   } catch {
     return null;
   }
 }
 
-// Save session
+// Save session — refreshes expiry for "remember me" sessions
 export function saveSession(session: Session, rememberMe?: boolean): void {
-  const storage = rememberMe !== undefined
-    ? (rememberMe ? localStorage : sessionStorage)
-    : getStorage();
-  storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  const remember = rememberMe !== undefined ? rememberMe : getRememberMe();
+  const storage = remember ? localStorage : sessionStorage;
+  const toStore: Session = {
+    ...session,
+    rememberMe: remember,
+    // Refresh 30-day expiry on every save when remembered
+    expiresAt: remember ? Date.now() + SESSION_EXPIRY_MS : undefined,
+  };
+  storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(toStore));
 }
 
 // Update session with belief system

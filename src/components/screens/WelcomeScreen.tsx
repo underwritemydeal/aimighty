@@ -5,6 +5,7 @@ interface WelcomeScreenProps {
   onBegin: () => void;
   language: LanguageCode;
   onLanguageChange: (lang: LanguageCode) => void;
+  onNavigate?: (screen: 'terms' | 'privacy') => void;
 }
 
 // Globe icon - thin elegant line art
@@ -148,7 +149,7 @@ const LanguageModal = memo(function LanguageModal({
   );
 });
 
-export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeScreenProps) {
+export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate }: WelcomeScreenProps) {
   const [phase, setPhase] = useState(0);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -400,6 +401,43 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange }: WelcomeSc
               }
             `}</style>
           </button>
+
+          {/* Terms and Privacy footer */}
+          <div
+            className="flex justify-center gap-4 mt-6"
+            style={{
+              opacity: phase >= 5 ? 0.4 : 0,
+              transition: 'opacity 0.6s ease-out',
+              fontSize: '0.7rem',
+              letterSpacing: '0.05em',
+            }}
+          >
+            <button
+              onClick={() => onNavigate?.('terms')}
+              style={{
+                color: 'rgba(255, 255, 255, 0.5)',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+              }}
+            >
+              Terms
+            </button>
+            <span style={{ color: 'rgba(255, 255, 255, 0.3)' }}>·</span>
+            <button
+              onClick={() => onNavigate?.('privacy')}
+              style={{
+                color: 'rgba(255, 255, 255, 0.5)',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+              }}
+            >
+              Privacy
+            </button>
+          </div>
         </div>
       </div>
 

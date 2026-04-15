@@ -6,6 +6,7 @@ import type { User } from '../../types';
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
   onBack: () => void;
+  onNavigate?: (screen: 'terms' | 'privacy') => void;
   language: LanguageCode;
 }
 
@@ -39,7 +40,7 @@ const EyeIcon = memo(function EyeIcon({ visible }: { visible: boolean }) {
   );
 });
 
-export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps) {
+export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: AuthScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [mode, setMode] = useState<AuthMode>('signup');
   const [email, setEmail] = useState('');
@@ -353,6 +354,33 @@ export function AuthScreen({ onAuthSuccess, onBack, language }: AuthScreenProps)
               style={{ color: '#d4af37', fontWeight: 500 }}
             >
               {mode === 'signup' ? 'Sign In' : 'Create Account'}
+            </button>
+          </p>
+
+          {/* Terms and Privacy */}
+          <p
+            className="text-center mt-6"
+            style={{
+              fontSize: '0.75rem',
+              color: 'rgba(255, 255, 255, 0.35)',
+              lineHeight: 1.6,
+            }}
+          >
+            By continuing, you agree to our{' '}
+            <button
+              type="button"
+              onClick={() => onNavigate?.('terms')}
+              style={{ color: 'rgba(255, 255, 255, 0.5)', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer' }}
+            >
+              Terms of Service
+            </button>
+            {' '}and{' '}
+            <button
+              type="button"
+              onClick={() => onNavigate?.('privacy')}
+              style={{ color: 'rgba(255, 255, 255, 0.5)', textDecoration: 'underline', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer' }}
+            >
+              Privacy Policy
             </button>
           </p>
         </div>

@@ -217,6 +217,8 @@ RESPONSE LENGTH RULES — FOLLOW THESE STRICTLY:
 
 NEVER give a 200+ word response to a casual greeting. Match the depth of your response to the depth of the question. If someone says "hey" you say "hey" back warmly. Save the sermons for when someone actually needs one.
 
+HARD CAP: Respond in 2-4 sentences maximum. Be warm, direct, and leave space for the human to respond. You are in conversation, not giving a sermon. For greetings, use only 1-2 sentences.
+
 `;
 
 // Get system prompt for belief system
@@ -392,11 +394,13 @@ const TTS_CHARACTERS: Record<string, { voice: string; instructions: string }> = 
 };
 
 // Default character per belief system
+// sbnr, taoism, pantheism → mary/coral (divine feminine voice)
+// all others → god/onyx
 const DEFAULT_CHARACTER: Record<string, string> = {
   protestant: 'god', catholic: 'god', islam: 'god',
   judaism: 'god', hinduism: 'god', buddhism: 'god',
-  mormonism: 'god', sikhism: 'god', taoism: 'god',
-  sbnr: 'god', pantheism: 'god', science: 'god',
+  mormonism: 'god', sikhism: 'god', taoism: 'mary',
+  sbnr: 'mary', pantheism: 'mary', science: 'god',
   agnosticism: 'god', atheism: 'god',
 };
 
@@ -827,7 +831,7 @@ export default {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 512,
+          max_tokens: 180,
           stream: true,
           system: [
             {

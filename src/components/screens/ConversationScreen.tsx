@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { sendMessage, type Message } from '../../services/claudeApi';
-import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio } from '../../services/openaiTTS';
+import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
+import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -52,6 +53,11 @@ interface DisplayMessage {
   role: 'user' | 'assistant' | 'greeting';
   content: string;
   timestamp: number;
+  audioUrl?: string; // ObjectURL for TTS audio blob (for replay)
+  // Sentence-level TTS tracking for word highlighting
+  sentences?: string[];
+  activeSentenceIdx?: number; // -1 = not playing, else current sentence
+  activeWordIdx?: number; // word index within active sentence
 }
 
 // Thin line art icons
@@ -150,6 +156,16 @@ const ChevronIndicator = memo(function ChevronIndicator({ pointsUp }: { pointsUp
       }}
     >
       <path d="M1 5L6 1L11 5" />
+    </svg>
+  );
+});
+
+// Small replay speaker icon for assistant messages
+const ReplaySpeakerIcon = memo(function ReplaySpeakerIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
     </svg>
   );
 });
@@ -334,6 +350,50 @@ function parseScriptureReferences(text: string, accentColor: string): React.Reac
   return parts.length > 0 ? parts : [text];
 }
 
+// Render divine message content.
+// If the message has sentences + an active sentence/word, render word-by-word highlight.
+// Otherwise fall back to scripture link parsing.
+function renderDivineContent(
+  message: DisplayMessage,
+  accentColor: string
+): React.ReactNode {
+  const activeIdx = message.activeSentenceIdx ?? -1;
+  const sentences = message.sentences;
+  if (!sentences || sentences.length === 0 || activeIdx < 0) {
+    return parseScriptureReferences(message.content, accentColor);
+  }
+  const activeWordIdx = message.activeWordIdx ?? -1;
+  return (
+    <>
+      {sentences.map((sent, sIdx) => {
+        const isActive = sIdx === activeIdx;
+        const words = sent.split(/\s+/);
+        return (
+          <span key={sIdx}>
+            {words.map((word, wIdx) => {
+              const highlighted = isActive && wIdx === activeWordIdx;
+              return (
+                <span
+                  key={wIdx}
+                  style={{
+                    color: highlighted ? accentColor : 'inherit',
+                    fontWeight: highlighted ? 400 : 300,
+                    transition: 'color 120ms ease',
+                  }}
+                >
+                  {word}
+                  {wIdx < words.length - 1 ? ' ' : ''}
+                </span>
+              );
+            })}
+            {sIdx < sentences.length - 1 ? ' ' : ''}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 // Belief selector modal
 const BeliefSelectorModal = memo(function BeliefSelectorModal({
   isOpen,
@@ -402,19 +462,29 @@ const BeliefSelectorModal = memo(function BeliefSelectorModal({
   );
 });
 
-// Settings dropdown
+// Menu dropdown — Daily Wisdom, Switch Belief, Language, Mute
 const SettingsDropdown = memo(function SettingsDropdown({
   isOpen,
   onClose,
   onSwitchBelief,
+  onDailyWisdom,
+  onToggleMute,
+  voiceEnabled,
   onSignOut,
+  onNavigate,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSwitchBelief: () => void;
+  onDailyWisdom: () => void;
+  onToggleMute: () => void;
+  voiceEnabled: boolean;
   onSignOut: () => void;
+  onNavigate?: (screen: 'terms' | 'privacy') => void;
 }) {
   if (!isOpen) return null;
+
+  const itemStyle = { fontSize: '0.9rem', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body, Outfit)' };
 
   return (
     <>
@@ -422,26 +492,59 @@ const SettingsDropdown = memo(function SettingsDropdown({
       <div
         className="absolute right-0 top-full mt-2 z-50"
         style={{
-          background: 'rgba(20, 20, 25, 0.95)',
+          background: 'rgba(3, 3, 8, 0.85)',
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(212, 175, 55, 0.2)',
           borderRadius: '12px',
-          minWidth: '180px',
+          minWidth: '210px',
           overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         }}
       >
         <button
-          onClick={() => { onSwitchBelief(); onClose(); }}
-          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
-          style={{ fontSize: '0.9rem', color: 'var(--color-text-primary)' }}
+          onClick={() => { onDailyWisdom(); onClose(); }}
+          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
+          style={itemStyle}
         >
-          Switch Belief System
+          <span>📖</span><span>Daily Wisdom</span>
         </button>
-        <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+        <button
+          onClick={() => { onSwitchBelief(); onClose(); }}
+          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
+          style={itemStyle}
+        >
+          <span>🌍</span><span>Switch Belief</span>
+        </button>
+        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+        <button
+          onClick={() => { onToggleMute(); }}
+          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
+          style={itemStyle}
+        >
+          <span>{voiceEnabled ? '🔊' : '🔇'}</span><span>{voiceEnabled ? 'Mute' : 'Unmute'}</span>
+        </button>
+        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+        <button
+          onClick={() => { onNavigate?.('terms'); onClose(); }}
+          className="w-full px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+          style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.5)' }}
+        >
+          Terms of Service
+        </button>
+        <button
+          onClick={() => { onNavigate?.('privacy'); onClose(); }}
+          className="w-full px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+          style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.5)' }}
+        >
+          Privacy Policy
+        </button>
+        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
         <button
           onClick={() => { onSignOut(); onClose(); }}
           className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5"
-          style={{ fontSize: '0.9rem', color: '#ef4444' }}
+          style={{ fontSize: '0.85rem', color: '#ef4444' }}
         >
           Sign Out
         </button>
@@ -457,10 +560,11 @@ interface ConversationScreenProps {
   onPaywall: () => void;
   onChangeBelief?: (belief: BeliefSystem) => void;
   onSignOut?: () => void;
+  onNavigate?: (screen: 'terms' | 'privacy') => void;
   language: LanguageCode;
 }
 
-export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBelief, onSignOut, language }: ConversationScreenProps) {
+export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBelief, onSignOut, onNavigate, language }: ConversationScreenProps) {
   const categorizedBelief = belief as CategorizedBeliefSystem;
   const accentColor = categorizedBelief.accentColor || belief.themeColor;
 
@@ -489,10 +593,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [voiceEnabled, setVoiceEnabledState] = useState(isVoiceEnabled());
   const [showBeliefModal, setShowBeliefModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDailyWisdom, setShowDailyWisdom] = useState(false);
+  const [dailyArticle, setDailyArticle] = useState<{ topic?: string; topicDisplay?: string; titles?: Record<string, string>; date?: string } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [character, setCharacter] = useState<Character>('god');
   const [controlsHidden, setControlsHidden] = useState(false);
+  const [replayingMessageId, setReplayingMessageId] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -589,9 +696,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   }, [controlsHidden, showControls]);
 
   // Speak response using OpenAI TTS
-  const speakResponse = useCallback((text: string) => {
+  // messageId is optional - if provided, audioUrl will be stored on the message for replay
+  const speakResponse = useCallback((text: string, messageId?: string) => {
     const speakStartTime = Date.now();
-    console.log('[Conversation] speakResponse called, text length:', text.length);
+    console.log('[Conversation] speakResponse called, text length:', text.length, 'messageId:', messageId);
 
     if (!voiceEnabled) {
       console.log('[Conversation] Voice disabled, skipping TTS');
@@ -603,17 +711,26 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       return;
     }
     setState('speaking');
+    // Hide input controls immediately when God begins speaking — clean cinematic moment
+    setControlsHidden(true);
     console.log('[Conversation] State set to speaking, calling TTS immediately (t+%dms)', Date.now() - speakStartTime);
 
     // Use OpenAI TTS with selected character - fire immediately, no delays
+    // Normalize belief ID before API call to handle aliases
     speakWithOpenAI(
       text,
-      belief.id,
+      normalizeBeliefId(belief.id),
       character,
       language,
-      () => {
-        console.log('[Conversation] TTS callback received (t+%dms)', Date.now() - speakStartTime);
+      (audioUrl?: string) => {
+        console.log('[Conversation] TTS callback received (t+%dms), audioUrl:', Date.now() - speakStartTime, audioUrl ? 'yes' : 'no');
         setState('idle');
+        // Store audioUrl on the message for replay functionality
+        if (audioUrl && messageId) {
+          setDisplayMessages((prev) =>
+            prev.map((m) => (m.id === messageId ? { ...m, audioUrl } : m))
+          );
+        }
         // Hide controls after speech ends
         scheduleHideControls();
       }
@@ -658,6 +775,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     initAudio();
     setState('sending');
     fullResponseRef.current = '';
+    clearSentenceQueue();
 
     // Add user message to display
     const userDisplayMessage: DisplayMessage = {
@@ -679,40 +797,113 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
     setTimeout(scrollToBottom, 100);
 
+    // Normalize belief ID before API call
     await sendMessage(
       newApiMessages,
-      belief.id,
+      normalizeBeliefId(belief.id),
       user.id,
       {
         onToken: (token) => {
           if (fullResponseRef.current === '') {
             setState('streaming');
-            // Add initial empty assistant message
+            // Hide input controls the moment God starts speaking
+            setControlsHidden(true);
             setDisplayMessages((prev) => [
               ...prev,
-              { id: assistantMessageId, role: 'assistant', content: '', timestamp: Date.now() },
+              {
+                id: assistantMessageId,
+                role: 'assistant',
+                content: '',
+                timestamp: Date.now(),
+                sentences: [],
+                activeSentenceIdx: -1,
+                activeWordIdx: -1,
+              },
             ]);
           }
           fullResponseRef.current += token;
-          // Update the streaming message
           setDisplayMessages((prev) =>
             prev.map((m) =>
               m.id === assistantMessageId ? { ...m, content: fullResponseRef.current } : m
             )
           );
         },
-        onSentence: () => {},
+        onSentence: (sentence) => {
+          if (!voiceEnabled) return;
+          // Append to sentence list and enqueue TTS immediately
+          let sentenceIdx = 0;
+          setDisplayMessages((prev) =>
+            prev.map((m) => {
+              if (m.id !== assistantMessageId) return m;
+              const sentences = [...(m.sentences || []), sentence];
+              sentenceIdx = sentences.length - 1;
+              return { ...m, sentences };
+            })
+          );
+
+          enqueueSentence(sentence, normalizeBeliefId(belief.id), character, language, {
+            onStart: () => {
+              setState('speaking');
+              setDisplayMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId
+                    ? { ...m, activeSentenceIdx: sentenceIdx, activeWordIdx: 0 }
+                    : m
+                )
+              );
+            },
+            onWord: (wordIdx) => {
+              setDisplayMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId && m.activeSentenceIdx === sentenceIdx
+                    ? { ...m, activeWordIdx: wordIdx }
+                    : m
+                )
+              );
+            },
+            onEnd: () => {
+              setDisplayMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMessageId && m.activeSentenceIdx === sentenceIdx
+                    ? { ...m, activeSentenceIdx: -1, activeWordIdx: -1 }
+                    : m
+                )
+              );
+            },
+          });
+        },
         onComplete: (text) => {
-          console.log('[Conversation] Stream complete, firing TTS immediately');
+          console.log('[Conversation] Stream complete');
           fullResponseRef.current = text;
           streamingMessageId.current = null;
-          // Final update - sync state then immediately fire TTS
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: text } : m))
           );
           setApiMessages([...newApiMessages, { role: 'assistant', content: text }]);
-          // Fire TTS immediately - no awaits, no delays
-          speakResponse(text);
+          // If voice disabled, skip TTS entirely
+          if (!voiceEnabled) {
+            setState('idle');
+            scheduleHideControls();
+          } else {
+            // TTS is already queued sentence-by-sentence via onSentence.
+            // Wait for queue to drain, then return to idle.
+            const drainWatcher = setInterval(() => {
+              setDisplayMessages((prev) => {
+                const msg = prev.find((m) => m.id === assistantMessageId);
+                if (msg && msg.activeSentenceIdx === -1) {
+                  clearInterval(drainWatcher);
+                  setState('idle');
+                  scheduleHideControls();
+                }
+                return prev;
+              });
+            }, 400);
+            // Safety timeout
+            setTimeout(() => {
+              clearInterval(drainWatcher);
+              setState((cur) => cur === 'speaking' || cur === 'streaming' ? 'idle' : cur);
+            }, 60000);
+          }
           setTimeout(scrollToBottom, 100);
 
           if (hasReachedFreeLimit() && !user.isPremium) {
@@ -725,13 +916,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: errorMessage } : m))
           );
-          speakResponse(errorMessage);
+          speakResponse(errorMessage, assistantMessageId);
         },
       },
       language,
       character
     );
-  }, [apiMessages, belief.id, user.id, user.isPremium, speakResponse, onPaywall, language, scrollToBottom, character]);
+  }, [apiMessages, belief.id, user.id, user.isPremium, speakResponse, onPaywall, language, scrollToBottom, character, voiceEnabled, scheduleHideControls]);
 
   // Handle send
   const handleSend = useCallback(() => {
@@ -783,6 +974,29 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
   }, [onChangeBelief]);
 
+  // Handle replay of a message's audio
+  const handleReplayAudio = useCallback(async (messageId: string, audioUrl: string) => {
+    // Don't replay if already replaying or speaking
+    if (replayingMessageId || state === 'speaking') return;
+
+    setReplayingMessageId(messageId);
+    try {
+      await replayAudio(audioUrl);
+    } finally {
+      setReplayingMessageId(null);
+    }
+  }, [replayingMessageId, state]);
+
+  // Fetch daily wisdom article topic
+  useEffect(() => {
+    if (!showDailyWisdom || dailyArticle) return;
+    const workerUrl = (import.meta as unknown as { env: { VITE_WORKER_URL?: string } }).env.VITE_WORKER_URL || '';
+    fetch(`${workerUrl}/daily-topic`)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error('failed')))
+      .then((data) => setDailyArticle(data))
+      .catch(() => setDailyArticle({ topicDisplay: 'Daily Wisdom', titles: {} }));
+  }, [showDailyWisdom, dailyArticle]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -802,16 +1016,22 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ background: '#000', height: '100dvh', minHeight: '-webkit-fill-available' }}
+      style={{ background: '#000', height: '100dvh', minHeight: '100dvh' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
       onClick={handleScreenTap}
       onTouchStart={handleScreenTap}
     >
-      {/* Background image with fallback */}
+      {/* Background image - full bleed, no black bars */}
       <div
-        className="fixed inset-0"
         style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          minHeight: '100dvh',
+          zIndex: 0,
           backgroundImage: `url(${actualImagePath})`,
           backgroundSize: 'cover',
           backgroundPosition: 'top center',
@@ -830,11 +1050,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         />
       )}
 
-      {/* Gradient overlay */}
+      {/* Gradient overlay - transparent top, dark bottom for text readability */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.5) 30%, rgba(0,0,0,0.8) 60%, rgba(0,0,0,0.95) 85%, rgba(0,0,0,0.98) 100%)',
+          background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 40%, rgba(3,3,8,0.55) 70%, rgba(3,3,8,0.85) 100%)',
+          zIndex: 1,
         }}
         aria-hidden="true"
       />
@@ -907,7 +1128,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 isOpen={showSettings}
                 onClose={() => setShowSettings(false)}
                 onSwitchBelief={() => setShowBeliefModal(true)}
+                onDailyWisdom={() => setShowDailyWisdom(true)}
+                onToggleMute={handleVoiceToggle}
+                voiceEnabled={voiceEnabled}
                 onSignOut={onSignOut || (() => {})}
+                onNavigate={onNavigate}
               />
             </div>
           </div>
@@ -969,7 +1194,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                       fontWeight: 400,
                       color: 'rgba(255, 248, 240, 0.95)',
                       lineHeight: 1.6,
-                      textAlign: 'right',
+                      textAlign: 'center',
                       marginLeft: isMobile ? 'auto' : 'auto',
                       marginRight: isMobile ? '0' : '10%',
                     }}
@@ -981,7 +1206,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   // Mobile: max 85%, smaller font
                   // Desktop: max 65%, larger font, more line-height, centered
                   <div
-                    className="text-divine"
+                    className="text-divine relative group"
                     style={{
                       maxWidth: isMobile ? '85%' : '65%',
                       fontSize: isMobile ? 'clamp(1.15rem, 3.2vw, 1.5rem)' : 'clamp(1.3rem, 2.5vw, 1.8rem)',
@@ -993,7 +1218,37 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                       marginRight: 'auto',
                     }}
                   >
-                    {parseScriptureReferences(message.content, accentColor)}
+                    {renderDivineContent(message, accentColor)}
+                    {/* Replay speaker icon - only show if message has audioUrl */}
+                    {message.audioUrl && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReplayAudio(message.id, message.audioUrl!);
+                        }}
+                        aria-label="Replay audio"
+                        className="absolute transition-all duration-200"
+                        style={{
+                          bottom: '-24px',
+                          right: '0',
+                          padding: '4px',
+                          borderRadius: '50%',
+                          color: replayingMessageId === message.id ? accentColor : 'rgba(255, 255, 255, 0.3)',
+                          opacity: isMobile ? 1 : 0,
+                          animation: replayingMessageId === message.id ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                        }}
+                      >
+                        <ReplaySpeakerIcon />
+                        <style>{`
+                          .group:hover button { opacity: 1 !important; }
+                          button:hover { color: ${accentColor} !important; }
+                          @keyframes pulse {
+                            0%, 100% { opacity: 1; }
+                            50% { opacity: 0.5; }
+                          }
+                        `}</style>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1027,13 +1282,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </button>
         )}
 
-        {/* Input controls - hideable for clean screenshot view */}
+        {/* Input controls - fixed at bottom, slides off during TTS for clean cinematic view */}
         <div
           className="shrink-0"
           style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 20,
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+            paddingTop: '12px',
+            background: 'linear-gradient(to top, rgba(3,3,8,0.92) 0%, rgba(3,3,8,0.7) 60%, rgba(3,3,8,0) 100%)',
             opacity: controlsHidden ? 0 : (isVisible ? 1 : 0),
-            transform: controlsHidden ? 'translateY(20px)' : 'translateY(0)',
-            transition: controlsHidden ? 'opacity 0.5s ease, transform 0.5s ease' : 'opacity 0.5s ease 0.4s, transform 0.3s ease',
+            transform: controlsHidden ? 'translateY(100%)' : 'translateY(0)',
+            transition: 'opacity 0.3s ease, transform 0.3s ease',
             pointerEvents: controlsHidden ? 'none' : 'auto',
           }}
         >
@@ -1120,6 +1383,81 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         </button>
       </div>
 
+      {/* Daily Wisdom reader */}
+      {showDailyWisdom && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col"
+          style={{
+            background: `linear-gradient(rgba(3,3,8,0.75), rgba(3,3,8,0.92)), url(${actualImagePath})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'top center',
+          }}
+        >
+          <div className="flex items-center justify-between px-5 py-4 shrink-0">
+            <button
+              onClick={() => setShowDailyWisdom(false)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5"
+              style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}
+            >
+              <BackIcon /> Back to Conversation
+            </button>
+            <button
+              onClick={() => {
+                const url = `https://aimightyme.com/wisdom/${belief.id}/${dailyArticle?.topic || 'today'}`;
+                if (navigator.share) {
+                  navigator.share({ title: dailyArticle?.topicDisplay || 'Daily Wisdom', url }).catch(() => {});
+                } else {
+                  navigator.clipboard?.writeText(url);
+                }
+              }}
+              className="px-3 py-2 rounded-lg hover:bg-white/5"
+              style={{ color: accentColor, fontSize: '0.85rem' }}
+            >
+              Share
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 pb-12">
+            <div className="mx-auto" style={{ maxWidth: '720px' }}>
+              <div
+                style={{
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase',
+                  color: accentColor,
+                  marginBottom: '12px',
+                }}
+              >
+                {dailyArticle?.date || 'Today'} · {belief.name}
+              </div>
+              <h1
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(1.8rem, 5vw, 2.6rem)',
+                  fontWeight: 300,
+                  color: 'rgba(255,248,240,0.98)',
+                  lineHeight: 1.2,
+                  marginBottom: '24px',
+                }}
+              >
+                {dailyArticle?.titles?.[belief.id] || dailyArticle?.topicDisplay || 'Loading…'}
+              </h1>
+              <p
+                style={{
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontSize: '1rem',
+                  lineHeight: 1.8,
+                  color: 'rgba(255,248,240,0.85)',
+                }}
+              >
+                {dailyArticle
+                  ? `Today's reflection draws from the wisdom of ${belief.name}. Begin a conversation to receive personal guidance on this theme.`
+                  : 'Gathering wisdom...'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Belief selector modal */}
       <BeliefSelectorModal
         isOpen={showBeliefModal}
@@ -1139,23 +1477,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   );
 }
 
-// Greeting messages per belief system - short and powerful
+// Greeting messages - uses canonical config with normalization
 function getGreeting(beliefId: string): string {
-  const greetings: Record<string, string> = {
-    protestant: 'I am here, My child.',
-    catholic: 'I am here, My child.',
-    islam: 'I am here. Speak.',
-    judaism: 'I am here. What weighs on your heart?',
-    hinduism: 'I am here. Speak freely.',
-    buddhism: 'I am here. Be still, and speak.',
-    mormonism: 'I am here, My child.',
-    sikhism: 'I am here. Speak freely.',
-    sbnr: 'I am here. Speak.',
-    taoism: 'I am here.',
-    pantheism: 'I am here. I have always been here.',
-    science: 'I am here. Ask anything.',
-    agnosticism: "I am here. What's on your mind?",
-    atheism: 'I am here. Speak freely.',
-  };
-  return greetings[beliefId] || greetings.protestant;
+  return getGreetingForBelief(normalizeBeliefId(beliefId));
 }

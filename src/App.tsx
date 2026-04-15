@@ -199,6 +199,7 @@ function App() {
             onBegin={handleBegin}
             language={language}
             onLanguageChange={handleLanguageChange}
+            onNavigate={(screen) => transitionTo(screen)}
           />
         )}
 
@@ -206,6 +207,7 @@ function App() {
           <AuthScreen
             onAuthSuccess={handleAuthSuccess}
             onBack={handleBackToWelcome}
+            onNavigate={(screen) => transitionTo(screen)}
             language={language}
           />
         )}
@@ -237,6 +239,7 @@ function App() {
             onPaywall={handleShowPaywall}
             onChangeBelief={handleChangeBelief}
             onSignOut={handleSignOut}
+            onNavigate={(screen) => transitionTo(screen)}
             language={language}
           />
         )}
