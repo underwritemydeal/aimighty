@@ -226,16 +226,24 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
           overflow: 'hidden',
         }}
       >
-        {/* Hero background image — fixed for parallax feel on mobile, cover center on desktop */}
+        {/* Hero background image.
+            Mobile: 'contain' so the full 9:16 image shows without cropping,
+                    void black fills any side gaps on wider/taller aspect ratios.
+            Desktop: 'cover' so the 16:9 image fills edge-to-edge.
+            backgroundAttachment always 'scroll' — iOS Safari disables 'fixed'
+            and renders it incorrectly, causing the zoom/clip bug. */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
+            width: '100vw',
+            height: '100dvh',
+            backgroundColor: colors.void,
             backgroundImage: `url(${heroImage})`,
-            backgroundSize: 'cover',
+            backgroundSize: isMobile ? 'contain' : 'cover',
             backgroundPosition: isMobile ? 'center top' : 'center center',
             backgroundRepeat: 'no-repeat',
-            backgroundAttachment: isMobile ? 'fixed' : 'scroll',
+            backgroundAttachment: 'scroll',
             zIndex: 0,
           }}
           aria-hidden="true"
