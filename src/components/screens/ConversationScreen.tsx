@@ -1,8 +1,19 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { sendMessage, type Message } from '../../services/claudeApi';
+import { sendMessage, summarizeConversation, type Message } from '../../services/claudeApi';
 import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
+import {
+  getTier,
+  hasReachedDailyLimit,
+  incrementDailyCount,
+  bumpStreak,
+  getStreak,
+  formatStreak,
+  streakMilestone,
+  saveMemory,
+  formatMemoryContext,
+} from '../../services/tierService';
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
@@ -462,29 +473,54 @@ const BeliefSelectorModal = memo(function BeliefSelectorModal({
   );
 });
 
-// Menu dropdown — Daily Wisdom, Switch Belief, Language, Mute
+// Menu dropdown — full tier-aware menu with daily content + streak
 const SettingsDropdown = memo(function SettingsDropdown({
   isOpen,
   onClose,
   onSwitchBelief,
   onDailyWisdom,
+  onDailyPrayer,
+  onSacredText,
+  onReflection,
   onToggleMute,
   voiceEnabled,
   onSignOut,
   onNavigate,
+  tier,
+  streakText,
+  onUpgrade,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSwitchBelief: () => void;
   onDailyWisdom: () => void;
+  onDailyPrayer: () => void;
+  onSacredText: () => void;
+  onReflection: () => void;
   onToggleMute: () => void;
   voiceEnabled: boolean;
   onSignOut: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
+  tier: 'free' | 'believer' | 'divine';
+  streakText: string;
+  onUpgrade: () => void;
 }) {
   if (!isOpen) return null;
 
   const itemStyle = { fontSize: '0.9rem', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body, Outfit)' };
+  const lockedStyle = { ...itemStyle, opacity: 0.45 };
+  const isFree = tier === 'free';
+
+  const contentItem = (icon: string, label: string, action: () => void) => (
+    <button
+      onClick={() => { if (isFree) { onUpgrade(); onClose(); return; } action(); onClose(); }}
+      className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
+      style={isFree ? lockedStyle : itemStyle}
+    >
+      <span>{isFree ? '🔒' : icon}</span>
+      <span>{label}</span>
+    </button>
+  );
 
   return (
     <>
@@ -492,23 +528,24 @@ const SettingsDropdown = memo(function SettingsDropdown({
       <div
         className="absolute right-0 top-full mt-2 z-50"
         style={{
-          background: 'rgba(3, 3, 8, 0.85)',
+          background: 'rgba(3, 3, 8, 0.9)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(212, 175, 55, 0.2)',
           borderRadius: '12px',
-          minWidth: '210px',
+          minWidth: '240px',
           overflow: 'hidden',
           boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
         }}
       >
-        <button
-          onClick={() => { onDailyWisdom(); onClose(); }}
-          className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
-          style={itemStyle}
-        >
-          <span>📖</span><span>Daily Wisdom</span>
-        </button>
+        {contentItem('📖', 'Daily Wisdom', onDailyWisdom)}
+        {contentItem('🙏', 'Daily Prayer', onDailyPrayer)}
+        {contentItem('✨', 'Sacred Text of the Day', onSacredText)}
+        {contentItem('💭', 'Reflection Prompt', onReflection)}
+        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
+        <div className="w-full px-4 py-3 flex items-center gap-3" style={{ ...itemStyle, opacity: 0.9 }}>
+          <span>🔥</span><span>{streakText}</span>
+        </div>
         <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
         <button
           onClick={() => { onSwitchBelief(); onClose(); }}
@@ -517,7 +554,6 @@ const SettingsDropdown = memo(function SettingsDropdown({
         >
           <span>🌍</span><span>Switch Belief</span>
         </button>
-        <div style={{ height: '1px', background: 'rgba(212, 175, 55, 0.12)' }} />
         <button
           onClick={() => { onToggleMute(); }}
           className="w-full px-4 py-3 text-left transition-colors hover:bg-white/5 flex items-center gap-3"
@@ -594,6 +630,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showBeliefModal, setShowBeliefModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showDailyWisdom, setShowDailyWisdom] = useState(false);
+  const [dailyLimitMessage, setDailyLimitMessage] = useState<string | null>(null);
+  const [streakMilestoneText, setStreakMilestoneText] = useState<string | null>(null);
+  const [tier] = useState(() => getTier());
+  const [streak] = useState(() => getStreak());
+  const [showPrayerModal, setShowPrayerModal] = useState(false);
+  const [showSacredTextModal, setShowSacredTextModal] = useState(false);
+  const [showReflectionModal, setShowReflectionModal] = useState(false);
+  interface DailyContent {
+    belief: string;
+    date: string;
+    prayer: string;
+    sacredText: { reference: string; text: string; reflection: string };
+    reflectionPrompt: string;
+  }
+  const [dailyContent, setDailyContent] = useState<DailyContent | null>(null);
   interface DailyArticle {
     title: string;
     metaDescription: string;
@@ -628,8 +679,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const hasGreeted = useRef(false);
   const fullResponseRef = useRef('');
   const streamingMessageId = useRef<string | null>(null);
+  const apiMessagesAtUnmountRef = useRef<Message[] | null>(null);
 
   const isInputEnabled = state === 'idle';
+
+  // Keep ref updated so the unmount memory hook can access latest messages
+  useEffect(() => {
+    apiMessagesAtUnmountRef.current = apiMessages;
+  }, [apiMessages]);
 
   // Handle voice toggle
   const handleVoiceToggle = useCallback(() => {
@@ -715,55 +772,77 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
   }, [controlsHidden, showControls]);
 
-  // Speak response using OpenAI TTS
-  // messageId is optional - if provided, audioUrl will be stored on the message for replay
+  // Speak response — tier-routed.
+  //   Divine → OpenAI /tts (already sentence-queued via onSentence)
+  //   Believer → browser SpeechSynthesis (no /tts calls, no word highlight)
+  //   Free → no TTS at all
   const speakResponse = useCallback((text: string, messageId?: string) => {
-    const speakStartTime = Date.now();
-    console.log('[Conversation] speakResponse called, text length:', text.length, 'messageId:', messageId);
+    const tier = getTier();
 
-    if (!voiceEnabled) {
-      console.log('[Conversation] Voice disabled, skipping TTS');
+    if (!voiceEnabled || tier === 'free') {
       setState('idle');
-      // If muted, hide controls after 2 seconds
-      hideControlsTimer.current = setTimeout(() => {
-        setControlsHidden(true);
-      }, 2000);
+      hideControlsTimer.current = setTimeout(() => setControlsHidden(true), 2000);
       return;
     }
-    setState('speaking');
-    // Hide input controls immediately when God begins speaking — clean cinematic moment
-    setControlsHidden(true);
-    console.log('[Conversation] State set to speaking, calling TTS immediately (t+%dms)', Date.now() - speakStartTime);
 
-    // Use OpenAI TTS with selected character - fire immediately, no delays
-    // Normalize belief ID before API call to handle aliases
-    speakWithOpenAI(
-      text,
-      normalizeBeliefId(belief.id),
-      character,
-      language,
-      (audioUrl?: string) => {
-        console.log('[Conversation] TTS callback received (t+%dms), audioUrl:', Date.now() - speakStartTime, audioUrl ? 'yes' : 'no');
-        setState('idle');
-        // Store audioUrl on the message for replay functionality
-        if (audioUrl && messageId) {
-          setDisplayMessages((prev) =>
-            prev.map((m) => (m.id === messageId ? { ...m, audioUrl } : m))
-          );
+    if (tier === 'divine') {
+      // Divine path: OpenAI TTS fallback (for the full-response path; normally the
+      // sentence-queue in onSentence handles playback). Kept here for onError fallback.
+      setState('speaking');
+      setControlsHidden(true);
+      speakWithOpenAI(
+        text,
+        normalizeBeliefId(belief.id),
+        character,
+        language,
+        (audioUrl?: string) => {
+          setState('idle');
+          if (audioUrl && messageId) {
+            setDisplayMessages((prev) =>
+              prev.map((m) => (m.id === messageId ? { ...m, audioUrl } : m))
+            );
+          }
+          scheduleHideControls();
         }
-        // Hide controls after speech ends
+      ).catch((e) => {
+        console.error('[Conversation] TTS error:', e);
+        setState('idle');
         scheduleHideControls();
-      }
-    ).catch((e) => {
-      console.error('[Conversation] TTS error:', e);
+      });
+      setTimeout(() => {
+        setState((current) => (current === 'speaking' ? 'idle' : current));
+      }, Math.max(30000, text.length * 150));
+      return;
+    }
+
+    // Believer path: browser SpeechSynthesis only — never /tts
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setState('idle');
       scheduleHideControls();
-    });
-
-    // Fallback timeout in case TTS hangs
-    setTimeout(() => {
-      setState((current) => (current === 'speaking' ? 'idle' : current));
-    }, Math.max(30000, text.length * 150)); // Longer timeout for API-based TTS
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 0.92;
+      utter.pitch = 0.95;
+      utter.lang = language || 'en-US';
+      setState('speaking');
+      setControlsHidden(true);
+      utter.onend = () => {
+        setState('idle');
+        scheduleHideControls();
+      };
+      utter.onerror = () => {
+        setState('idle');
+        scheduleHideControls();
+      };
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      console.error('[Conversation] Browser TTS error:', e);
+      setState('idle');
+      scheduleHideControls();
+    }
   }, [belief.id, character, language, voiceEnabled, scheduleHideControls]);
 
   // Greeting on load - TEXT ONLY, no TTS
@@ -787,8 +866,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   // Send message to Claude
   const sendToAI = useCallback(async (userMessage: string) => {
-    if (hasReachedFreeLimit() && !user.isPremium) {
+    const tier = getTier();
+
+    // Free: hard paywall on lifetime limit
+    if (tier === 'free' && hasReachedFreeLimit() && !user.isPremium) {
       onPaywall();
+      return;
+    }
+
+    // Believer / Divine: inline daily limit (no redirect)
+    if ((tier === 'believer' || tier === 'divine') && hasReachedDailyLimit()) {
+      setDailyLimitMessage(
+        tier === 'believer'
+          ? "You've reached your daily limit. Come back tomorrow, or upgrade to Divine for 20 messages/day."
+          : "You've reached your daily limit. Come back tomorrow."
+      );
       return;
     }
 
@@ -796,6 +888,24 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     setState('sending');
     fullResponseRef.current = '';
     clearSentenceQueue();
+
+    // Streak: only user messages count (not greetings)
+    const updated = bumpStreak();
+    const ms = streakMilestone(updated.currentStreak);
+    if (ms) {
+      setStreakMilestoneText(ms);
+      setTimeout(() => setStreakMilestoneText(null), 4500);
+    }
+
+    // Divine-only: inject memory context into apiMessages as a priming system-ish hint
+    // We fold it into the first user message if memory exists and it's the first user turn.
+    let userContent = userMessage;
+    if (tier === 'divine' && apiMessages.length === 0) {
+      const memCtx = formatMemoryContext(belief.id);
+      if (memCtx) {
+        userContent = `${memCtx}\n\n---\n\n${userMessage}`;
+      }
+    }
 
     // Add user message to display
     const userDisplayMessage: DisplayMessage = {
@@ -806,10 +916,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     };
     setDisplayMessages((prev) => [...prev, userDisplayMessage]);
 
-    // Add to API messages
-    const newApiMessages: Message[] = [...apiMessages, { role: 'user', content: userMessage }];
+    // Add to API messages (use userContent so memory context is injected on first turn)
+    const newApiMessages: Message[] = [...apiMessages, { role: 'user', content: userContent }];
     setApiMessages(newApiMessages);
     incrementMessageCount();
+    incrementDailyCount();
 
     // Create placeholder for streaming response
     const assistantMessageId = `assistant-${Date.now()}`;
@@ -850,6 +961,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         },
         onSentence: (sentence) => {
           if (!voiceEnabled) return;
+          // Only Divine tier gets the streaming OpenAI sentence-queue TTS.
+          // Believer uses browser SpeechSynthesis (fired once, in speakResponse/onComplete).
+          if (getTier() !== 'divine') return;
           // Append to sentence list and enqueue TTS immediately
           let sentenceIdx = 0;
           setDisplayMessages((prev) =>
@@ -899,13 +1013,37 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: text } : m))
           );
-          setApiMessages([...newApiMessages, { role: 'assistant', content: text }]);
-          // If voice disabled, skip TTS entirely
-          if (!voiceEnabled) {
+          const finalApiMessages: Message[] = [...newApiMessages, { role: 'assistant', content: text }];
+          setApiMessages(finalApiMessages);
+
+          // Divine memory checkpoint: every 3 user turns, save a summary
+          const userTurnCount = finalApiMessages.filter((m) => m.role === 'user').length;
+          if (getTier() === 'divine' && userTurnCount > 0 && userTurnCount % 3 === 0) {
+            summarizeConversation(finalApiMessages, normalizeBeliefId(belief.id))
+              .then((note) => {
+                if (note && note.summary) {
+                  saveMemory(belief.id, {
+                    date: new Date().toISOString().split('T')[0],
+                    summary: note.summary,
+                    mood: note.mood,
+                    topics: note.topics || [],
+                    followUp: note.followUp || '',
+                  });
+                }
+              })
+              .catch(() => {});
+          }
+
+          const currentTier = getTier();
+          // Free: no voice
+          if (!voiceEnabled || currentTier === 'free') {
             setState('idle');
             scheduleHideControls();
+          } else if (currentTier === 'believer') {
+            // Believer: browser SpeechSynthesis, fire once here
+            speakResponse(text, assistantMessageId);
           } else {
-            // TTS is already queued sentence-by-sentence via onSentence.
+            // Divine: TTS is already queued sentence-by-sentence via onSentence.
             // Wait for queue to drain, then return to idle.
             const drainWatcher = setInterval(() => {
               setDisplayMessages((prev) => {
@@ -1006,6 +1144,49 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       setReplayingMessageId(null);
     }
   }, [replayingMessageId, state]);
+
+  // Fetch daily content (prayer / sacred text / reflection) on demand
+  useEffect(() => {
+    if (!showPrayerModal && !showSacredTextModal && !showReflectionModal) return;
+    if (dailyContent && dailyContent.belief === belief.id) return;
+    const key = `daily-content-${belief.id}-${new Date().toISOString().split('T')[0]}`;
+    const cached = sessionStorage.getItem(key);
+    if (cached) {
+      try { setDailyContent(JSON.parse(cached)); return; } catch { /* fall through */ }
+    }
+    const workerUrl = 'https://aimighty-api.robby-hess.workers.dev';
+    fetch(`${workerUrl}/daily-content?belief=${encodeURIComponent(belief.id)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error('failed')))
+      .then((data: DailyContent) => {
+        setDailyContent(data);
+        sessionStorage.setItem(key, JSON.stringify(data));
+      })
+      .catch((e) => console.error('[Conversation] daily-content fetch failed:', e));
+  }, [showPrayerModal, showSacredTextModal, showReflectionModal, belief.id, dailyContent]);
+
+  // Divine: save memory checkpoint on unmount (conversation end)
+  useEffect(() => {
+    return () => {
+      if (getTier() !== 'divine') return;
+      // Snapshot messages ref via state at time of unmount
+      // We rely on apiMessagesRef for the latest list
+      const msgs = apiMessagesAtUnmountRef.current;
+      if (!msgs || msgs.length < 2) return;
+      summarizeConversation(msgs, normalizeBeliefId(belief.id))
+        .then((note) => {
+          if (note && note.summary) {
+            saveMemory(belief.id, {
+              date: new Date().toISOString().split('T')[0],
+              summary: note.summary,
+              mood: note.mood,
+              topics: note.topics || [],
+              followUp: note.followUp || '',
+            });
+          }
+        })
+        .catch(() => {});
+    };
+  }, [belief.id]);
 
   // Fetch full daily wisdom article for current belief
   useEffect(() => {
@@ -1156,10 +1337,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 onClose={() => setShowSettings(false)}
                 onSwitchBelief={() => setShowBeliefModal(true)}
                 onDailyWisdom={() => setShowDailyWisdom(true)}
+                onDailyPrayer={() => setShowPrayerModal(true)}
+                onSacredText={() => setShowSacredTextModal(true)}
+                onReflection={() => setShowReflectionModal(true)}
                 onToggleMute={handleVoiceToggle}
                 voiceEnabled={voiceEnabled}
                 onSignOut={onSignOut || (() => {})}
                 onNavigate={onNavigate}
+                tier={tier}
+                streakText={formatStreak(streak)}
+                onUpgrade={onPaywall}
               />
             </div>
           </div>
@@ -1280,6 +1467,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 )}
               </div>
             ))}
+
+            {/* AI disclosure — shown only while the greeting is the only message */}
+            {displayMessages.length === 1 && displayMessages[0].role === 'greeting' && (
+              <div
+                className="text-center"
+                style={{
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontSize: '0.72rem',
+                  fontWeight: 300,
+                  color: 'rgba(255,255,255,0.6)',
+                  letterSpacing: '0.05em',
+                  animation: 'fadeInUp 0.8s ease 0.5s both',
+                }}
+              >
+                Powered by AI — with deep respect for your tradition
+              </div>
+            )}
 
             {/* Thinking dots */}
             {state === 'sending' && (
@@ -1409,6 +1613,219 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           <ChevronIndicator pointsUp={controlsHidden} />
         </button>
       </div>
+
+      {/* Daily content modals (prayer / sacred text / reflection) */}
+      {(showPrayerModal || showSacredTextModal || showReflectionModal) && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col"
+          style={{
+            background: `linear-gradient(rgba(3,3,8,0.82), rgba(3,3,8,0.94)), url(${actualImagePath})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'top center',
+          }}
+        >
+          <div className="flex items-center justify-between px-5 py-4 shrink-0">
+            <button
+              onClick={() => {
+                setShowPrayerModal(false);
+                setShowSacredTextModal(false);
+                setShowReflectionModal(false);
+              }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5"
+              style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}
+            >
+              <BackIcon /> Back
+            </button>
+            <button
+              onClick={() => {
+                const text = showPrayerModal
+                  ? dailyContent?.prayer || ''
+                  : showSacredTextModal
+                  ? `${dailyContent?.sacredText?.reference}\n${dailyContent?.sacredText?.text}`
+                  : dailyContent?.reflectionPrompt || '';
+                navigator.clipboard?.writeText(text);
+              }}
+              className="px-3 py-2 rounded-lg hover:bg-white/5"
+              style={{ color: accentColor, fontSize: '0.85rem' }}
+            >
+              Share
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 pb-12">
+            <div className="mx-auto" style={{ maxWidth: '640px', textAlign: 'center', paddingTop: '40px' }}>
+              {!dailyContent && (
+                <p style={{ color: 'rgba(255,248,240,0.6)', fontFamily: 'var(--font-body, Outfit)' }}>
+                  Gathering today's wisdom…
+                </p>
+              )}
+              {dailyContent && showPrayerModal && (
+                <>
+                  <div style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: accentColor, marginBottom: '20px' }}>
+                    Daily Prayer · {belief.name}
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'clamp(1.3rem, 3.2vw, 1.8rem)',
+                      fontWeight: 300,
+                      lineHeight: 1.7,
+                      color: 'rgba(255,248,240,0.95)',
+                      marginBottom: '40px',
+                    }}
+                  >
+                    {dailyContent.prayer}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowPrayerModal(false);
+                      setInputText(`Pray with me: ${dailyContent.prayer}`);
+                      setTimeout(() => inputRef.current?.focus(), 100);
+                    }}
+                    className="px-6 py-3 rounded-full"
+                    style={{
+                      background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
+                      border: `1px solid ${accentColor}60`,
+                      color: accentColor,
+                      fontSize: '0.9rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Pray with God
+                  </button>
+                </>
+              )}
+              {dailyContent && showSacredTextModal && (
+                <>
+                  <div style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: accentColor, marginBottom: '20px' }}>
+                    Sacred Text · {belief.name}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '1rem',
+                      letterSpacing: '0.05em',
+                      color: accentColor,
+                      marginBottom: '16px',
+                    }}
+                  >
+                    {dailyContent.sacredText.reference}
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'clamp(1.4rem, 3.4vw, 2rem)',
+                      fontWeight: 300,
+                      lineHeight: 1.5,
+                      color: 'rgba(255,248,240,0.95)',
+                      marginBottom: '32px',
+                    }}
+                  >
+                    &ldquo;{dailyContent.sacredText.text}&rdquo;
+                  </p>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-body, Outfit)',
+                      fontSize: '0.95rem',
+                      lineHeight: 1.7,
+                      color: 'rgba(255,248,240,0.75)',
+                    }}
+                  >
+                    {dailyContent.sacredText.reflection}
+                  </p>
+                </>
+              )}
+              {dailyContent && showReflectionModal && (
+                <>
+                  <div style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: accentColor, marginBottom: '20px' }}>
+                    Reflection · {belief.name}
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'clamp(1.5rem, 4vw, 2.1rem)',
+                      fontWeight: 300,
+                      lineHeight: 1.5,
+                      color: 'rgba(255,248,240,0.95)',
+                      marginBottom: '40px',
+                    }}
+                  >
+                    {dailyContent.reflectionPrompt}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowReflectionModal(false);
+                      setInputText(dailyContent.reflectionPrompt);
+                      setTimeout(() => inputRef.current?.focus(), 100);
+                    }}
+                    className="px-6 py-3 rounded-full"
+                    style={{
+                      background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
+                      border: `1px solid ${accentColor}60`,
+                      color: accentColor,
+                      fontSize: '0.9rem',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Reflect with God
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Streak milestone overlay */}
+      {streakMilestoneText && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center pointer-events-none"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+              color: accentColor,
+              textAlign: 'center',
+              padding: '0 24px',
+              animation: 'fadeInUp 0.6s ease forwards',
+            }}
+          >
+            {streakMilestoneText}
+          </div>
+        </div>
+      )}
+
+      {/* Daily limit inline banner */}
+      {dailyLimitMessage && (
+        <div
+          className="fixed left-0 right-0 z-40 px-6"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 120px)' }}
+        >
+          <div
+            className="mx-auto text-center"
+            style={{
+              maxWidth: '520px',
+              padding: '14px 20px',
+              background: 'rgba(3,3,8,0.92)',
+              border: `1px solid ${accentColor}40`,
+              borderRadius: '14px',
+              color: 'rgba(255,248,240,0.9)',
+              fontSize: '0.9rem',
+              fontFamily: 'var(--font-body, Outfit)',
+            }}
+          >
+            {dailyLimitMessage}
+            <button
+              onClick={() => setDailyLimitMessage(null)}
+              className="ml-3"
+              style={{ color: accentColor, fontSize: '0.8rem' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Daily Wisdom reader */}
       {showDailyWisdom && (

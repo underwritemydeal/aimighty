@@ -99,12 +99,27 @@ const BeliefCard = memo(function BeliefCard({
           >
             {belief.name}
           </h3>
+          {belief.selfDescription && (
+            <p
+              style={{
+                fontFamily: 'var(--font-body, Outfit)',
+                fontSize: '0.75rem',
+                fontWeight: 300,
+                color: 'rgba(255, 255, 255, 0.7)',
+                textShadow: '0 2px 8px rgba(0,0,0,0.8)',
+                lineHeight: 1.3,
+                marginBottom: '4px',
+              }}
+            >
+              {belief.selfDescription}
+            </p>
+          )}
           <p
             style={{
               fontFamily: 'var(--font-display)',
               fontSize: '0.85rem',
               fontWeight: 300,
-              color: 'rgba(255, 255, 255, 0.6)',
+              color: 'rgba(255, 255, 255, 0.55)',
               textShadow: '0 2px 8px rgba(0,0,0,0.8)',
               lineHeight: 1.4,
             }}

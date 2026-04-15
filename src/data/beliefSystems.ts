@@ -25,6 +25,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#1a1a0a', '#2a2000'],
     category: 'religious',
     imagePath: '/images/avatars/protestant.jpg',
+    selfDescription: 'I believe in God and the Bible',
   },
   {
     id: 'catholic',
@@ -38,6 +39,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#0a0a1a', '#101030'],
     category: 'religious',
     imagePath: '/images/avatars/catholic.jpg',
+    selfDescription: "I'm Catholic",
   },
   {
     id: 'islam',
@@ -51,6 +53,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#0a1a0a', '#002000'],
     category: 'religious',
     imagePath: '/images/avatars/islam.jpg',
+    selfDescription: "I'm Muslim",
   },
   {
     id: 'judaism',
@@ -64,6 +67,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#1a1a0a', '#2a2000'],
     category: 'religious',
     imagePath: '/images/avatars/judaism.jpg',
+    selfDescription: "I'm Jewish",
   },
   {
     id: 'hinduism',
@@ -77,6 +81,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#1a0a00', '#301500'],
     category: 'religious',
     imagePath: '/images/avatars/hinduism.jpg',
+    selfDescription: "I'm Hindu",
   },
   {
     id: 'buddhism',
@@ -90,6 +95,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#1a1a00', '#282000'],
     category: 'religious',
     imagePath: '/images/avatars/buddhism.jpg',
+    selfDescription: 'I practice Buddhism',
   },
   {
     id: 'mormonism',
@@ -103,6 +109,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#101015', '#181820'],
     category: 'religious',
     imagePath: '/images/avatars/mormon.jpg',
+    selfDescription: "I'm Mormon / Latter-day Saint",
   },
   {
     id: 'sikhism',
@@ -116,6 +123,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#1a0800', '#301000'],
     category: 'religious',
     imagePath: '/images/avatars/sikhism.jpg',
+    selfDescription: "I'm Sikh",
   },
 
   // ═══════════════════════════════════════
@@ -133,6 +141,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#1a0a2a', '#200040'],
     category: 'spiritual',
     imagePath: '/images/avatars/sbnr.jpg',
+    selfDescription: "I'm spiritual but not religious",
   },
   {
     id: 'taoism',
@@ -146,6 +155,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#001510', '#002018'],
     category: 'spiritual',
     imagePath: '/images/avatars/taoism.jpg',
+    selfDescription: 'I follow the Tao',
   },
   {
     id: 'pantheism',
@@ -159,6 +169,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#0a1a0a', '#001a00'],
     category: 'spiritual',
     imagePath: '/images/avatars/pantheism.jpg',
+    selfDescription: 'I connect with nature as divine',
   },
 
   // ═══════════════════════════════════════
@@ -176,6 +187,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#0a0a2a', '#000040'],
     category: 'philosophical',
     imagePath: '/images/avatars/science.jpg',
+    selfDescription: 'I believe in science and reason',
   },
   {
     id: 'agnosticism',
@@ -189,6 +201,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#0a0a10', '#151520'],
     category: 'philosophical',
     imagePath: '/images/avatars/agnosticism.jpg',
+    selfDescription: "I'm not sure what I believe",
   },
   {
     id: 'atheism-stoicism',
@@ -202,6 +215,7 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     backgroundGradient: ['#0f0f0a', '#1a1a15'],
     category: 'philosophical',
     imagePath: '/images/avatars/stoicism.jpg',
+    selfDescription: 'I find meaning through reason',
   },
 ];
 

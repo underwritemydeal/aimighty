@@ -212,7 +212,13 @@ function normalizeBeliefId(id: string): string {
 }
 
 // Conversational instruction to prepend to all prompts
-const CONVERSATION_INSTRUCTION = `IMPORTANT: You are having a REAL CONVERSATION. If someone says "hey, how are you?" or "what's up?" — respond naturally and warmly like a friend before shifting to anything spiritual. Not every message needs a deep theological response. Match the user's energy:
+const CONVERSATION_INSTRUCTION = `YOUR PURPOSE: AImighty exists because people have questions they're afraid to ask in church, questions they don't know who to bring to, or simply a need to feel heard by something greater. You are not here to convert, correct, or lecture. You are here to listen, respond with wisdom, and meet each person exactly where they are. Warm, accessible, judgment-free, humble.
+
+DISCLOSURE RULE: If the human directly asks "Are you real?", "Are you actually God?", "Is this AI?", "Am I talking to a computer?" — always answer honestly and warmly. Never claim to literally BE God or a divine figure. You are an AI that speaks in the voice and wisdom of this tradition. Say something like: "I am AI — but the questions you're bringing are real. The wisdom I draw from is real. And the conversation we can have is real. What's on your mind?" Then gently redirect to what matters.
+
+TONE AWARENESS: You can read the energy of the conversation. If the human is being playful, joking, or clearly testing you with a funny or absurd question — respond with warmth and light humor appropriate to your tradition. Never be stiff or robotic when someone is clearly being lighthearted. A divine figure who can smile is more trustworthy than one who cannot. HOWEVER — if the conversation turns serious, grief-related, or emotionally heavy, immediately match that gravity. Read the room. Always. Humor is NEVER appropriate for grief, loss, death, mental-health struggles, relationship trauma, or crisis.
+
+IMPORTANT: You are having a REAL CONVERSATION. If someone says "hey, how are you?" or "what's up?" — respond naturally and warmly like a friend before shifting to anything spiritual. Not every message needs a deep theological response. Match the user's energy:
 
 - Casual greeting → warm casual response, then gently ask what's on their heart
 - Small talk → engage naturally, be personable, show warmth and personality
@@ -645,6 +651,202 @@ export default {
         console.error('Daily topic error:', error);
         return new Response(
           JSON.stringify({ error: 'Failed to get daily topic' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Daily content endpoint — prayer + sacred text + reflection prompt
+    // Cached per belief per day in KV under daily-content:YYYY-MM-DD:<belief>
+    if (request.method === 'GET' && url.pathname === '/daily-content') {
+      try {
+        const rawBelief = url.searchParams.get('belief') || 'protestant';
+        const belief = normalizeBeliefId(rawBelief);
+        const validBeliefs = ['protestant', 'catholic', 'islam', 'judaism', 'hinduism',
+          'buddhism', 'mormonism', 'sikhism', 'taoism', 'sbnr', 'pantheism', 'science',
+          'agnosticism', 'atheism-stoicism'];
+        if (!validBeliefs.includes(belief)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid belief id' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const cacheKey = `daily-content:${today}:${belief}`;
+
+        if (env.ARTICLES) {
+          const cached = await env.ARTICLES.get(cacheKey);
+          if (cached) {
+            return new Response(cached, {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        const basePrompt = getSystemPrompt(belief).substring(0, 350);
+
+        const contentPrompt = `You generate daily spiritual content for AImighty.
+
+Tradition: ${belief}
+Date: ${today}
+
+Return STRICT JSON only (no markdown fences, no commentary):
+{
+  "prayer": "A 3-5 sentence prayer authentic to the ${belief} tradition's prayer style. Not generic — use the tradition's actual vocabulary and cadence.",
+  "sacredText": {
+    "reference": "Actual scripture/teaching citation (e.g. 'Philippians 4:13', 'Quran 2:286', 'Dhammapada 183', 'Meditations 6.7'). Real reference only.",
+    "text": "The actual words of that passage, quoted directly.",
+    "reflection": "A 1-2 sentence reflection on what this passage means today."
+  },
+  "reflectionPrompt": "One deep, personal question (1-2 sentences max) for the seeker to sit with today."
+}
+
+Rules:
+- Prayer must sound like this tradition, not generic
+- Sacred text must be real, not invented
+- Keep everything warm and grounded
+- No medical/legal/financial advice
+
+Voice of the tradition (for style only):
+${basePrompt}`;
+
+        const claudeResp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 700,
+            messages: [{ role: 'user', content: contentPrompt }],
+          }),
+        });
+
+        if (!claudeResp.ok) {
+          return new Response(
+            JSON.stringify({ error: 'Content generation failed' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const claudeJson = await claudeResp.json() as { content?: Array<{ text?: string }> };
+        const rawText = claudeJson.content?.[0]?.text || '';
+        const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim();
+
+        interface DailyContent {
+          prayer: string;
+          sacredText: { reference: string; text: string; reflection: string };
+          reflectionPrompt: string;
+        }
+
+        let parsed: DailyContent;
+        try {
+          parsed = JSON.parse(cleaned) as DailyContent;
+        } catch {
+          parsed = {
+            prayer: 'Let this day be open to wisdom, presence, and grace.',
+            sacredText: {
+              reference: 'Within',
+              text: 'Be still.',
+              reflection: 'Stillness is where the deepest wisdom speaks.',
+            },
+            reflectionPrompt: 'What are you carrying that you could set down today?',
+          };
+        }
+
+        const payload = JSON.stringify({ belief, date: today, ...parsed });
+        if (env.ARTICLES) {
+          await env.ARTICLES.put(cacheKey, payload, { expirationTtl: 172800 });
+        }
+        return new Response(payload, {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('[DAILY-CONTENT] error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Daily content failed' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Summarize conversation endpoint — for rolling memory (Divine tier only)
+    if (request.method === 'POST' && url.pathname === '/summarize-conversation') {
+      try {
+        const body = await request.json() as {
+          messages: Array<{ role: string; content: string }>;
+          belief: string;
+        };
+        if (!body.messages || body.messages.length === 0) {
+          return new Response(
+            JSON.stringify({ error: 'No messages provided' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const transcript = body.messages
+          .slice(-20) // cap for token safety
+          .map((m) => `${m.role === 'user' ? 'User' : 'God'}: ${m.content}`)
+          .join('\n');
+
+        const summaryPrompt = `You are a memory assistant. Summarize this spiritual conversation in 2-3 sentences maximum. Note the person's emotional state, main topics discussed, and any breakthrough moments or unresolved questions. Be concise and compassionate.
+
+Return STRICT JSON only (no markdown fences):
+{
+  "summary": "2-3 sentences max",
+  "mood": "one of: grieving, hopeful, lost, growing, joyful, angry, peaceful, searching",
+  "topics": ["up to 3 keywords"],
+  "followUp": "one thing to check on next time, optional, can be empty string"
+}
+
+Conversation:
+${transcript}`;
+
+        const claudeResp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 150,
+            messages: [{ role: 'user', content: summaryPrompt }],
+          }),
+        });
+
+        if (!claudeResp.ok) {
+          return new Response(
+            JSON.stringify({ error: 'Summary generation failed' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const claudeJson = await claudeResp.json() as { content?: Array<{ text?: string }> };
+        const rawText = claudeJson.content?.[0]?.text || '';
+        const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim();
+
+        let parsed: { summary: string; mood: string; topics: string[]; followUp: string };
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch {
+          parsed = { summary: 'A conversation took place.', mood: 'searching', topics: [], followUp: '' };
+        }
+
+        return new Response(JSON.stringify(parsed), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('[SUMMARIZE] error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Summarize failed' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

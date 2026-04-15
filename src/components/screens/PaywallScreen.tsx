@@ -15,15 +15,6 @@ const BackIcon = memo(function BackIcon() {
   );
 });
 
-// Check icon
-const CheckIcon = memo(function CheckIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-});
-
 export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -33,16 +24,8 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
   }, []);
 
   const handleStartTrial = () => {
-    alert('Free trial will be available soon. Thank you for your interest!');
+    alert('Payment will be available soon. Thank you for your interest!');
   };
-
-  const features = [
-    t('paywall.unlimitedConversations', language),
-    t('paywall.allBeliefs', language),
-    t('paywall.voiceIO', language),
-    t('paywall.history', language),
-    t('paywall.priority', language),
-  ];
 
   return (
     <div
@@ -89,127 +72,197 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
       </nav>
 
       {/* Content */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center px-4 py-12">
+      <div className="relative z-10 min-h-screen flex flex-col items-center px-4 py-12 overflow-y-auto">
         <div
-          className="w-full max-w-md"
+          className="w-full"
           style={{
+            maxWidth: '920px',
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
             transition: 'all 0.6s ease',
           }}
         >
-          {/* Glass card */}
-          <div
-            className="glass-card text-center"
-            style={{ padding: '40px 32px' }}
+          <h1
+            id="paywall-heading"
+            className="text-center text-divine mb-2"
+            style={{ fontSize: 'clamp(1.6rem, 4vw, 2.2rem)', color: 'rgba(255,248,240,0.95)' }}
           >
-            {/* Headline */}
-            <h1
-              id="paywall-heading"
-              className="text-divine mb-3"
-              style={{
-                fontSize: '1.5rem',
-                color: 'rgba(255, 248, 240, 0.9)',
-              }}
-            >
-              {t('paywall.sessionEnded', language)}
-            </h1>
+            {t('paywall.sessionEnded', language)}
+          </h1>
+          <p
+            className="text-center mb-10"
+            style={{
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '0.95rem',
+              fontWeight: 300,
+              color: 'rgba(255, 255, 255, 0.6)',
+            }}
+          >
+            {t('paywall.continueJourney', language)}
+          </p>
 
-            {/* Subtext */}
-            <p
-              className="mb-8"
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: '0.9rem',
-                fontWeight: 300,
-                color: 'rgba(255, 255, 255, 0.6)',
-              }}
-            >
-              {t('paywall.continueJourney', language)}
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* FREE */}
+            <TierCard
+              name="Free (Seeker)"
+              price="$0"
+              priceNote="lifetime"
+              grayed
+              features={[
+                { t: '3 lifetime messages', ok: true },
+                { t: 'Text only', ok: true },
+                { t: 'No voice, no daily content', ok: false },
+              ]}
+              ctaLabel="Current"
+              onCta={() => {}}
+            />
 
-            {/* Pricing */}
-            <div className="mb-6">
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '2rem',
-                  fontWeight: 600,
-                  color: '#d4af37',
-                }}
-              >
-                $4.99
-              </span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 'var(--text-base)',
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  marginLeft: '4px',
-                }}
-              >
-                {t('paywall.perMonth', language)}
-              </span>
-            </div>
+            {/* BELIEVER */}
+            <TierCard
+              name="Believer"
+              price="$4.99"
+              priceNote="/ month"
+              features={[
+                { t: '10 conversations per day', ok: true },
+                { t: 'Daily Prayer, Sacred Text, Reflection', ok: true },
+                { t: 'Conversation streak tracking', ok: true },
+                { t: 'Text conversations (browser voice)', ok: true },
+                { t: 'No premium AI voice', ok: false },
+                { t: 'No conversation memory', ok: false },
+              ]}
+              ctaLabel="Coming Soon"
+              onCta={handleStartTrial}
+            />
 
-            {/* Yearly option */}
-            <p
-              className="mb-8"
-              style={{
-                fontSize: 'var(--text-sm)',
-                color: 'rgba(255, 255, 255, 0.5)',
-              }}
-            >
-              or $39.99/year — save 33%
-            </p>
-
-            {/* Features */}
-            <ul className="space-y-3 mb-8 text-left">
-              {features.map((feature) => (
-                <li key={feature} className="flex items-center gap-3">
-                  <CheckIcon />
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 'var(--text-sm)',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                    }}
-                  >
-                    {feature}
-                  </span>
-                </li>
-              ))}
-            </ul>
-
-            {/* CTA */}
-            <button
-              onClick={handleStartTrial}
-              className="w-full rounded-2xl transition-all duration-200 hover:opacity-90"
-              style={{
-                height: '56px',
-                background: '#d4af37',
-                color: '#0a0a0f',
-                fontFamily: 'var(--font-display)',
-                fontSize: 'var(--text-base)',
-                fontWeight: 500,
-              }}
-            >
-              {t('paywall.startTrial', language)}
-            </button>
-
-            {/* Cancel notice */}
-            <p
-              className="mt-6"
-              style={{
-                fontSize: '0.8rem',
-                color: 'rgba(255, 255, 255, 0.35)',
-              }}
-            >
-              {t('paywall.cancelAnytime', language)}
-            </p>
+            {/* DIVINE */}
+            <TierCard
+              name="Divine"
+              price="$14.99"
+              priceNote="/ month"
+              highlight
+              features={[
+                { t: '20 conversations per day', ok: true },
+                { t: 'Everything in Believer', ok: true },
+                { t: 'Premium AI voice — warm, human, moving', ok: true },
+                { t: 'God remembers your past conversations', ok: true },
+                { t: 'Personalized Daily Blessing', ok: true },
+                { t: 'Word-by-word text sync with voice', ok: true },
+                { t: 'Cinematic full-screen experience', ok: true },
+              ]}
+              ctaLabel="Coming Soon"
+              onCta={handleStartTrial}
+            />
           </div>
+
+          <p
+            className="text-center mt-10"
+            style={{
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '0.75rem',
+              color: 'rgba(255, 255, 255, 0.4)',
+              lineHeight: 1.6,
+              maxWidth: '620px',
+              margin: '40px auto 0',
+            }}
+          >
+            AImighty is an AI-powered spiritual companion. It is not affiliated with any
+            religious institution and does not claim divine authority.
+          </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface TierFeature { t: string; ok: boolean }
+interface TierCardProps {
+  name: string;
+  price: string;
+  priceNote: string;
+  features: TierFeature[];
+  ctaLabel: string;
+  onCta: () => void;
+  highlight?: boolean;
+  grayed?: boolean;
+}
+function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight, grayed }: TierCardProps) {
+  return (
+    <div
+      className="glass-card relative"
+      style={{
+        padding: '28px 24px',
+        opacity: grayed ? 0.6 : 1,
+        border: highlight ? '1px solid #d4af37' : '1px solid rgba(255,255,255,0.08)',
+        background: highlight
+          ? 'linear-gradient(160deg, rgba(212,175,55,0.12), rgba(3,3,8,0.85))'
+          : 'rgba(3,3,8,0.7)',
+      }}
+    >
+      {highlight && (
+        <div
+          className="absolute"
+          style={{
+            top: '-10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#d4af37',
+            color: '#0a0a0f',
+            fontFamily: 'var(--font-body, Outfit)',
+            fontSize: '0.65rem',
+            fontWeight: 600,
+            letterSpacing: '0.15em',
+            textTransform: 'uppercase',
+            padding: '4px 12px',
+            borderRadius: '999px',
+          }}
+        >
+          Most Popular
+        </div>
+      )}
+      <h3
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '1.2rem',
+          fontWeight: 500,
+          color: 'rgba(255,248,240,0.95)',
+          marginBottom: '8px',
+        }}
+      >
+        {name}
+      </h3>
+      <div className="mb-4">
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 600, color: '#d4af37' }}>{price}</span>
+        <span style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', marginLeft: '6px' }}>{priceNote}</span>
+      </div>
+      <ul className="mb-6" style={{ listStyle: 'none', padding: 0 }}>
+        {features.map((f, i) => (
+          <li key={i} className="flex items-start gap-2" style={{ marginBottom: '10px' }}>
+            <span style={{ color: f.ok ? '#d4af37' : 'rgba(255,255,255,0.35)', fontSize: '0.9rem', lineHeight: 1.3 }}>
+              {f.ok ? '✓' : '✕'}
+            </span>
+            <span style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '0.82rem', color: f.ok ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.38)', lineHeight: 1.4 }}>
+              {f.t}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <button
+        onClick={onCta}
+        className="w-full rounded-xl transition-opacity"
+        style={{
+          height: '44px',
+          background: highlight ? '#d4af37' : 'rgba(255,255,255,0.06)',
+          color: highlight ? '#0a0a0f' : 'rgba(255,255,255,0.85)',
+          border: highlight ? 'none' : '1px solid rgba(255,255,255,0.12)',
+          fontFamily: 'var(--font-body, Outfit)',
+          fontSize: '0.88rem',
+          fontWeight: 500,
+          opacity: grayed ? 0.6 : 1,
+          cursor: grayed ? 'default' : 'pointer',
+        }}
+      >
+        {ctaLabel}
+      </button>
     </div>
   );
 }

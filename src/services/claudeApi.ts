@@ -193,6 +193,28 @@ export async function sendMessage(
 }
 
 /**
+ * Summarize a conversation for Divine-tier memory.
+ * Returns the parsed JSON note or null on failure.
+ */
+export async function summarizeConversation(
+  messages: Message[],
+  belief: string
+): Promise<{ summary: string; mood: string; topics: string[]; followUp: string } | null> {
+  try {
+    const resp = await fetch(`${WORKER_URL}/summarize-conversation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, belief }),
+    });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch (e) {
+    console.error('[summarizeConversation] failed:', e);
+    return null;
+  }
+}
+
+/**
  * Check if the API is available (for offline detection)
  */
 export async function checkApiHealth(): Promise<boolean> {
