@@ -636,6 +636,153 @@ export default {
       }
     }
 
+    // Daily article endpoint - full SEO article body, cached per belief per day
+    if (request.method === 'GET' && url.pathname === '/daily-article') {
+      try {
+        const rawBelief = url.searchParams.get('belief') || 'protestant';
+        const belief = normalizeBeliefId(rawBelief);
+        const validBeliefs = ['protestant', 'catholic', 'islam', 'judaism', 'hinduism',
+          'buddhism', 'mormonism', 'sikhism', 'taoism', 'sbnr', 'pantheism', 'science',
+          'agnosticism', 'atheism'];
+        if (!validBeliefs.includes(belief)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid belief id' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const topic = await pickTodaysTopic(env);
+        const cacheKey = `article:${today}:${belief}:${topic}`;
+
+        // Return cached article if we've already generated it today
+        if (env.ARTICLES) {
+          const cached = await env.ARTICLES.get(cacheKey);
+          if (cached) {
+            console.log('[DAILY-ARTICLE] Cache hit:', cacheKey);
+            return new Response(cached, {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+        }
+
+        const title = getArticleTitle(belief, topic);
+        const slug = `${topic}-${belief}`;
+        const topicDisplay = capitalize(topic);
+        const beliefSystemPrompt = getSystemPrompt(belief);
+
+        // Generate full article body via Claude
+        const articlePrompt = `Write a complete SEO/AEO-optimized article for the AImighty "Daily Wisdom" page.
+
+Topic: ${topicDisplay}
+Belief system: ${belief}
+Article title (use exactly as given): ${title}
+
+Return STRICT JSON with this shape (no markdown code fences, no commentary, JSON only):
+{
+  "metaDescription": "150-160 char meta description optimized for search",
+  "intro": "A warm 2-3 sentence opening paragraph that hooks the reader",
+  "sections": [
+    { "heading": "Short H2 heading", "body": "2-4 sentence paragraph drawing from ${belief} tradition with specific scripture/teacher citation" },
+    { "heading": "Short H2 heading", "body": "2-4 sentence paragraph" },
+    { "heading": "Short H2 heading", "body": "2-4 sentence paragraph" }
+  ],
+  "closing": "A warm closing paragraph (2-3 sentences) that invites reflection",
+  "cta": "A short call-to-action sentence inviting the reader to begin a conversation"
+}
+
+Requirements:
+- Ground every section in the ${belief} tradition — specific scripture, teacher, or philosophical reference
+- Do NOT claim to be literally divine; this is educational + devotional writing
+- Include 3 to 4 sections
+- Keep the tone warm, direct, and conversational
+- Respect safety guardrails: no medical/legal/financial advice; for crisis, reference 988
+
+Voice of the tradition (for style only):
+${beliefSystemPrompt.substring(0, 400)}`;
+
+        const claudeResp = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 1500,
+            messages: [{ role: 'user', content: articlePrompt }],
+          }),
+        });
+
+        if (!claudeResp.ok) {
+          const errText = await claudeResp.text();
+          console.error('[DAILY-ARTICLE] Claude error:', errText);
+          return new Response(
+            JSON.stringify({ error: 'Article generation failed' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const claudeJson = await claudeResp.json() as { content?: Array<{ text?: string }> };
+        const rawText = claudeJson.content?.[0]?.text || '';
+        // Strip code fences if Claude added any
+        const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim();
+
+        interface ArticleContent {
+          metaDescription: string;
+          intro: string;
+          sections: Array<{ heading: string; body: string }>;
+          closing: string;
+          cta: string;
+        }
+
+        let parsed: ArticleContent;
+        try {
+          parsed = JSON.parse(cleaned) as ArticleContent;
+        } catch {
+          // Fallback: wrap the raw text as intro
+          parsed = {
+            metaDescription: `${topicDisplay} through the wisdom of ${belief}.`,
+            intro: cleaned.substring(0, 400),
+            sections: [],
+            closing: '',
+            cta: 'Begin a conversation for personal guidance.',
+          };
+        }
+
+        const article = {
+          title,
+          metaDescription: parsed.metaDescription,
+          slug,
+          belief,
+          topic,
+          topicDisplay,
+          date: today,
+          body: parsed,
+          url: `https://aimightyme.com/${belief}`,
+        };
+
+        // Cache for 2 days (allow one day overlap around midnight)
+        if (env.ARTICLES) {
+          await env.ARTICLES.put(cacheKey, JSON.stringify(article), { expirationTtl: 172800 });
+          console.log('[DAILY-ARTICLE] Cached:', cacheKey);
+        }
+
+        return new Response(JSON.stringify(article), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('[DAILY-ARTICLE] error:', error);
+        return new Response(
+          JSON.stringify({ error: 'Daily article failed' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Topic history endpoint - for debugging
     if (request.method === 'GET' && url.pathname === '/topic-history') {
       try {

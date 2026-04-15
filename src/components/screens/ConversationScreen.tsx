@@ -594,10 +594,30 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showBeliefModal, setShowBeliefModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showDailyWisdom, setShowDailyWisdom] = useState(false);
-  const [dailyArticle, setDailyArticle] = useState<{ topic?: string; topicDisplay?: string; titles?: Record<string, string>; date?: string } | null>(null);
+  interface DailyArticle {
+    title: string;
+    metaDescription: string;
+    slug: string;
+    belief: string;
+    topic: string;
+    topicDisplay: string;
+    date: string;
+    body: {
+      intro: string;
+      sections: Array<{ heading: string; body: string }>;
+      closing: string;
+      cta: string;
+    };
+    url: string;
+  }
+  const [dailyArticle, setDailyArticle] = useState<DailyArticle | null>(null);
+  const [articleLoading, setArticleLoading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [character, setCharacter] = useState<Character>('god');
+  // Default character per belief: sbnr/taoism/pantheism speak with the Divine Feminine (mary/coral)
+  const [character, setCharacter] = useState<Character>(() => {
+    return ['sbnr', 'taoism', 'pantheism'].includes(belief.id) ? 'mary' : 'god';
+  });
   const [controlsHidden, setControlsHidden] = useState(false);
   const [replayingMessageId, setReplayingMessageId] = useState<string | null>(null);
 
@@ -987,15 +1007,22 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
   }, [replayingMessageId, state]);
 
-  // Fetch daily wisdom article topic
+  // Fetch full daily wisdom article for current belief
   useEffect(() => {
-    if (!showDailyWisdom || dailyArticle) return;
-    const workerUrl = (import.meta as unknown as { env: { VITE_WORKER_URL?: string } }).env.VITE_WORKER_URL || '';
-    fetch(`${workerUrl}/daily-topic`)
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error('failed')))
-      .then((data) => setDailyArticle(data))
-      .catch(() => setDailyArticle({ topicDisplay: 'Daily Wisdom', titles: {} }));
-  }, [showDailyWisdom, dailyArticle]);
+    if (!showDailyWisdom) return;
+    if (dailyArticle && dailyArticle.belief === belief.id) return;
+    setArticleLoading(true);
+    setDailyArticle(null);
+    const workerUrl = 'https://aimighty-api.robby-hess.workers.dev';
+    fetch(`${workerUrl}/daily-article?belief=${encodeURIComponent(belief.id)}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`)))
+      .then((data: DailyArticle) => setDailyArticle(data))
+      .catch((e) => {
+        console.error('[Conversation] daily-article fetch failed:', e);
+        setDailyArticle(null);
+      })
+      .finally(() => setArticleLoading(false));
+  }, [showDailyWisdom, belief.id, dailyArticle]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1427,7 +1454,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   marginBottom: '12px',
                 }}
               >
-                {dailyArticle?.date || 'Today'} · {belief.name}
+                {dailyArticle?.date || new Date().toISOString().split('T')[0]} · {belief.name}
               </div>
               <h1
                 style={{
@@ -1439,20 +1466,61 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   marginBottom: '24px',
                 }}
               >
-                {dailyArticle?.titles?.[belief.id] || dailyArticle?.topicDisplay || 'Loading…'}
+                {articleLoading ? 'Gathering wisdom…' : (dailyArticle?.title || 'Daily Wisdom')}
               </h1>
-              <p
-                style={{
-                  fontFamily: 'var(--font-body, Outfit)',
-                  fontSize: '1rem',
-                  lineHeight: 1.8,
-                  color: 'rgba(255,248,240,0.85)',
-                }}
-              >
-                {dailyArticle
-                  ? `Today's reflection draws from the wisdom of ${belief.name}. Begin a conversation to receive personal guidance on this theme.`
-                  : 'Gathering wisdom...'}
-              </p>
+              {articleLoading && (
+                <p style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '1rem', color: 'rgba(255,248,240,0.6)' }}>
+                  Generating today's reflection for {belief.name}…
+                </p>
+              )}
+              {dailyArticle && !articleLoading && (
+                <div style={{ fontFamily: 'var(--font-body, Outfit)', color: 'rgba(255,248,240,0.85)' }}>
+                  <p style={{ fontSize: '1.1rem', lineHeight: 1.8, marginBottom: '28px', fontStyle: 'italic' }}>
+                    {dailyArticle.body.intro}
+                  </p>
+                  {dailyArticle.body.sections?.map((s, i) => (
+                    <div key={i} style={{ marginBottom: '28px' }}>
+                      <h2
+                        style={{
+                          fontFamily: 'var(--font-display)',
+                          fontSize: '1.4rem',
+                          fontWeight: 400,
+                          color: accentColor,
+                          marginBottom: '10px',
+                        }}
+                      >
+                        {s.heading}
+                      </h2>
+                      <p style={{ fontSize: '1rem', lineHeight: 1.8 }}>{s.body}</p>
+                    </div>
+                  ))}
+                  {dailyArticle.body.closing && (
+                    <p style={{ fontSize: '1rem', lineHeight: 1.8, marginBottom: '24px' }}>
+                      {dailyArticle.body.closing}
+                    </p>
+                  )}
+                  {dailyArticle.body.cta && (
+                    <button
+                      onClick={() => setShowDailyWisdom(false)}
+                      className="w-full text-center py-4 px-6 rounded-xl mt-4"
+                      style={{
+                        background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
+                        border: `1px solid ${accentColor}60`,
+                        color: accentColor,
+                        fontSize: '0.95rem',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {dailyArticle.body.cta}
+                    </button>
+                  )}
+                </div>
+              )}
+              {!dailyArticle && !articleLoading && (
+                <p style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '1rem', color: 'rgba(255,248,240,0.6)' }}>
+                  Unable to load today's reflection. Please try again later.
+                </p>
+              )}
             </div>
           </div>
         </div>
