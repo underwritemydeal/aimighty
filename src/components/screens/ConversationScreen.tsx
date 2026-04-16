@@ -1216,7 +1216,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         onStart: () => { setState('listening'); setInputText(''); },
         onResult: (transcript) => setInputText(transcript),
         onEnd: () => setState('idle'),
-        onError: (error) => { setState('idle'); setSpeechError(error); setTimeout(() => setSpeechError(null), 3000); },
+        onError: (error) => { setState('idle'); setSpeechError(error); setTimeout(() => setSpeechError(null), 6000); },
       });
     }
   }, [state, language]);

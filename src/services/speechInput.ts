@@ -199,13 +199,15 @@ export function startListening(callbacks: SpeechInputCallbacks): boolean {
     log('Recognition error:', event.error);
     isListening = false;
 
-    // Map error codes to user-friendly messages
+    // Map error codes to user-friendly messages.
+    // The permission-denied / device-missing copies explicitly point users
+    // to the text fallback so the mic button doesn't look broken (P1-6).
     const errorMessages: Record<string, string> = {
-      'no-speech': 'No speech detected. Please try again.',
-      'audio-capture': 'Microphone not found. Please check your device.',
-      'not-allowed': 'Microphone access denied. Please enable microphone permissions.',
-      'network': 'Network error. Please check your connection.',
-      'service-not-allowed': 'Speech service not allowed. Please use HTTPS.',
+      'no-speech': 'Didn\'t catch that. Try again — or type below.',
+      'audio-capture': 'No microphone found. You can still type below.',
+      'not-allowed': 'Voice input needs microphone access. You can still type below.',
+      'network': 'Network hiccup on voice. You can still type below.',
+      'service-not-allowed': 'Voice needs a secure connection. You can still type below.',
       'aborted': '', // User cancelled, no message needed
     };
 
