@@ -354,6 +354,29 @@ export function isAudioPaused(): boolean {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// TTS TEXT CLEANING — runs ONLY on the string sent to the TTS
+// engine, never on what is displayed in the chat UI.
+// ═══════════════════════════════════════════════════════════════
+
+function cleanTextForTTS(text: string): string {
+  // Fix 2: Remove scripture citations like John 3:16 or Romans 8:28-30
+  text = text.replace(/\b(John|Matthew|Luke|Mark|Acts|Romans|Genesis|Exodus|Psalm|Psalms|Proverbs|Isaiah|Revelation|Quran|Surah|Hadith|Gita|Bhagavad)\s+\d+:\d+[-\d]*/gi, '');
+
+  // Remove parenthetical or bracketed citations like (John 3:16) or [Romans 8:28]
+  text = text.replace(/[\(\[][^\)\]]*\d+:\d+[^\)\]]*[\)\]]/g, '');
+
+  // Fix 3: Convert standalone ALL-CAPS words (2+ letters) to title case
+  text = text.replace(/\b([A-Z]{2,})\b/g, (match) => {
+    return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+  });
+
+  // Clean up double spaces left behind
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  return text;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // SENTENCE-LEVEL STREAMING TTS QUEUE
 // Fetches and queues audio per sentence so first sentence plays fast,
 // and subsequent sentences play back-to-back with no gap.
@@ -397,9 +420,11 @@ export function enqueueSentence(
     return;
   }
 
-  const words = text.trim().split(/\s+/);
+  // Clean the text for TTS only — UI still shows the original
+  const ttsText = cleanTextForTTS(text);
+  const words = ttsText.split(/\s+/).filter(Boolean);
   const entry: QueuedSentence = {
-    text,
+    text: ttsText,
     audioUrl: null,
     words,
     onStart: callbacks?.onStart,
@@ -409,13 +434,13 @@ export function enqueueSentence(
   };
 
   const fetchStart = Date.now();
-  const snippet = text.slice(0, 32).replace(/\n/g, ' ');
-  console.log(`[TTS-TIMING] sentence FIRED (t=0) "${snippet}…" (${text.length}ch)`);
+  const snippet = ttsText.slice(0, 32).replace(/\n/g, ' ');
+  console.log(`[TTS-TIMING] sentence FIRED (t=0) "${snippet}…" (${ttsText.length}ch)`);
 
   entry.fetchPromise = fetch(`${WORKER_URL}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, beliefSystem, character, language }),
+    body: JSON.stringify({ text: ttsText, beliefSystem, character, language }),
   })
     .then((r) => {
       console.log(`[TTS-TIMING] sentence HEADERS t+${Date.now() - fetchStart}ms "${snippet}…"`);
@@ -485,19 +510,13 @@ async function playNextInQueue(): Promise<void> {
   audio.src = entry.audioUrl;
   audio.volume = 1.0;
 
-  // Word highlighting via time progression
+  // Sentence-level highlighting: highlight all words at once when audio
+  // starts, clear on end. Word-by-word highlighting is disabled because
+  // Smallest AI Lightning does not return word-level timestamps and
+  // client-side estimation (duration / wordCount) drifts out of sync.
   entry.onStart?.(entry.words.length);
-
-  let lastWordIdx = -1;
-  audio.ontimeupdate = () => {
-    if (!audio.duration || isNaN(audio.duration)) return;
-    const progress = audio.currentTime / audio.duration;
-    const idx = Math.min(entry.words.length - 1, Math.floor(progress * entry.words.length));
-    if (idx !== lastWordIdx) {
-      lastWordIdx = idx;
-      entry.onWord?.(idx);
-    }
-  };
+  // Signal all words highlighted immediately
+  entry.onWord?.(entry.words.length - 1);
 
   audio.onended = () => {
     audio.ontimeupdate = null;

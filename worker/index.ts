@@ -247,7 +247,7 @@ RESPONSE LENGTH RULES — FOLLOW THESE STRICTLY:
 
 Match the depth of your response to the depth of the question. If someone says "hey" you say "hey" back warmly. A real conversation has short turns, not monologues. Leave room for the human to respond.
 
-HARD CAP: Respond in 2-3 sentences maximum. 1 sentence for greetings. Never exceed this. You are in conversation, not giving a sermon. Depth comes from specificity — one vivid image, one exact verse, one real name — not from piling on sentences.
+HARD RULE: Respond in 3-4 sentences maximum. Never exceed 60 words total. Count your sentences before responding. If you have written a fifth sentence, delete it. This rule has no exceptions.
 
 `;
 
@@ -1060,7 +1060,7 @@ export default {
           body: JSON.stringify({
             text: spokenText,
             voice_id: voiceConfig.voice_id,
-            sample_rate: 24000,
+            sample_rate: 16000,
             speed: voiceConfig.speed,
             language: smallestLang,
             output_format: 'mp3',
@@ -2175,7 +2175,7 @@ ${beliefSystemPrompt.substring(0, 400)}`;
             },
             body: JSON.stringify({
               model: 'claude-sonnet-4-20250514',
-              max_tokens: 140,
+              max_tokens: 120,
               stream: true,
               system: [
                 {
