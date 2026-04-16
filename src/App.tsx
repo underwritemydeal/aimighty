@@ -12,6 +12,7 @@ import { TermsScreen } from './components/screens/TermsScreen';
 import { ArticlePage } from './components/screens/ArticlePage';
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
 import { getLastBelief, setLastBelief, clearLastBelief } from './services/tierService';
+import { safeSetItem, safeGetItem } from './services/safeStorage';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -52,14 +53,14 @@ function App() {
 
   // Language state — persisted to localStorage
   const [language, setLanguage] = useState<LanguageCode>(() => {
-    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    const stored = safeGetItem(LANGUAGE_STORAGE_KEY);
     return (stored as LanguageCode) || defaultLanguage;
   });
 
   // Update language with persistence
   const handleLanguageChange = useCallback((lang: LanguageCode) => {
     setLanguage(lang);
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    safeSetItem(LANGUAGE_STORAGE_KEY, lang);
     // Update document direction for RTL languages
     document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
     document.documentElement.lang = lang;
