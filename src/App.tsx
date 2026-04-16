@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LandingPage } from './components/screens/LandingPage';
-import { WelcomeScreen } from './components/screens/WelcomeScreen';
 import { AuthScreen } from './components/screens/AuthScreen';
 import { BeliefSelector } from './components/screens/BeliefSelector';
 import { BeliefWelcomeScreen } from './components/screens/BeliefWelcomeScreen';
@@ -36,20 +35,17 @@ function App() {
   });
 
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
-    if (typeof window === 'undefined') return 'welcome';
+    if (typeof window === 'undefined') return 'auth';
     const p = window.location.pathname;
+    // Public content pages — always render directly
     if (articleRoute) return 'article';
-    if (p === '/' || p === '') {
-      // Returning logged-in users skip the landing page entirely and go
-      // straight into the app. The session-restore useEffect below will
-      // then promote them to conversation or belief-selector.
-      if (isLoggedIn()) return 'welcome';
-      return 'landing';
-    }
     if (p === '/about') return 'about';
     if (p === '/privacy') return 'privacy';
     if (p === '/terms') return 'terms';
-    return 'welcome';
+    // Everything else (/, /app, etc):
+    //   session → conversation/belief-selector (resolved in useEffect below)
+    //   no session → auth screen. No landing page. No welcome screen.
+    return isLoggedIn() ? 'loading' : 'auth';
   });
   const [selectedBelief, setSelectedBelief] = useState<BeliefSystem | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -57,62 +53,56 @@ function App() {
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Language state — persisted to localStorage
-  const [language, setLanguage] = useState<LanguageCode>(() => {
+  const [language] = useState<LanguageCode>(() => {
     const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
     return (stored as LanguageCode) || defaultLanguage;
   });
 
-  // Update language with persistence
-  const handleLanguageChange = useCallback((lang: LanguageCode) => {
-    setLanguage(lang);
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
-    // Update document direction for RTL languages
-    document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
-    document.documentElement.lang = lang;
-  }, []);
-
-  // Set initial document direction and check session on mount
+  // Set initial document direction and restore session on mount
   useEffect(() => {
     document.documentElement.dir = isRTL(language) ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
 
-    // Skip session-restore for public landing/about/privacy/terms/article so refreshing
-    // those URLs doesn't yank the user into the app unexpectedly
-    const publicPaths = ['landing', 'about', 'privacy', 'terms', 'article'];
+    // Public content pages — no session restore needed
+    const publicPaths = ['about', 'privacy', 'terms', 'article'];
     if (publicPaths.includes(currentScreen)) {
       setIsInitialized(true);
       return;
     }
 
-    // Check for existing session
+    // Restore session: if logged in → conversation or belief-selector.
+    // If not → stay on auth screen. No landing page. No welcome screen.
     if (isLoggedIn()) {
       const existingUser = getCurrentUser();
       const session = getSession();
 
       if (existingUser) {
         setUser(existingUser);
-        // Update URL to /app so the user sees the app path, not /
-        if (window.location.pathname === '/' || window.location.pathname === '') {
+
+        // Always show /app in the URL bar
+        if (window.location.pathname !== '/app') {
           window.history.replaceState({}, '', '/app');
         }
 
-        // Prefer `aimighty_last_belief` (set on every conversation start).
-        // Fall back to legacy session.beliefSystemId for backward compat.
+        // Go to last conversation, or belief-selector if no saved belief
         const lastBeliefId = getLastBelief() || session?.beliefSystemId;
         if (lastBeliefId) {
           const savedBelief = beliefSystems.find(b => b.id === lastBeliefId);
           if (savedBelief) {
             setSelectedBelief(savedBelief);
-            // Go directly to conversation screen — skip BeliefSelector
             setCurrentScreen('conversation');
           } else {
             setCurrentScreen('belief-selector');
           }
         } else {
-          // First-time login — show BeliefSelector
           setCurrentScreen('belief-selector');
         }
+      } else {
+        // Session exists but user object is gone — force re-auth
+        setCurrentScreen('auth');
       }
+    } else {
+      setCurrentScreen('auth');
     }
 
     setIsInitialized(true);
@@ -128,27 +118,21 @@ function App() {
     }, 550);
   };
 
-  const handleBegin = () => {
-    // If user is already logged in, go to belief selector or conversation
-    if (user) {
-      const session = getSession();
-      if (session?.beliefSystemId) {
-        const savedBelief = beliefSystems.find(b => b.id === session.beliefSystemId);
-        if (savedBelief) {
-          setSelectedBelief(savedBelief);
-          transitionTo('conversation');
-          return;
-        }
-      }
-      transitionTo('belief-selector');
-    } else {
-      // Otherwise, show auth screen
-      transitionTo('auth');
-    }
-  };
-
   const handleAuthSuccess = (authenticatedUser: User) => {
     setUser(authenticatedUser);
+    window.history.replaceState({}, '', '/app');
+
+    // If they have a saved belief from a previous session, go straight
+    // to conversation. Otherwise belief-selector.
+    const lastBeliefId = getLastBelief();
+    if (lastBeliefId) {
+      const savedBelief = beliefSystems.find(b => b.id === lastBeliefId);
+      if (savedBelief) {
+        setSelectedBelief(savedBelief);
+        transitionTo('conversation');
+        return;
+      }
+    }
     transitionTo('belief-selector');
   };
 
@@ -184,10 +168,6 @@ function App() {
     transitionTo('paywall');
   };
 
-  const handleBackToWelcome = () => {
-    transitionTo('welcome');
-  };
-
   const handleBackToBeliefSelector = () => {
     transitionTo('belief-selector');
   };
@@ -200,7 +180,7 @@ function App() {
     signOut();
     setUser(null);
     setSelectedBelief(null);
-    transitionTo('welcome');
+    transitionTo('auth');
   }, []);
 
   // Handle navigation to static pages
@@ -261,7 +241,22 @@ function App() {
             onEnterApp={() => {
               if (typeof window !== 'undefined') window.history.pushState({}, '', '/app');
               setArticleRoute(null);
-              transitionTo('welcome');
+              if (isLoggedIn()) {
+                const existingUser = getCurrentUser();
+                if (existingUser) {
+                  setUser(existingUser);
+                  const lastBeliefId = getLastBelief();
+                  const savedBelief = lastBeliefId ? beliefSystems.find(b => b.id === lastBeliefId) : null;
+                  if (savedBelief) {
+                    setSelectedBelief(savedBelief);
+                    transitionTo('conversation');
+                  } else {
+                    transitionTo('belief-selector');
+                  }
+                  return;
+                }
+              }
+              transitionTo('auth');
             }}
           />
         )}
@@ -272,7 +267,20 @@ function App() {
               if (typeof window !== 'undefined') {
                 window.history.pushState({}, '', '/app');
               }
-              transitionTo('welcome');
+              // If already logged in (edge case), go to conversation.
+              // Otherwise go to auth.
+              if (user) {
+                const lastBeliefId = getLastBelief();
+                const savedBelief = lastBeliefId ? beliefSystems.find(b => b.id === lastBeliefId) : null;
+                if (savedBelief) {
+                  setSelectedBelief(savedBelief);
+                  transitionTo('conversation');
+                } else {
+                  transitionTo('belief-selector');
+                }
+              } else {
+                transitionTo('auth');
+              }
             }}
             onNavigate={(screen) => {
               if (typeof window !== 'undefined') {
@@ -283,19 +291,15 @@ function App() {
           />
         )}
 
-        {currentScreen === 'welcome' && (
-          <WelcomeScreen
-            onBegin={handleBegin}
-            language={language}
-            onLanguageChange={handleLanguageChange}
-            onNavigate={(screen) => transitionTo(screen)}
-          />
+        {/* Loading state while session is being restored */}
+        {currentScreen === 'loading' && (
+          <div style={{ background: '#030308', height: '100dvh', minHeight: '100dvh' }} />
         )}
 
         {currentScreen === 'auth' && (
           <AuthScreen
             onAuthSuccess={handleAuthSuccess}
-            onBack={handleBackToWelcome}
+            onBack={() => transitionTo('landing')}
             onNavigate={(screen) => transitionTo(screen)}
             language={language}
           />
@@ -304,7 +308,7 @@ function App() {
         {currentScreen === 'belief-selector' && (
           <BeliefSelector
             onSelect={handleSelectBelief}
-            onBack={handleBackToWelcome}
+            onBack={handleSignOut}
             language={language}
             onSignOut={handleSignOut}
           />
@@ -342,15 +346,15 @@ function App() {
         )}
 
         {currentScreen === 'about' && (
-          <AboutScreen onBack={() => handleNavigate('welcome')} />
+          <AboutScreen onBack={() => handleNavigate('auth')} />
         )}
 
         {currentScreen === 'privacy' && (
-          <PrivacyScreen onBack={() => handleNavigate('welcome')} />
+          <PrivacyScreen onBack={() => handleNavigate('auth')} />
         )}
 
         {currentScreen === 'terms' && (
-          <TermsScreen onBack={() => handleNavigate('welcome')} />
+          <TermsScreen onBack={() => handleNavigate('auth')} />
         )}
       </div>
     </div>
