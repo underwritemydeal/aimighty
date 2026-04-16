@@ -1138,6 +1138,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: errorMessage } : m))
           );
+          // Reset state so the input bar re-enables. Without this, the UI sits in
+          // 'streaming' forever after any network/API failure (P0-1 / 03-harden.md).
+          setState('idle');
+          scheduleHideControls();
           speakResponse(errorMessage, assistantMessageId);
         },
       },
