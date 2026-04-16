@@ -747,6 +747,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const fullResponseRef = useRef('');
   const streamingMessageId = useRef<string | null>(null);
   const apiMessagesAtUnmountRef = useRef<Message[] | null>(null);
+  // P1 perf: track TTS drain watcher timers so we can clear on unmount
+  // to prevent setInterval/setTimeout from firing setState on an unmounted
+  // component (causes React warning + slow leak if user navigates mid-TTS).
+  const drainWatcherRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const drainSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Synchronous send guard — prevents double-tap on mobile from firing two
   // parallel requests before React commits the state flush (P0-2).
   const isSendingRef = useRef(false);
@@ -1139,20 +1144,27 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           } else {
             // Divine: TTS is already queued sentence-by-sentence via onSentence.
             // Wait for queue to drain, then return to idle.
+            // Clear any previous watcher before starting a new one.
+            if (drainWatcherRef.current) clearInterval(drainWatcherRef.current);
+            if (drainSafetyRef.current) clearTimeout(drainSafetyRef.current);
             const drainWatcher = setInterval(() => {
               setDisplayMessages((prev) => {
                 const msg = prev.find((m) => m.id === assistantMessageId);
                 if (msg && msg.activeSentenceIdx === -1) {
                   clearInterval(drainWatcher);
+                  if (drainWatcherRef.current === drainWatcher) drainWatcherRef.current = null;
                   setState('idle');
                   scheduleHideControls();
                 }
                 return prev;
               });
             }, 400);
+            drainWatcherRef.current = drainWatcher;
             // Safety timeout
-            setTimeout(() => {
+            drainSafetyRef.current = setTimeout(() => {
               clearInterval(drainWatcher);
+              if (drainWatcherRef.current === drainWatcher) drainWatcherRef.current = null;
+              drainSafetyRef.current = null;
               setState((cur) => cur === 'speaking' || cur === 'streaming' ? 'idle' : cur);
             }, 60000);
           }
@@ -1271,6 +1283,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       })
       .catch((e) => console.error('[Conversation] daily-content fetch failed:', e));
   }, [showPrayerModal, showSacredTextModal, showReflectionModal, belief.id, dailyContent]);
+
+  // Clear any in-flight TTS drain watcher on unmount so setInterval
+  // doesn't keep firing setState on an unmounted component.
+  useEffect(() => {
+    return () => {
+      if (drainWatcherRef.current) {
+        clearInterval(drainWatcherRef.current);
+        drainWatcherRef.current = null;
+      }
+      if (drainSafetyRef.current) {
+        clearTimeout(drainSafetyRef.current);
+        drainSafetyRef.current = null;
+      }
+    };
+  }, []);
 
   // Divine: save memory checkpoint on unmount (conversation end)
   useEffect(() => {
