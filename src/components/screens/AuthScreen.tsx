@@ -212,6 +212,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(''); }}
                   placeholder="Email"
+                  aria-label="Email"
                   autoComplete="email"
                   required
                   style={{
@@ -237,6 +238,8 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(''); }}
                     placeholder="Password"
+                    aria-label="Password"
+                    aria-describedby="password-hint"
                     autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     required
                     style={{
@@ -262,7 +265,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
                     <EyeIcon visible={showPassword} />
                   </button>
                 </div>
-                <p className="mt-2" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.35)' }}>
+                <p id="password-hint" className="mt-2" style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.35)' }}>
                   Minimum 8 characters
                 </p>
               </div>
