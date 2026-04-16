@@ -42,7 +42,7 @@ const BeliefCard = memo(function BeliefCard({
       onMouseLeave={() => setIsHovered(false)}
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}
-      aria-label={`Select ${belief.name} - ${belief.subtitle}. ${belief.description}`}
+      aria-label={`Select ${belief.name}`}
       className="w-full text-left belief-card"
       style={{
         height: '130px',
