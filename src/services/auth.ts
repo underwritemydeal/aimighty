@@ -1,5 +1,18 @@
 import type { User } from '../types';
 import type { LanguageCode } from '../data/translations';
+import { safeSetItem, safeGetItem, safeRemoveItem } from './safeStorage';
+
+// Wrap a Storage.setItem call so a Private Mode / quota throw cannot
+// bubble up mid-signup or mid-sign-in. localStorage writes go through
+// safeSetItem; sessionStorage calls still need a guard here because
+// sessionStorage can also throw in restricted contexts.
+function trySetItem(storage: Storage, key: string, value: string): void {
+  try {
+    storage.setItem(key, value);
+  } catch {
+    /* swallow — caller proceeds with in-memory state */
+  }
+}
 
 // Disposable email domains to block
 const DISPOSABLE_DOMAINS = [
@@ -32,22 +45,22 @@ const REMEMBER_ME_KEY = 'aimighty_remember_me';
 
 // Helper to get storage (localStorage if remembered, sessionStorage if not)
 function getStorage(): Storage {
-  const remembered = localStorage.getItem(REMEMBER_ME_KEY) === 'true';
+  const remembered = safeGetItem(REMEMBER_ME_KEY) === 'true';
   return remembered ? localStorage : sessionStorage;
 }
 
 // Set remember me preference
 export function setRememberMe(remember: boolean): void {
   if (remember) {
-    localStorage.setItem(REMEMBER_ME_KEY, 'true');
+    safeSetItem(REMEMBER_ME_KEY, 'true');
   } else {
-    localStorage.removeItem(REMEMBER_ME_KEY);
+    safeRemoveItem(REMEMBER_ME_KEY);
   }
 }
 
 // Get remember me preference
 export function getRememberMe(): boolean {
-  return localStorage.getItem(REMEMBER_ME_KEY) === 'true';
+  return safeGetItem(REMEMBER_ME_KEY) === 'true';
 }
 
 // Session interface
@@ -107,7 +120,7 @@ function simpleHash(str: string): string {
 // Get stored accounts
 function getStoredAccounts(): Record<string, { passwordHash: string; userId: string }> {
   try {
-    const stored = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    const stored = safeGetItem(ACCOUNTS_STORAGE_KEY);
     return stored ? JSON.parse(stored) : {};
   } catch {
     return {};
@@ -118,16 +131,16 @@ function getStoredAccounts(): Record<string, { passwordHash: string; userId: str
 function saveAccount(email: string, passwordHash: string, userId: string): void {
   const accounts = getStoredAccounts();
   accounts[email.toLowerCase()] = { passwordHash, userId };
-  localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+  safeSetItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
 }
 
 // Get current user from storage
 export function getCurrentUser(): User | null {
   try {
     // Check localStorage first (remembered), then sessionStorage
-    let stored = localStorage.getItem(USER_STORAGE_KEY);
+    let stored = safeGetItem(USER_STORAGE_KEY);
     if (!stored) {
-      stored = sessionStorage.getItem(USER_STORAGE_KEY);
+      try { stored = sessionStorage.getItem(USER_STORAGE_KEY); } catch { stored = null; }
     }
     if (!stored) return null;
     return JSON.parse(stored) as User;
@@ -141,16 +154,16 @@ function saveUser(user: User, rememberMe?: boolean): void {
   const storage = rememberMe !== undefined
     ? (rememberMe ? localStorage : sessionStorage)
     : getStorage();
-  storage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+  trySetItem(storage, USER_STORAGE_KEY, JSON.stringify(user));
 }
 
 // Get current session — honors expiry for "remember me" sessions
 export function getSession(): Session | null {
   try {
     // Check localStorage first (remembered), then sessionStorage
-    let stored = localStorage.getItem(SESSION_STORAGE_KEY);
+    let stored = safeGetItem(SESSION_STORAGE_KEY);
     if (!stored) {
-      stored = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      try { stored = sessionStorage.getItem(SESSION_STORAGE_KEY); } catch { stored = null; }
     }
     if (!stored) return null;
     const session = JSON.parse(stored) as Session;
@@ -175,7 +188,7 @@ export function saveSession(session: Session, rememberMe?: boolean): void {
     // Refresh 30-day expiry on every save when remembered
     expiresAt: remember ? Date.now() + SESSION_EXPIRY_MS : undefined,
   };
-  storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(toStore));
+  trySetItem(storage, SESSION_STORAGE_KEY, JSON.stringify(toStore));
 }
 
 // Update session with belief system
@@ -307,11 +320,11 @@ export async function signIn(email: string, password: string, rememberMe: boolea
 // Sign out
 export function signOut(): void {
   // Clear from both storages
-  localStorage.removeItem(USER_STORAGE_KEY);
-  localStorage.removeItem(SESSION_STORAGE_KEY);
-  localStorage.removeItem(REMEMBER_ME_KEY);
-  sessionStorage.removeItem(USER_STORAGE_KEY);
-  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  safeRemoveItem(USER_STORAGE_KEY);
+  safeRemoveItem(SESSION_STORAGE_KEY);
+  safeRemoveItem(REMEMBER_ME_KEY);
+  try { sessionStorage.removeItem(USER_STORAGE_KEY); } catch { /* ignore */ }
+  try { sessionStorage.removeItem(SESSION_STORAGE_KEY); } catch { /* ignore */ }
 }
 
 // Check if user is logged in (has valid session)
