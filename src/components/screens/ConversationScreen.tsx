@@ -1490,8 +1490,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         >
           {/* Vertical centering wrapper - centers content when only greeting */}
           {/* Desktop: max-width 800px centered. Mobile: full width */}
+          {/* a11y: role=log + aria-live=polite announces new/streaming
+              assistant text to screen-reader users. aria-atomic=false so
+              each token update is read incrementally rather than re-reading
+              the entire thread on every mutation. */}
           <div
             className="mx-auto flex flex-col"
+            role="log"
+            aria-live="polite"
+            aria-atomic="false"
+            aria-relevant="additions text"
             style={{
               minHeight: '100%',
               maxWidth: 'min(800px, 100%)',
@@ -1929,6 +1937,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       {showFreeLimitBanner && (
         <div
           className="fixed left-0 right-0 z-40 px-6"
+          role="alert"
+          aria-live="assertive"
           style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 180px)' }}
         >
           <div
@@ -1990,6 +2000,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       {dailyLimitMessage && (
         <div
           className="fixed left-0 right-0 z-40 px-6"
+          role="alert"
+          aria-live="assertive"
           style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 120px)' }}
         >
           <div
