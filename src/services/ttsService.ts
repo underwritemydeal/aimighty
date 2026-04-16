@@ -9,6 +9,8 @@
  * ElevenLabs: Custom cloned voice, ~$0.03-0.05/conversation, most human-sounding
  */
 
+import { safeSetItem, safeGetItem } from './safeStorage';
+
 let audioContext: AudioContext | null = null;
 let analyserNode: AnalyserNode | null = null;
 let onAudioLevelCallback: ((level: number) => void) | null = null;
@@ -20,8 +22,7 @@ let hasTestedTTS = false;
 // Voice enabled state with localStorage persistence
 const VOICE_STORAGE_KEY = 'aimighty-voice-enabled';
 let voiceEnabled = (() => {
-  if (typeof window === 'undefined') return true;
-  const stored = localStorage.getItem(VOICE_STORAGE_KEY);
+  const stored = safeGetItem(VOICE_STORAGE_KEY);
   return stored === null ? true : stored === 'true';
 })();
 
@@ -443,9 +444,7 @@ export function isSpeaking(): boolean {
 export function setVoiceEnabled(enabled: boolean): void {
   log('setVoiceEnabled:', enabled);
   voiceEnabled = enabled;
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(VOICE_STORAGE_KEY, String(enabled));
-  }
+  safeSetItem(VOICE_STORAGE_KEY, String(enabled));
   if (!enabled) stop();
 }
 
