@@ -1,15 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { LandingPage } from './components/screens/LandingPage';
-import { WelcomeScreen } from './components/screens/WelcomeScreen';
-import { AuthScreen } from './components/screens/AuthScreen';
-import { BeliefSelector } from './components/screens/BeliefSelector';
-import { BeliefWelcomeScreen } from './components/screens/BeliefWelcomeScreen';
-import { ConversationScreen } from './components/screens/ConversationScreen';
-import { PaywallScreen } from './components/screens/PaywallScreen';
-import { AboutScreen } from './components/screens/AboutScreen';
-import { PrivacyScreen } from './components/screens/PrivacyScreen';
-import { TermsScreen } from './components/screens/TermsScreen';
-import { ArticlePage } from './components/screens/ArticlePage';
+// Route-level code splitting: keep LandingPage eager (most common entry,
+// LCP-critical); lazy-load everything else so the landing bundle stays small.
+const WelcomeScreen = lazy(() => import('./components/screens/WelcomeScreen').then(m => ({ default: m.WelcomeScreen })));
+const AuthScreen = lazy(() => import('./components/screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
+const BeliefSelector = lazy(() => import('./components/screens/BeliefSelector').then(m => ({ default: m.BeliefSelector })));
+const BeliefWelcomeScreen = lazy(() => import('./components/screens/BeliefWelcomeScreen').then(m => ({ default: m.BeliefWelcomeScreen })));
+const ConversationScreen = lazy(() => import('./components/screens/ConversationScreen').then(m => ({ default: m.ConversationScreen })));
+const PaywallScreen = lazy(() => import('./components/screens/PaywallScreen').then(m => ({ default: m.PaywallScreen })));
+const AboutScreen = lazy(() => import('./components/screens/AboutScreen').then(m => ({ default: m.AboutScreen })));
+const PrivacyScreen = lazy(() => import('./components/screens/PrivacyScreen').then(m => ({ default: m.PrivacyScreen })));
+const TermsScreen = lazy(() => import('./components/screens/TermsScreen').then(m => ({ default: m.TermsScreen })));
+const ArticlePage = lazy(() => import('./components/screens/ArticlePage').then(m => ({ default: m.ArticlePage })));
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
 import { getLastBelief, setLastBelief, clearLastBelief, setDivine } from './services/tierService';
 import { safeSetItem, safeGetItem } from './services/safeStorage';
@@ -358,6 +360,7 @@ function App() {
           transition: 'opacity 450ms var(--ease-out-expo)',
         }}
       >
+        <Suspense fallback={<div style={{ minHeight: '100dvh', background: 'var(--color-void)' }} aria-hidden="true" />}>
         {currentScreen === 'article' && articleRoute && (
           <ArticlePage
             belief={articleRoute.belief}
@@ -461,6 +464,7 @@ function App() {
         {currentScreen === 'terms' && (
           <TermsScreen onBack={() => handleNavigate('welcome')} />
         )}
+        </Suspense>
       </div>
     </div>
   );
