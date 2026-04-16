@@ -2154,48 +2154,88 @@ ${beliefSystemPrompt.substring(0, 400)}`;
       // Cost logging
       console.log('[COST] Claude API call - belief:', beliefSystem, 'messages:', historyMessages.length, 'estimated_input_tokens:', estimatedInputTokens);
 
-      // Call Claude API with streaming and prompt caching
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'prompt-caching-2024-07-31',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 140,
-          stream: true,
-          system: [
-            {
-              type: 'text',
-              text: systemPrompt,
-              cache_control: { type: 'ephemeral' },
+      // Call Claude API with streaming and prompt caching.
+      // We retry once on failure (network hiccup, overload, stream idle
+      // timeout from Anthropic's infra). A 25-second AbortController timeout
+      // prevents the Cloudflare Worker from hanging until its own CPU limit.
+      const MAX_ATTEMPTS = 2;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': env.ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'anthropic-beta': 'prompt-caching-2024-07-31',
             },
-          ],
-          messages: historyMessages,
-        }),
-      });
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 140,
+              stream: true,
+              system: [
+                {
+                  type: 'text',
+                  text: systemPrompt,
+                  cache_control: { type: 'ephemeral' },
+                },
+              ],
+              messages: historyMessages,
+            }),
+          });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Claude API error:', errorText);
-        return new Response(
-          JSON.stringify({ error: 'AI service temporarily unavailable' }),
-          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Claude API error (attempt ${attempt}):`, errorText);
+            // Retry on 529 (overloaded) or 500+ server errors
+            if (attempt < MAX_ATTEMPTS && response.status >= 500) {
+              console.log('[CHAT] Retrying after server error...');
+              continue;
+            }
+            return new Response(
+              JSON.stringify({ error: 'AI service temporarily unavailable' }),
+              { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          // Forward the SSE stream
+          return new Response(response.body, {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+            },
+          });
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          const isAbort = fetchErr instanceof Error && fetchErr.name === 'AbortError';
+          console.error(`[CHAT] fetch failed (attempt ${attempt}, abort=${isAbort}):`, fetchErr);
+          if (attempt < MAX_ATTEMPTS) {
+            console.log('[CHAT] Retrying...');
+            continue;
+          }
+          return new Response(
+            JSON.stringify({
+              error: isAbort
+                ? 'Response took too long. Please try again.'
+                : 'AI service temporarily unavailable',
+            }),
+            { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
-
-      // Forward the SSE stream
-      return new Response(response.body, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
-      });
+      // Should never reach here, but satisfy TS
+      return new Response(
+        JSON.stringify({ error: 'AI service temporarily unavailable' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } catch (error) {
       console.error('Worker error:', error);
       return new Response(

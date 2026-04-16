@@ -1,7 +1,7 @@
 # AImighty Project Instructions
 
 **Voice AI for spiritual guidance across 14 belief systems.**
-**Last Updated: April 15, 2026 (post landing-redesign + hero bg fix)**
+**Last Updated: April 16, 2026 (response shortening + refund compliance + mobile UX fixes)**
 
 ## What This Is
 
@@ -19,10 +19,10 @@ God (in all 14 forms) is: warm, accessible, occasionally funny when appropriate,
 | **Styling** | Tailwind CSS v4 + Glass morphism |
 | **Visual** | Midjourney AI-generated divine figure images (9:16) |
 | **Backend** | Cloudflare Workers (serverless + cron) |
-| **AI Chat** | Claude API (`claude-sonnet-4-20250514`) via streaming SSE |
-| **TTS** | OpenAI `gpt-4o-mini-tts` (Onyx/Ash/Coral) — Divine tier only |
+| **AI Chat** | Claude API (`claude-sonnet-4-20250514`) via streaming SSE, `max_tokens: 140` |
+| **TTS** | Smallest AI Lightning V3.1/V2 (5 voice characters) — Divine tier only |
 | **Browser TTS** | `window.speechSynthesis` — Believer tier only |
-| **STT** | Web Speech API (free, browser-native) |
+| **STT** | Web Speech API (free, browser-native, cached instance to avoid iOS re-prompts) |
 | **Storage** | Cloudflare KV (articles, subscribers, tiers, daily content) |
 | **Auth** | Email/password with localStorage/sessionStorage + rememberMe |
 | **Payments** | Stripe Checkout (subscription) — price IDs in `src/config/stripe.ts` |
@@ -62,13 +62,13 @@ Aimighty/
     │   │   └── TermsScreen.tsx        # /terms (dark)
     │   ├── services/
     │   │   ├── claudeApi.ts           # Streaming Claude + summarizeConversation
-    │   │   ├── openaiTTS.ts           # OpenAI TTS + sentence queue + word highlight
-    │   │   ├── speechInput.ts         # Web Speech API
-    │   │   ├── auth.ts                # Session + 30-day rememberMe expiry
+    │   │   ├── openaiTTS.ts           # Smallest AI TTS + sentence queue + word highlight + pause/resume
+    │   │   ├── speechInput.ts         # Web Speech API (cached SpeechRecognition instance)
+    │   │   ├── auth.ts                # Session + 30-day rememberMe + lastEmail auto-populate
     │   │   └── tierService.ts         # Tier, daily counter, streak, memory
     │   ├── config/
     │   │   ├── beliefSystems.ts       # Canonical IDs, aliases, greetings
-    │   │   └── stripe.ts              # Price IDs (fill from Stripe dashboard)
+    │   │   └── stripe.ts              # Price IDs + startCheckout + openBillingPortal
     │   └── data/
     │       ├── beliefSystems.ts       # 14 beliefs w/ selfDescription
     │       └── translations.ts        # i18n (15+ languages)
@@ -114,18 +114,23 @@ Stored via `getTier()` in `src/services/tierService.ts`. MVP:
 - Logged in + `localStorage.aimighty_tier === 'divine'` → `'divine'`
 - Otherwise logged in → `'believer'`
 
-Authoritative tier comes from Stripe via worker `/user-tier?userId=` (KV-backed, 35-day TTL).
+Authoritative tier comes from Stripe via worker `/user-tier?userId=` (KV-backed JSON `UserTierRecord`, 400-day TTL for annual / 40-day for monthly).
 
 | Tier | Price | Messages | Voice | Memory | Daily Content |
 |---|---|---|---|---|---|
-| **Free (Seeker)** | $0 | 3 lifetime | — | — | 🔒 (upgrade to unlock) |
+| **Free (Seeker)** | $0 | 3 lifetime | — | — | locked (upgrade to unlock) |
 | **Believer** | $4.99/mo · $47/yr | 10/day | Browser SpeechSynthesis | — | ✓ |
-| **Divine** | $14.99/mo · $119/yr | 20/day | OpenAI gpt-4o-mini-tts (Onyx/Ash/Coral) + sentence queue + word highlight | ✓ (rolling, per-belief) | ✓ |
+| **Divine** | $14.99/mo · $119/yr | 20/day | Smallest AI Lightning V3.1/V2 (5 voices) + sentence queue + word highlight | ✓ (rolling, per-belief) | ✓ |
 
 **TTS routing** (ConversationScreen `speakResponse`):
-- `'divine'` → OpenAI sentence queue (iOS persistent audio element, `ontimeupdate`-driven word index)
+- `'divine'` → Smallest AI Lightning TTS sentence queue (~$0.005/1k chars) with persistent audio element, `ontimeupdate`-driven word index, pause/resume support
 - `'believer'` → `window.speechSynthesis.speak()` once per response
 - `'free'` → no TTS
+
+**TTS audio behavior:**
+- Tap on screen does NOT stop audio (unlockMobileAudio early-returns if already unlocked)
+- If audio is paused (e.g. iOS backgrounding), tap resumes from where it left off via `resumeAudio()`
+- `pauseAudio()` / `resumeAudio()` / `isAudioPaused()` exported from `openaiTTS.ts` for future use
 
 **Daily counter** (`aimighty_daily` in localStorage): `{date, count, tier}`. Resets on date change. Only user messages count; God's greeting and God's response don't. Limit hits show an inline banner (not paywall redirect) for Believer/Divine.
 
@@ -228,7 +233,7 @@ KV namespace `ARTICLES` binding id `8e9f4fd21df54bb985d6bfcb3e414910` holds:
 - `generation:history` — topic rotation history
 - `email-subscriber:<email>` — subscriber record
 - `email-subscribers-list` — email index
-- `user-tier:<userId>` — paid tier from Stripe webhook
+- `user-tier:<userId>` — paid tier from Stripe webhook (JSON `UserTierRecord`)
 
 ## Email Newsletter
 
@@ -257,8 +262,22 @@ Signup forms live on LandingPage (between Pricing and FAQ) and PaywallScreen (fa
 - **Price IDs** in `src/config/stripe.ts` — fill from Stripe dashboard once products exist. Until populated, `isStripeConfigured()` returns false and PaywallScreen shows "Coming Soon".
 - **Products needed:** Believer Monthly ($4.99) · Believer Annual ($47) · Divine Monthly ($14.99) · Divine Annual ($119)
 - **Flow:** PaywallScreen CTA → `startCheckout()` → POST `/create-checkout-session` → Stripe Checkout → success redirect to `/app?upgraded=true`
-- **Webhook:** `checkout.session.completed` → map priceId → tier → write `user-tier:<userId>` to KV with 35-day TTL
-- **On app load:** `fetchUserTier(userId)` reads authoritative tier from worker, overrides localStorage
+- **Checkout session** includes: `consent_collection[terms_of_service]=required` (EU/UK Art. 16(m) waiver), `billing_address_collection=required` (region detection), `subscription_data[metadata][userId]` (so `customer.subscription.deleted` can revoke tier), `allow_promotion_codes=true`.
+- **Webhook** handles 3 events: `checkout.session.completed` (writes full `UserTierRecord` JSON to KV), `customer.subscription.deleted` (revokes tier), `customer.subscription.updated` (records `cancelledAt` for scheduled cancellation).
+- **Price → tier mapping**: deterministic via `STRIPE_PRICE_{BELIEVER,DIVINE}_{MONTHLY,ANNUAL}` env secrets matched against checkout metadata. Falls back to substring heuristic if env secrets aren't set.
+- **On app load:** `fetchUserTier(userId)` reads authoritative tier from worker, overrides localStorage.
+- **Self-service cancel:** `openBillingPortal(userId)` in `src/config/stripe.ts` → POST `/create-portal-session` → Stripe Billing Portal URL → user can cancel, update payment, download invoices. Required for CA SB-313 and FTC Click-to-Cancel.
+- **Refund eligibility:** `computeRefundEligibility()` in `worker/index.ts` — eligible IFF `firstMessageAt === null` AND within 14 days of `activatedAt`. Support queries `/refund-eligibility?userId=<id>` for a deterministic `{eligible, reason}` response.
+
+## Refund Policy
+
+**All sales final once used.** Codified in ToS §4.4–4.6:
+- Monthly: non-refundable once charged.
+- Annual: non-refundable for the full 12-month term once used.
+- **Zero-use exception:** full refund if user has NOT sent any messages AND is within 14 days of purchase. Enforced server-side via `firstMessageAt` on the `UserTierRecord`.
+- **EU/UK/EEA (§4.5):** Explicit right-of-withdrawal waiver citing Directive 2011/83/EU Art. 16(m) and UK CCR 2013 Reg. 37. Waiver activates on first message; user retains full statutory right until then.
+- **California/US (§4.6):** Auto-renewal disclosures per CA Bus. & Prof. Code §§17600–17606. Self-service cancellation via Stripe Billing Portal satisfies SB-313.
+- **PaywallScreen disclosure:** visible before checkout, references waiver language + support email + /terms link.
 
 ## SEO Article Pages
 
@@ -291,8 +310,10 @@ Applied to all 14 belief prompts via string interpolation. Contains:
 1. **PURPOSE** — judgment-free listening, not conversion
 2. **DISCLOSURE RULE** — honest about being AI
 3. **TONE AWARENESS** — humor when appropriate, gravity when the room turns serious
-4. **RESPONSE LENGTH RULES** — 1-2 sentences for greetings, up to 2-4 for substantive responses
-5. **HARD CAP** — "2-4 sentences maximum. You are in conversation, not giving a sermon."
+4. **RESPONSE LENGTH RULES** — 1 sentence for greetings, 1-2 simple, 2-3 medium, 3 deep
+5. **HARD CAP** — "2-3 sentences maximum. 1 sentence for greetings. Never exceed this."
+
+Each belief's `RESPONSE DEPTH` block reinforces the HARD CAP and instructs Claude to deliver depth through **specificity** (exact verses, real names, real numbers) rather than length. This resolved a prior contradiction where belief prompts said "5-10 sentences for deeper questions" which overrode the HARD CAP.
 
 ## Design System
 
@@ -324,7 +345,7 @@ import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designS
 - **Never use `backgroundAttachment: 'fixed'`** — iOS Safari disables it and renders the background incorrectly (zoom/clip bug). Always `scroll`.
 - ConversationScreen / belief card background divs use `backgroundSize: 'cover'` + `backgroundPosition: 'top center'`
 - **LandingPage mobile hero** is the exception: `backgroundSize: 'contain'` + `backgroundColor: colors.void` so the full 9:16 cosmic image renders without cropping on narrow iPhones
-- ConversationScreen input bar: `position: fixed; bottom: 0; padding-bottom: env(safe-area-inset-bottom)` — slides off during TTS
+- ConversationScreen input bar: `position: fixed; bottom: var(--kb-offset, 0px); padding-bottom: env(safe-area-inset-bottom)` — slides off during TTS via `transform: translateY(100%)`. The `--kb-offset` CSS variable is set by a `visualViewport` listener in ConversationScreen that tracks the iOS software keyboard height. On iOS, an extra 44px buffer accounts for Safari's form accessory bar (domain pill + prev/next/Done row) which overlays the visual viewport without being subtracted from `visualViewport.height`.
 - Safe-area padding on content wrappers, NOT on the background image
 - God's text: **desktop centered**, **mobile left-aligned** (easier to read on narrow screens)
 
@@ -346,6 +367,16 @@ import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designS
   - OFF → sessionStorage (cleared when tab closes)
 - `getSession()` auto-expires on access when past `expiresAt`
 - Rate limits: 50 msgs/hour, 500 char max input
+- **Returning user experience:** `setLastEmail()` is called on successful signUp/signIn, persisting to `aimighty_last_email` in localStorage. AuthScreen defaults to the Sign In tab (not Sign Up) if `hasSignedInBefore()` is true, and pre-populates the email field from `getLastEmail()`. First-time visitors still see Create Account.
+
+## Speech Input (STT)
+- Uses `window.SpeechRecognition` / `webkitSpeechRecognition` (free, browser-native)
+- **Cached instance:** `speechInput.ts` caches the `SpeechRecognition` instance at module level (`cachedRecognition`) and reuses it across `startListening()` calls. Only `instance.lang` is updated when the user changes language. This prevents iOS Safari from re-prompting for microphone permission on every mic tap (iOS prompts per-instance, not per-start).
+
+## Belief Welcome Screen
+- Shows a cinematic quote overlay before entering the conversation
+- **70 rotating quotes:** `welcomeMessages` is `Record<string, string[]>` with 5 quotes per belief × 14 beliefs. `pickWelcome()` selects one randomly on mount via `useState` initializer.
+- **Timing:** bg fade-in at 300ms, quote fade-in at 800ms, auto-continue at 5800ms (~4s of fully readable quote time). Tap-to-skip is always available.
 
 ## Safety Guardrails (Non-Negotiable)
 1. Mental health crisis → 988 Suicide & Crisis Lifeline

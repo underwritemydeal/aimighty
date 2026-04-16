@@ -53,8 +53,15 @@ export async function sendMessage(
   };
   console.log('[ClaudeAPI] Request body:', JSON.stringify(requestBody, null, 2));
 
+  // Client-side retry: if the first attempt fails with a 5xx, stream idle
+  // timeout, or network error, wait 1.5s and retry once. The worker also
+  // retries internally, so the user gets up to 2 × 2 = 4 total attempts
+  // before seeing an error.
+  const MAX_CLIENT_ATTEMPTS = 2;
+
+  for (let clientAttempt = 1; clientAttempt <= MAX_CLIENT_ATTEMPTS; clientAttempt++) {
   try {
-    console.log('[ClaudeAPI] Sending fetch request...');
+    console.log(`[ClaudeAPI] Sending fetch request (attempt ${clientAttempt})...`);
     const response = await fetch(WORKER_URL, {
       method: 'POST',
       headers: {
@@ -66,8 +73,6 @@ export async function sendMessage(
 
     console.log('=== CLAUDE API RESPONSE ===');
     console.log('[ClaudeAPI] Response status:', response.status);
-    console.log('[ClaudeAPI] Response statusText:', response.statusText);
-    console.log('[ClaudeAPI] Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -79,7 +84,12 @@ export async function sendMessage(
       } catch {
         errorMessage = errorText || errorMessage;
       }
-      console.error('[ClaudeAPI] Parsed error:', errorMessage);
+      // Retry on server errors (502, 504, 529) before giving up
+      if (clientAttempt < MAX_CLIENT_ATTEMPTS && response.status >= 500) {
+        console.log('[ClaudeAPI] Retrying after', response.status, '...');
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
       throw new Error(errorMessage);
     }
 
@@ -183,13 +193,26 @@ export async function sendMessage(
       callbacks.onSentence(currentSentence.trim());
     }
     callbacks.onComplete(fullText);
+    return; // Success — exit the retry loop
   } catch (error) {
     console.error('=== CLAUDE API ERROR ===');
-    console.error('[ClaudeAPI] Error:', error);
-    console.error('[ClaudeAPI] Error type:', error instanceof Error ? error.constructor.name : typeof error);
-    console.error('[ClaudeAPI] Error message:', error instanceof Error ? error.message : String(error));
+    console.error(`[ClaudeAPI] Error (attempt ${clientAttempt}):`, error instanceof Error ? error.message : String(error));
+    // Retry on network / stream errors before giving up
+    if (clientAttempt < MAX_CLIENT_ATTEMPTS) {
+      const msg = error instanceof Error ? error.message : '';
+      const isRetryable = msg.includes('timeout') || msg.includes('idle') ||
+        msg.includes('network') || msg.includes('fetch') || msg.includes('502') ||
+        msg.includes('504') || msg.includes('temporarily');
+      if (isRetryable) {
+        console.log('[ClaudeAPI] Retrying after stream error...');
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+    }
     callbacks.onError(error instanceof Error ? error : new Error(String(error)));
+    return;
   }
+  } // end retry loop
 }
 
 /**
