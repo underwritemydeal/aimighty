@@ -17,6 +17,7 @@ import {
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
+import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -1234,7 +1235,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       try { setDailyContent(JSON.parse(cached)); return; } catch { /* fall through */ }
     }
     const workerUrl = 'https://aimighty-api.robby-hess.workers.dev';
-    fetch(`${workerUrl}/daily-content?belief=${encodeURIComponent(belief.id)}`)
+    // 10s budget for daily-content JSON.
+    fetchWithTimeout(`${workerUrl}/daily-content?belief=${encodeURIComponent(belief.id)}`, {}, 10000)
       .then((r) => r.ok ? r.json() : Promise.reject(new Error('failed')))
       .then((data: DailyContent) => {
         setDailyContent(data);
@@ -1274,7 +1276,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     setArticleLoading(true);
     setDailyArticle(null);
     const workerUrl = 'https://aimighty-api.robby-hess.workers.dev';
-    fetch(`${workerUrl}/daily-article?belief=${encodeURIComponent(belief.id)}`)
+    // 15s budget for article JSON — larger payload, but bounded.
+    fetchWithTimeout(`${workerUrl}/daily-article?belief=${encodeURIComponent(belief.id)}`, {}, 15000)
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`)))
       .then((data: DailyArticle) => setDailyArticle(data))
       .catch((e) => {
