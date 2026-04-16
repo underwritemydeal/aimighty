@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { beliefSystems } from '../../data/beliefSystems';
 import { normalizeBeliefId } from '../../config/beliefSystems';
+import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 
 interface ArticlePageProps {
   belief: string;
@@ -41,7 +42,8 @@ export function ArticlePage({ belief, slug: _slug, onBackToHome, onEnterApp }: A
   const imagePath = beliefData?.imagePath || `/images/avatars/${normalized}.jpg`;
 
   useEffect(() => {
-    fetch(`${WORKER_URL}/daily-article?belief=${encodeURIComponent(normalized)}`)
+    // 15s budget for article JSON.
+    fetchWithTimeout(`${WORKER_URL}/daily-article?belief=${encodeURIComponent(normalized)}`, {}, 15000)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: Article) => setArticle(data))
       .catch((e) => setError(String(e)));
