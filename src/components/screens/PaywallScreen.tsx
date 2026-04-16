@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { t, type LanguageCode } from '../../data/translations';
 import { STRIPE_PRICE_IDS, startCheckout, isStripeConfigured } from '../../config/stripe';
 import { getCurrentUser } from '../../services/auth';
+import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 
 interface PaywallScreenProps {
   onBack: () => void;
@@ -50,11 +51,12 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
     if (!newsletterEmail.trim()) return;
     setNewsletterState('loading');
     try {
-      const r = await fetch('https://aimighty-api.robby-hess.workers.dev/email-signup', {
+      // 10s budget — short-path signup endpoint.
+      const r = await fetchWithTimeout('https://aimighty-api.robby-hess.workers.dev/email-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: newsletterEmail.trim() }),
-      });
+      }, 10000);
       setNewsletterState(r.ok ? 'success' : 'error');
     } catch {
       setNewsletterState('error');
