@@ -31,6 +31,10 @@
 
     <link rel="canonical" href="https://aimightyme.com/" />
 
+    <!-- LCP: preload hero (responsive) so it starts fetching with the HTML parse -->
+    <link rel="preload" as="image" href="/images/hero-mobile.jpg" media="(max-width: 767px)" fetchpriority="high" />
+    <link rel="preload" as="image" href="/images/hero-desktop.jpg" media="(min-width: 768px)" fetchpriority="high" />
+
     <!-- Premium fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
