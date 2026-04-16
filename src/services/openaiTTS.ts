@@ -54,7 +54,13 @@ function getPersistentAudio(): HTMLAudioElement {
  * Call this SYNCHRONOUSLY in onClick/onTouchEnd handlers.
  */
 export function unlockMobileAudio(): void {
-  console.log('[TTS Mobile] unlockMobileAudio called, already unlocked:', audioUnlocked);
+  // CRITICAL: early-return if already unlocked. Before this guard, every tap
+  // on the conversation screen was setting the persistent audio element's src
+  // to a silent MP3 — instantly killing whatever TTS response was playing.
+  // This is the root cause of "tap stops the voice".
+  if (audioUnlocked) return;
+
+  console.log('[TTS Mobile] unlockMobileAudio called (first unlock)');
 
   const audio = getPersistentAudio();
 
@@ -278,7 +284,8 @@ export async function speakWithOpenAI(
 }
 
 /**
- * Stop current audio playback
+ * Stop current audio playback and clear the sentence queue. This is a full
+ * stop — use pauseAudio() + resumeAudio() if you want reversible pause.
  */
 export function stop(): void {
   if (persistentAudio) {
@@ -294,6 +301,56 @@ export function stop(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     speechSynthesis.cancel();
   }
+}
+
+/**
+ * Pause current audio playback WITHOUT resetting currentTime. The queue stays
+ * intact. A subsequent resumeAudio() call will pick up from where it left off.
+ */
+export function pauseAudio(): void {
+  if (persistentAudio && !persistentAudio.paused && !persistentAudio.ended) {
+    persistentAudio.pause();
+    console.log('[TTS] audio paused at', persistentAudio.currentTime);
+  }
+}
+
+/**
+ * Resume audio that was previously paused by pauseAudio() or by the iOS Safari
+ * backgrounding interruption. Returns true if a resume actually happened.
+ * No-op if there's nothing to resume (never played, already playing, or ended).
+ */
+export function resumeAudio(): boolean {
+  if (!persistentAudio) return false;
+  // Conditions to resume: currently paused, not ended, and has some playback
+  // progress (so we know this isn't just a freshly-initialized element).
+  if (
+    persistentAudio.paused &&
+    !persistentAudio.ended &&
+    persistentAudio.currentTime > 0 &&
+    persistentAudio.src
+  ) {
+    const at = persistentAudio.currentTime;
+    persistentAudio.play().then(
+      () => console.log('[TTS] audio resumed from', at),
+      (e) => console.warn('[TTS] resume failed:', e)
+    );
+    return true;
+  }
+  return false;
+}
+
+/**
+ * True iff there is a paused-but-not-ended audio that can be resumed.
+ * Used by screen-tap handlers to decide whether to resume speech on tap.
+ */
+export function isAudioPaused(): boolean {
+  if (!persistentAudio) return false;
+  return (
+    persistentAudio.paused &&
+    !persistentAudio.ended &&
+    persistentAudio.currentTime > 0 &&
+    persistentAudio.src.length > 0
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════
