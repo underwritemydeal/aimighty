@@ -219,6 +219,43 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
             />
           </div>
 
+          {/* Refund policy disclosure */}
+          <div
+            className="text-center"
+            style={{
+              maxWidth: '620px',
+              margin: '32px auto 0',
+              padding: '16px 20px',
+              background: 'rgba(212,175,55,0.04)',
+              border: '1px solid rgba(212,175,55,0.15)',
+              borderRadius: '12px',
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '0.78rem',
+              lineHeight: 1.6,
+              color: 'rgba(255,248,240,0.6)',
+            }}
+          >
+            <strong style={{ color: 'rgba(212,175,55,0.9)', fontWeight: 500 }}>
+              All sales final.
+            </strong>{' '}
+            Monthly and annual subscriptions are non-refundable once you send your first
+            message. If you change your mind before using the Service, email{' '}
+            <a
+              href="mailto:support@aimightyme.com"
+              style={{ color: 'rgba(212,175,55,0.9)', textDecoration: 'underline' }}
+            >
+              support@aimightyme.com
+            </a>{' '}
+            within 14 days for a full refund. Cancel anytime to stop future renewals.{' '}
+            <a
+              href="/terms"
+              style={{ color: 'rgba(212,175,55,0.9)', textDecoration: 'underline' }}
+            >
+              Full terms
+            </a>
+            .
+          </div>
+
           {/* Newsletter fallback */}
           <div
             className="mt-12 text-center"
