@@ -9,6 +9,7 @@
  */
 
 import { fetchWithTimeout } from './fetchWithTimeout';
+import { safeSetItem, safeGetItem } from './safeStorage';
 
 const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 
@@ -16,15 +17,12 @@ const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 const VOICE_STORAGE_KEY = 'aimighty-voice-enabled';
 
 function getVoiceEnabled(): boolean {
-  if (typeof window === 'undefined') return true;
-  const stored = localStorage.getItem(VOICE_STORAGE_KEY);
+  const stored = safeGetItem(VOICE_STORAGE_KEY);
   return stored === null ? true : stored === 'true';
 }
 
 function setVoiceEnabledStorage(enabled: boolean): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(VOICE_STORAGE_KEY, String(enabled));
-  }
+  safeSetItem(VOICE_STORAGE_KEY, String(enabled));
 }
 
 let voiceEnabled = getVoiceEnabled();
