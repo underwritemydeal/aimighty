@@ -11,6 +11,12 @@ interface Env {
   RESEND_API_KEY?: string; // For newsletter (Resend)
   STRIPE_SECRET_KEY?: string; // For checkout + webhook
   STRIPE_WEBHOOK_SECRET?: string;
+  // Stripe price IDs — set via `wrangler secret put`. Used to deterministically
+  // map a completed checkout's priceId to a tier + cycle in the webhook.
+  STRIPE_PRICE_BELIEVER_MONTHLY?: string;
+  STRIPE_PRICE_BELIEVER_ANNUAL?: string;
+  STRIPE_PRICE_DIVINE_MONTHLY?: string;
+  STRIPE_PRICE_DIVINE_ANNUAL?: string;
 }
 
 // ═══════════════════════════════════════
@@ -804,6 +810,192 @@ async function verifyStripeSignature(payload: string, sigHeader: string, secret:
   return expected === signature;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// USER TIER RECORD — KV-backed JSON
+// ═══════════════════════════════════════════════════════════════
+//
+// `user-tier:<userId>` KV key holds a UserTierRecord as JSON. This is the
+// authoritative source for a user's paid subscription state. It's written by
+// the Stripe webhook and read by /user-tier, /refund-eligibility, and the
+// chat endpoint (to stamp firstMessageAt on first use).
+//
+// For backwards compatibility, old records are stored as the bare string
+// 'believer' or 'divine' — readUserTierRecord() promotes those into a record
+// shape with activatedAt=0 and firstMessageAt=0 so they are treated as
+// "already used" (refund-ineligible, which is safer than the alternative).
+
+interface UserTierRecord {
+  tier: 'believer' | 'divine';
+  priceId: string;
+  activatedAt: number;          // ms epoch
+  firstMessageAt: number | null; // null = never used → refund-eligible
+  region: string | null;         // ISO 3166-1 alpha-2 country code
+  consentTosAccepted: boolean;   // from Stripe consent_collection
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  cycle: 'monthly' | 'annual';
+  cancelledAt: number | null;    // set by customer.subscription.deleted
+}
+
+// EEA + UK countries that have a statutory 14-day right of withdrawal for
+// digital services under Directive 2011/83/EU Article 16(m) and the UK
+// Consumer Contracts Regulations 2013.
+const EU_UK_COUNTRIES = new Set([
+  'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT',
+  'LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO',
+  'GB',
+]);
+
+async function readUserTierRecord(
+  env: Env,
+  userId: string
+): Promise<UserTierRecord | null> {
+  if (!env.ARTICLES || !userId) return null;
+  const raw = await env.ARTICLES.get(`user-tier:${userId}`);
+  if (!raw) return null;
+  // Legacy record: bare string 'believer' or 'divine'
+  if (raw === 'believer' || raw === 'divine') {
+    return {
+      tier: raw,
+      priceId: '',
+      activatedAt: 0,
+      firstMessageAt: 0, // treat as used → ineligible for refund
+      region: null,
+      consentTosAccepted: false,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      cycle: 'monthly',
+      cancelledAt: null,
+    };
+  }
+  try {
+    const parsed = JSON.parse(raw) as UserTierRecord;
+    if (parsed && (parsed.tier === 'believer' || parsed.tier === 'divine')) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeUserTierRecord(
+  env: Env,
+  userId: string,
+  record: UserTierRecord
+): Promise<void> {
+  if (!env.ARTICLES || !userId) return;
+  // TTL: 400 days for annual (covers full term + 35-day grace),
+  // 40 days for monthly (covers billing cycle + 10-day grace).
+  // Webhook-renewed on every successful payment, so healthy subs never expire.
+  const ttlSeconds = record.cycle === 'annual' ? 400 * 86400 : 40 * 86400;
+  await env.ARTICLES.put(`user-tier:${userId}`, JSON.stringify(record), {
+    expirationTtl: ttlSeconds,
+  });
+}
+
+function priceIdToTierAndCycle(
+  priceId: string,
+  env: Env
+): { tier: 'believer' | 'divine'; cycle: 'monthly' | 'annual' } {
+  // Prefer explicit env-var mapping (production)
+  if (priceId && priceId === env.STRIPE_PRICE_BELIEVER_MONTHLY) {
+    return { tier: 'believer', cycle: 'monthly' };
+  }
+  if (priceId && priceId === env.STRIPE_PRICE_BELIEVER_ANNUAL) {
+    return { tier: 'believer', cycle: 'annual' };
+  }
+  if (priceId && priceId === env.STRIPE_PRICE_DIVINE_MONTHLY) {
+    return { tier: 'divine', cycle: 'monthly' };
+  }
+  if (priceId && priceId === env.STRIPE_PRICE_DIVINE_ANNUAL) {
+    return { tier: 'divine', cycle: 'annual' };
+  }
+  // Fallback substring heuristic (dev / pre-configured)
+  const lower = priceId.toLowerCase();
+  const tier: 'believer' | 'divine' = lower.includes('divine')
+    ? 'divine'
+    : 'believer';
+  const cycle: 'monthly' | 'annual' =
+    lower.includes('annual') || lower.includes('year') ? 'annual' : 'monthly';
+  return { tier, cycle };
+}
+
+// Refund eligibility: legal + policy combined.
+//
+// POLICY: Refunds are only issued if the user has not sent any messages under
+// the subscription AND is within 14 days of activation. This enforces the ToS
+// "zero-use exception" and simultaneously satisfies the EU/UK 14-day right of
+// withdrawal (because the user has not "performed" the digital service yet).
+//
+// Returns an `eligible` boolean plus a human-readable `reason` that support
+// can paste into a refund response.
+function computeRefundEligibility(
+  record: UserTierRecord,
+  now: number = Date.now()
+): {
+  eligible: boolean;
+  reason: string;
+  daysSincePurchase: number;
+  region: string | null;
+  euUkProtected: boolean;
+} {
+  const region = record.region;
+  const euUkProtected = region != null && EU_UK_COUNTRIES.has(region);
+  const daysSincePurchase =
+    record.activatedAt > 0
+      ? Math.floor((now - record.activatedAt) / 86400000)
+      : Infinity;
+
+  if (record.activatedAt === 0) {
+    return {
+      eligible: false,
+      reason:
+        'Legacy subscription record with no activation timestamp. Refund eligibility cannot be determined automatically — review manually in Stripe.',
+      daysSincePurchase: Infinity,
+      region,
+      euUkProtected,
+    };
+  }
+
+  if (record.firstMessageAt != null) {
+    return {
+      eligible: false,
+      reason:
+        'User has sent at least one message under this subscription. Per ToS §4.4 the purchase is final.' +
+        (euUkProtected
+          ? ' (EU/UK: the 14-day right of withdrawal was waived by express consent at checkout and lapsed on first use per Directive 2011/83/EU Art. 16(m).)'
+          : ''),
+      daysSincePurchase,
+      region,
+      euUkProtected,
+    };
+  }
+
+  if (daysSincePurchase > 14) {
+    return {
+      eligible: false,
+      reason:
+        'More than 14 days have passed since purchase. The zero-use refund window has closed.',
+      daysSincePurchase,
+      region,
+      euUkProtected,
+    };
+  }
+
+  return {
+    eligible: true,
+    reason:
+      'User has not sent any messages and is within the 14-day zero-use window. Full refund may be issued per ToS §4.4.' +
+      (euUkProtected
+        ? ' (EU/UK: user retains full right of withdrawal under Directive 2011/83/EU.)'
+        : ''),
+    daysSincePurchase,
+    region,
+    euUkProtected,
+  };
+}
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     // Cron-triggered daily email batch — 15:00 UTC (7am PST)
@@ -811,7 +1003,7 @@ export default {
       console.log('[CRON] daily emails:', r);
     }));
   },
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Handle CORS preflight
@@ -1513,8 +1705,24 @@ ${beliefSystemPrompt.substring(0, 400)}`;
         params.append('cancel_url', 'https://aimightyme.com/app');
         params.append('client_reference_id', body.userId);
         if (body.email) params.append('customer_email', body.email);
+        // Session-level metadata (available on checkout.session.completed)
         params.append('metadata[userId]', body.userId);
         params.append('metadata[priceId]', body.priceId);
+        // Subscription-level metadata (available on customer.subscription.*)
+        params.append('subscription_data[metadata][userId]', body.userId);
+        params.append('subscription_data[metadata][priceId]', body.priceId);
+        // Required ToS consent — satisfies EU/UK Art. 16(m) waiver requirement
+        // and creates an auditable record for chargeback defense.
+        params.append('consent_collection[terms_of_service]', 'required');
+        // Link to our hosted ToS — Stripe renders this next to the checkbox
+        // Stripe requires this to be set on the Account level (Settings →
+        // Public details → Terms of service link). We can't set it per-session.
+        // Billing address required for EU/UK region detection + tax compliance
+        params.append('billing_address_collection', 'required');
+        // Allow coupon codes
+        params.append('allow_promotion_codes', 'true');
+        // Automatic tax — enable in Stripe Dashboard for full EU VAT support.
+        // params.append('automatic_tax[enabled]', 'true');
 
         const stripeResp = await fetch('https://api.stripe.com/v1/checkout/sessions', {
           method: 'POST',
@@ -1565,14 +1773,65 @@ ${beliefSystemPrompt.substring(0, 400)}`;
           const obj = event.data.object as {
             client_reference_id?: string;
             metadata?: { userId?: string; priceId?: string };
+            customer_details?: { address?: { country?: string } };
+            consent?: { terms_of_service?: string };
+            customer?: string | null;
+            subscription?: string | null;
           };
           const userId = obj.client_reference_id || obj.metadata?.userId;
           const priceId = obj.metadata?.priceId || '';
           if (userId) {
-            // Map price → tier. The user configures their Stripe price IDs on both ends.
-            const tier = priceId.toLowerCase().includes('divine') ? 'divine' : 'believer';
-            await env.ARTICLES.put(`user-tier:${userId}`, tier, { expirationTtl: 35 * 24 * 60 * 60 });
-            console.log('[STRIPE] set tier', tier, 'for user', userId);
+            const { tier, cycle } = priceIdToTierAndCycle(priceId, env);
+            const record: UserTierRecord = {
+              tier,
+              priceId,
+              activatedAt: Date.now(),
+              firstMessageAt: null,
+              region: obj.customer_details?.address?.country || null,
+              consentTosAccepted: obj.consent?.terms_of_service === 'accepted',
+              stripeCustomerId: obj.customer || null,
+              stripeSubscriptionId: obj.subscription || null,
+              cycle,
+              cancelledAt: null,
+            };
+            await writeUserTierRecord(env, userId, record);
+            console.log(
+              '[STRIPE] activated', tier, cycle, 'for user', userId,
+              'region:', record.region, 'consent:', record.consentTosAccepted
+            );
+          }
+        } else if (event.type === 'customer.subscription.deleted') {
+          // Subscription fully cancelled (end of billing period reached or
+          // admin cancellation) — revoke access immediately by deleting the
+          // KV record. The user will drop to the 'free' tier on next read.
+          const obj = event.data.object as {
+            metadata?: { userId?: string };
+            id?: string;
+          };
+          const userId = obj.metadata?.userId;
+          if (userId) {
+            await env.ARTICLES.delete(`user-tier:${userId}`);
+            console.log('[STRIPE] revoked tier for user', userId, '(subscription deleted)');
+          } else {
+            console.warn('[STRIPE] subscription.deleted without metadata.userId, sub:', obj.id);
+          }
+        } else if (event.type === 'customer.subscription.updated') {
+          // Track cancellation-scheduled state. If the user clicked "Cancel at
+          // period end" in the Stripe portal, we record it but keep access
+          // until the actual deletion event fires.
+          const obj = event.data.object as {
+            metadata?: { userId?: string };
+            cancel_at_period_end?: boolean;
+            cancel_at?: number | null;
+          };
+          const userId = obj.metadata?.userId;
+          if (userId && obj.cancel_at_period_end) {
+            const existing = await readUserTierRecord(env, userId);
+            if (existing) {
+              existing.cancelledAt = (obj.cancel_at || Math.floor(Date.now() / 1000)) * 1000;
+              await writeUserTierRecord(env, userId, existing);
+              console.log('[STRIPE] user', userId, 'scheduled cancellation at', existing.cancelledAt);
+            }
           }
         }
         return new Response('ok', { status: 200 });
@@ -1591,11 +1850,125 @@ ${beliefSystemPrompt.substring(0, 400)}`;
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      const tier = await env.ARTICLES.get(`user-tier:${userId}`);
-      return new Response(JSON.stringify({ tier: tier || 'free' }), {
+      const record = await readUserTierRecord(env, userId);
+      return new Response(JSON.stringify({ tier: record?.tier || 'free' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // GET /refund-eligibility?userId=<id>
+    // Returns structured eligibility info for manual refund review. Support
+    // staff query this endpoint before issuing a refund — it's deterministic
+    // and leaves a clear audit trail in worker logs.
+    if (request.method === 'GET' && url.pathname === '/refund-eligibility') {
+      const userId = url.searchParams.get('userId') || '';
+      if (!userId || !env.ARTICLES) {
+        return new Response(
+          JSON.stringify({
+            eligible: false,
+            reason: 'Missing userId or KV not configured.',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const record = await readUserTierRecord(env, userId);
+      if (!record) {
+        return new Response(
+          JSON.stringify({
+            eligible: false,
+            reason: 'No active subscription found for this user.',
+          }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      const verdict = computeRefundEligibility(record);
+      console.log(
+        '[REFUND-CHECK] user:', userId,
+        'eligible:', verdict.eligible,
+        'days:', verdict.daysSincePurchase,
+        'region:', verdict.region,
+        'firstMessageAt:', record.firstMessageAt
+      );
+      return new Response(
+        JSON.stringify({
+          userId,
+          eligible: verdict.eligible,
+          reason: verdict.reason,
+          daysSincePurchase: verdict.daysSincePurchase,
+          region: verdict.region,
+          euUkProtected: verdict.euUkProtected,
+          activatedAt: record.activatedAt,
+          firstMessageAt: record.firstMessageAt,
+          tier: record.tier,
+          cycle: record.cycle,
+          priceId: record.priceId,
+          stripeSubscriptionId: record.stripeSubscriptionId,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // POST /create-portal-session
+    // Returns a Stripe Customer Portal URL so the user can self-serve
+    // cancellation, payment method updates, and invoice downloads. Required
+    // for California SB-313 and the FTC Click-to-Cancel rule.
+    if (request.method === 'POST' && url.pathname === '/create-portal-session') {
+      if (!env.STRIPE_SECRET_KEY) {
+        return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      try {
+        const body = (await request.json()) as { userId: string };
+        if (!body.userId) {
+          return new Response(JSON.stringify({ error: 'Missing userId' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        const record = await readUserTierRecord(env, body.userId);
+        if (!record?.stripeCustomerId) {
+          return new Response(
+            JSON.stringify({ error: 'No Stripe customer found for this user' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const portalParams = new URLSearchParams();
+        portalParams.append('customer', record.stripeCustomerId);
+        portalParams.append('return_url', 'https://aimightyme.com/app');
+        const portalResp = await fetch(
+          'https://api.stripe.com/v1/billing_portal/sessions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: portalParams.toString(),
+          }
+        );
+        if (!portalResp.ok) {
+          const err = await portalResp.text();
+          console.error('[STRIPE] portal session error:', err);
+          return new Response(
+            JSON.stringify({ error: 'Stripe portal error' }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const session = (await portalResp.json()) as { url?: string };
+        return new Response(JSON.stringify({ portalUrl: session.url }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (e) {
+        console.error('[STRIPE] portal error:', e);
+        return new Response(JSON.stringify({ error: 'Portal failed' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // robots.txt
@@ -1724,6 +2097,25 @@ ${beliefSystemPrompt.substring(0, 400)}`;
             { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
+
+        // Stamp firstMessageAt on the user's tier record so we can determine
+        // refund eligibility later. Non-blocking (waitUntil) — never delay
+        // the chat response for a KV write. Only stamps once; subsequent
+        // messages are no-ops.
+        ctx.waitUntil(
+          (async () => {
+            try {
+              const existing = await readUserTierRecord(env, userId);
+              if (existing && existing.firstMessageAt == null) {
+                existing.firstMessageAt = Date.now();
+                await writeUserTierRecord(env, userId, existing);
+                console.log('[FIRST-USE] stamped firstMessageAt for user', userId);
+              }
+            } catch (e) {
+              console.warn('[FIRST-USE] stamp failed:', e);
+            }
+          })()
+        );
       }
 
       // Get system prompt with character personality and language instruction

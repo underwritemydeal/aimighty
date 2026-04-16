@@ -17,6 +17,7 @@ import {
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
+import { openBillingPortal } from '../../config/stripe';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -494,6 +495,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onReflection,
   onSignOut,
   onNavigate,
+  onManageSubscription,
   tier,
   streakText,
   onUpgrade,
@@ -507,6 +509,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onReflection: () => void;
   onSignOut: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
+  onManageSubscription: () => void;
   tier: 'free' | 'believer' | 'divine';
   streakText: string;
   onUpgrade: () => void;
@@ -584,6 +587,16 @@ const SettingsDropdown = memo(function SettingsDropdown({
         >
           Switch Belief
         </button>
+
+        {!isFree && (
+          <button
+            onClick={() => { onManageSubscription(); onClose(); }}
+            className="menu-item"
+            style={baseItemStyle}
+          >
+            Manage Subscription
+          </button>
+        )}
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
 
@@ -1422,6 +1435,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 onReflection={() => setShowReflectionModal(true)}
                 onSignOut={onSignOut || (() => {})}
                 onNavigate={onNavigate}
+                onManageSubscription={() => { void openBillingPortal(user.id); }}
                 tier={tier}
                 streakText={formatStreak(streak)}
                 onUpgrade={onPaywall}

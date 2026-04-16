@@ -156,8 +156,8 @@ localStorage key `aimighty_memory_<beliefId>` holds up to 5 notes per belief:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/` | Claude chat (streaming SSE), `max_tokens: 180`, 2-4 sentence HARD CAP |
-| `POST` | `/tts` | OpenAI TTS proxy (Divine tier only) |
+| `POST` | `/` | Claude chat (streaming SSE), `max_tokens: 140`, 2-3 sentence HARD CAP. Stamps `firstMessageAt` on user tier record (non-blocking via `ctx.waitUntil`) |
+| `POST` | `/tts` | Smallest AI Lightning V3.1/V2 TTS proxy (Divine tier only) |
 | `GET` | `/daily-topic` | Today's topic (date-idempotent via `topic:YYYY-MM-DD`) + titles for all 14 beliefs |
 | `GET` | `/daily-content?belief=<id>` | Prayer + sacredText + reflectionPrompt — cached 48h |
 | `GET` | `/daily-article?belief=<id>` | Full SEO article body — cached 48h |
@@ -165,13 +165,37 @@ localStorage key `aimighty_memory_<beliefId>` holds up to 5 notes per belief:
 | `POST` | `/email-signup` | Add subscriber + send welcome via Resend |
 | `GET` | `/unsubscribe?email=<email>` | Mark `active: false`, show HTML confirmation |
 | `GET` | `/send-daily-emails` | Cron-triggered batch (also callable for testing) |
-| `POST` | `/create-checkout-session` | Stripe Checkout session creation |
-| `POST` | `/stripe-webhook` | Stripe webhook — verifies HMAC-SHA256 signature, stores tier in KV |
-| `GET` | `/user-tier?userId=<id>` | Read tier from KV (35-day TTL, falls back to `'free'`) |
+| `POST` | `/create-checkout-session` | Stripe Checkout session — includes `consent_collection[terms_of_service]=required` (EU/UK Art. 16(m) waiver) + `billing_address_collection=required` (region detection + tax) |
+| `POST` | `/stripe-webhook` | Stripe webhook — verifies HMAC-SHA256 signature, handles `checkout.session.completed`, `customer.subscription.deleted`, `customer.subscription.updated` |
+| `GET` | `/user-tier?userId=<id>` | Read tier from KV record (returns `{tier}`, falls back to `'free'`) |
+| `GET` | `/refund-eligibility?userId=<id>` | Structured refund eligibility check — returns `{eligible, reason, daysSincePurchase, region, euUkProtected, firstMessageAt, ...}`. Used by support for manual refund review |
+| `POST` | `/create-portal-session` | Body `{userId}` → returns `{portalUrl}` for Stripe Billing Portal. Required for CA SB-313 and FTC Click-to-Cancel compliance |
 | `GET` | `/sitemap.xml` | Dynamic sitemap (home + app + static + today's 14 articles) |
 | `GET` | `/robots.txt` | `User-agent: * / Allow: /` + sitemap ref |
 | `GET` | `/topic-history` | KV topic history (debug) |
 | `POST` | `/reset-topics` | Admin reset |
+
+### User Tier KV Record
+
+`user-tier:<userId>` stores a JSON `UserTierRecord`:
+```ts
+{
+  tier: 'believer' | 'divine',
+  priceId: string,
+  activatedAt: number,          // ms epoch
+  firstMessageAt: number | null, // null = never used → refund-eligible
+  region: string | null,         // ISO 3166-1 alpha-2
+  consentTosAccepted: boolean,   // from Stripe consent_collection
+  stripeCustomerId: string | null,
+  stripeSubscriptionId: string | null,
+  cycle: 'monthly' | 'annual',
+  cancelledAt: number | null,
+}
+```
+
+- **TTL** — 400 days for annual, 40 days for monthly. Webhook-renewed on every successful payment so healthy subs never expire.
+- **Legacy records** (bare string `'believer'` / `'divine'` from before the migration) are read transparently by `readUserTierRecord()` and treated as "already used" for refund purposes.
+- **Refund eligibility** — Zero messages sent AND within 14 days of `activatedAt`. Enforced by `computeRefundEligibility()` in `worker/index.ts`.
 
 ### Cron Trigger
 
@@ -186,11 +210,16 @@ Fires daily at 15:00 UTC (7am PST). Handler: `scheduled()` → `sendDailyEmailsB
 ### Worker Secrets
 
 Set via `npx wrangler secret put <NAME>`:
-- `ANTHROPIC_API_KEY` — Claude
-- `OPENAI_API_KEY` — TTS
+- `ANTHROPIC_API_KEY` — Claude chat
+- `SMALLEST_AI_API_KEY` — Smallest AI Lightning V3.1/V2 TTS (Divine tier)
+- `OPENAI_API_KEY` — legacy, kept as fallback only (no longer used by `/tts`)
 - `RESEND_API_KEY` — newsletter (app degrades gracefully if missing)
-- `STRIPE_SECRET_KEY` — checkout
+- `STRIPE_SECRET_KEY` — Stripe API key for checkout + portal
 - `STRIPE_WEBHOOK_SECRET` — webhook signature verify
+- `STRIPE_PRICE_BELIEVER_MONTHLY` — exact price ID → maps completed checkout to tier + cycle
+- `STRIPE_PRICE_BELIEVER_ANNUAL` — same
+- `STRIPE_PRICE_DIVINE_MONTHLY` — same
+- `STRIPE_PRICE_DIVINE_ANNUAL` — same
 
 KV namespace `ARTICLES` binding id `8e9f4fd21df54bb985d6bfcb3e414910` holds:
 - `article:<date>:<belief>:<topic>` — cached articles
