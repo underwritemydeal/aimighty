@@ -11,8 +11,9 @@ import { PrivacyScreen } from './components/screens/PrivacyScreen';
 import { TermsScreen } from './components/screens/TermsScreen';
 import { ArticlePage } from './components/screens/ArticlePage';
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
-import { getLastBelief, setLastBelief, clearLastBelief } from './services/tierService';
+import { getLastBelief, setLastBelief, clearLastBelief, setDivine } from './services/tierService';
 import { safeSetItem, safeGetItem } from './services/safeStorage';
+import { pollUserTierUntilPaid } from './config/stripe';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -50,6 +51,10 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  // True while we poll `/user-tier` after a Stripe checkout redirect.
+  // Blocks the UI so a just-paid user cannot enter a conversation while
+  // the webhook is still in flight and the server still reports 'free'.
+  const [isFinalizingUpgrade, setIsFinalizingUpgrade] = useState(false);
 
   // Language state — persisted to localStorage
   const [language, setLanguage] = useState<LanguageCode>(() => {
@@ -107,6 +112,47 @@ function App() {
     }
 
     setIsInitialized(true);
+  }, []);
+
+  // After Stripe checkout success, Stripe redirects to /app?upgraded=true.
+  // The webhook that writes the paid tier to KV can trail the redirect by
+  // several seconds. Poll `/user-tier` with backoff so the user is not
+  // dropped into a conversation still flagged 'free'.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgraded') !== 'true') return;
+
+    const existingUser = getCurrentUser();
+    if (!existingUser) {
+      // No session to reconcile — just clean the URL.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('upgraded');
+      window.history.replaceState({}, '', url.toString());
+      return;
+    }
+
+    setIsFinalizingUpgrade(true);
+    let cancelled = false;
+    pollUserTierUntilPaid(existingUser.id, 15000)
+      .then((tier) => {
+        if (cancelled) return;
+        // Mirror server tier into localStorage so getTier() agrees.
+        // Believer needs no flag (logged-in default); Divine is the one
+        // that must be set explicitly for TTS routing to pick it up.
+        if (tier === 'divine') setDivine(true);
+        // Always strip ?upgraded=true even if polling timed out — we don't
+        // want to re-poll on every refresh.
+        const url = new URL(window.location.href);
+        url.searchParams.delete('upgraded');
+        window.history.replaceState({}, '', url.toString());
+      })
+      .finally(() => {
+        if (!cancelled) setIsFinalizingUpgrade(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const transitionTo = (screen: Screen) => {
@@ -230,6 +276,52 @@ function App() {
         }}
         aria-hidden="true"
       />
+
+      {/* Stripe upgrade-finalizing overlay.
+          Shown only when ?upgraded=true is detected and /user-tier is still
+          reporting 'free'. Blocks interaction so the user doesn't enter a
+          conversation with stale tier state. */}
+      {isFinalizingUpgrade && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(3, 3, 8, 0.92)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '24px',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(1.4rem, 4vw, 2rem)',
+              fontWeight: 300,
+              color: 'rgba(255, 248, 240, 0.95)',
+              marginBottom: '16px',
+            }}
+          >
+            Finalizing your upgrade…
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '0.9rem',
+              color: 'rgba(255, 248, 240, 0.6)',
+              maxWidth: '360px',
+              lineHeight: 1.5,
+            }}
+          >
+            One moment while we unlock your tier. This usually takes a few seconds.
+          </div>
+        </div>
+      )}
 
       {/* Screen container */}
       <div

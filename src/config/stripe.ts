@@ -68,3 +68,29 @@ export async function fetchUserTier(userId: string): Promise<'free' | 'believer'
     return 'free';
   }
 }
+
+/**
+ * Poll the worker's `/user-tier` after a Stripe checkout success redirect
+ * (`?upgraded=true`). Stripe's webhook can take 2-10s to arrive at our worker
+ * and write the paid tier to KV; without this poll, the user enters their
+ * first conversation still marked `'free'` and gets no TTS. Exponential
+ * backoff starting at 500ms, capped at 15s total budget. Resolves as soon
+ * as a non-free tier appears, or returns `'free'` if the budget expires.
+ */
+export async function pollUserTierUntilPaid(
+  userId: string,
+  totalBudgetMs: number = 15000,
+): Promise<'free' | 'believer' | 'divine'> {
+  if (!userId) return 'free';
+  const started = Date.now();
+  let delay = 500;
+  while (Date.now() - started < totalBudgetMs) {
+    const tier = await fetchUserTier(userId);
+    if (tier === 'believer' || tier === 'divine') return tier;
+    const remaining = totalBudgetMs - (Date.now() - started);
+    if (remaining <= 0) break;
+    await new Promise((r) => setTimeout(r, Math.min(delay, remaining)));
+    delay = Math.min(delay * 1.7, 3000);
+  }
+  return 'free';
+}
