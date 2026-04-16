@@ -3,6 +3,7 @@
  * Uses Web Speech API for voice recognition
  * Supports both standard SpeechRecognition and Safari's webkitSpeechRecognition
  */
+import { safeGetItem, safeSetItem, safeRemoveItem } from './safeStorage';
 
 // TypeScript declarations for Web Speech API
 interface SpeechRecognitionEvent extends Event {
@@ -90,6 +91,43 @@ const languageToBCP47: Record<string, string> = {
   it: 'it-IT',
 };
 
+// P1-2: speech language is decoupled from UI language. A bilingual user
+// can keep the UI in English but speak Spanish — setting en-US on the
+// recognizer produces gibberish. Resolution order:
+//   1. Explicit user override (aimighty_speech_language) — reserved for a
+//      future settings toggle.
+//   2. navigator.language, which is already a BCP-47 tag reflecting the
+//      user's OS/browser locale (e.g. es-MX, en-GB).
+//   3. UI language mapped through languageToBCP47.
+//   4. en-US.
+const SPEECH_LANGUAGE_KEY = 'aimighty_speech_language';
+
+function resolveSpeechLanguage(uiLanguage: string): string {
+  const override = safeGetItem(SPEECH_LANGUAGE_KEY);
+  if (override) return override;
+
+  if (typeof navigator !== 'undefined' && navigator.language) {
+    const nav = navigator.language;
+    // Accept BCP-47 forms like "es", "es-MX", "zh-Hant".
+    if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/i.test(nav)) {
+      return nav;
+    }
+  }
+
+  return languageToBCP47[uiLanguage] || 'en-US';
+}
+
+/** Persist an explicit speech-input language override (BCP-47). Pass null to clear. */
+export function setSpeechLanguage(bcp47: string | null): void {
+  if (bcp47) safeSetItem(SPEECH_LANGUAGE_KEY, bcp47);
+  else safeRemoveItem(SPEECH_LANGUAGE_KEY);
+}
+
+/** Resolve the BCP-47 language that will be used for recognition. */
+export function getSpeechLanguage(uiLanguage: string = 'en'): string {
+  return resolveSpeechLanguage(uiLanguage);
+}
+
 /**
  * Check if speech recognition is supported
  * Works with both standard API and Safari's webkit prefix
@@ -119,10 +157,12 @@ function getRecognition(language: string = 'en'): SpeechRecognition | null {
     instance.continuous = true; // Keep listening until user stops
     instance.interimResults = true; // Get partial results for real-time feedback
 
-    // Set language based on user's selected language
-    const bcp47Code = languageToBCP47[language] || 'en-US';
+    // Speech language is resolved from navigator.language first so a
+    // bilingual user who kept the UI in English can still be transcribed
+    // correctly in their actual spoken language (P1-2).
+    const bcp47Code = resolveSpeechLanguage(language);
     instance.lang = bcp47Code;
-    log('Speech recognition language:', bcp47Code);
+    log('Speech recognition language:', bcp47Code, '(ui:', language + ')');
 
     log('Speech recognition initialized');
     return instance;
