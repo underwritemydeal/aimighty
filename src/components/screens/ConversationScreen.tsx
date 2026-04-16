@@ -752,6 +752,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // component (causes React warning + slow leak if user navigates mid-TTS).
   const drainWatcherRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const drainSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // P1 perf: batch token-stream renders into rAF. Claude can emit 150-300
+  // tokens/s; without batching each token triggers a setState -> reconcile
+  // on a potentially long message list. rAF caps it at the display's
+  // refresh rate (~60 Hz) for the same visual fidelity with far less work.
+  const pendingRafRef = useRef<number | null>(null);
   // Synchronous send guard — prevents double-tap on mobile from firing two
   // parallel requests before React commits the state flush (P0-2).
   const isSendingRef = useRef(false);
@@ -1049,11 +1054,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             ]);
           }
           fullResponseRef.current += token;
-          setDisplayMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMessageId ? { ...m, content: fullResponseRef.current } : m
-            )
-          );
+          // Batch into rAF so we re-render at frame rate, not token rate.
+          if (pendingRafRef.current !== null) return;
+          pendingRafRef.current = requestAnimationFrame(() => {
+            pendingRafRef.current = null;
+            const snapshot = fullResponseRef.current;
+            setDisplayMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMessageId ? { ...m, content: snapshot } : m
+              )
+            );
+          });
         },
         onSentence: (sentence) => {
           if (!voiceEnabled) return;
@@ -1108,6 +1119,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           isSendingRef.current = false;
           fullResponseRef.current = text;
           streamingMessageId.current = null;
+          // Cancel any pending token-batch rAF so its stale snapshot
+          // cannot overwrite the final committed text.
+          if (pendingRafRef.current !== null) {
+            cancelAnimationFrame(pendingRafRef.current);
+            pendingRafRef.current = null;
+          }
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: text } : m))
           );
@@ -1295,6 +1312,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       if (drainSafetyRef.current) {
         clearTimeout(drainSafetyRef.current);
         drainSafetyRef.current = null;
+      }
+      if (pendingRafRef.current !== null) {
+        cancelAnimationFrame(pendingRafRef.current);
+        pendingRafRef.current = null;
       }
     };
   }, []);
