@@ -733,6 +733,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const fullResponseRef = useRef('');
   const streamingMessageId = useRef<string | null>(null);
   const apiMessagesAtUnmountRef = useRef<Message[] | null>(null);
+  // Synchronous send guard — prevents double-tap on mobile from firing two
+  // parallel requests before React commits the state flush (P0-2).
+  const isSendingRef = useRef(false);
 
   const isInputEnabled = state === 'idle';
 
@@ -1069,6 +1072,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         },
         onComplete: (text) => {
           console.log('[Conversation] Stream complete');
+          // Release send guard — safe to send the next message (P0-2).
+          isSendingRef.current = false;
           fullResponseRef.current = text;
           streamingMessageId.current = null;
           setDisplayMessages((prev) =>
@@ -1134,6 +1139,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         },
         onError: (error) => {
           console.error('[Conversation] Error:', error);
+          // Release send guard (P0-2).
+          isSendingRef.current = false;
           const errorMessage = 'I am still here. Please try speaking to me again.';
           setDisplayMessages((prev) =>
             prev.map((m) => (m.id === assistantMessageId ? { ...m, content: errorMessage } : m))
@@ -1152,7 +1159,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   // Handle send
   const handleSend = useCallback(() => {
-    if (!inputText.trim() || !isInputEnabled) return;
+    // Synchronous guard against double-tap (P0-2). React state flushes are
+    // not synchronous; isInputEnabled alone can let a bouncy second tap slip
+    // through before 'streaming' is committed.
+    if (!inputText.trim() || !isInputEnabled || isSendingRef.current) return;
+    isSendingRef.current = true;
     // Unlock mobile audio on user gesture
     unlockMobileAudio();
     const message = inputText.trim();
