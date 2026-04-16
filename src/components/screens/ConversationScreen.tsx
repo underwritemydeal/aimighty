@@ -344,22 +344,31 @@ function parseScriptureReferences(text: string, accentColor: string): React.Reac
       ? `https://quran.com/${match[5] || match[1]}/${match[6] || match[2]}`
       : `https://www.biblegateway.com/passage/?search=${encodeURIComponent(fullMatch)}&version=NIV`;
 
-    parts.push(
-      <a
-        key={match.index}
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          color: accentColor,
-          textDecoration: 'underline',
-          textDecorationColor: `${accentColor}50`,
-          textUnderlineOffset: '2px',
-        }}
-      >
-        {fullMatch}
-      </a>
-    );
+    // Defense-in-depth: only ever render an <a> if the constructed URL
+    // is plain https://. The prefix is hardcoded above, but a future
+    // refactor (or a Claude response ever feeding into this path) should
+    // not be able to produce a javascript:/data:/file: href. Closes P0-7.
+    if (/^https:\/\//i.test(url)) {
+      parts.push(
+        <a
+          key={match.index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: accentColor,
+            textDecoration: 'underline',
+            textDecorationColor: `${accentColor}50`,
+            textUnderlineOffset: '2px',
+          }}
+        >
+          {fullMatch}
+        </a>
+      );
+    } else {
+      // Not a safe URL — render as plain text.
+      parts.push(fullMatch);
+    }
 
     lastIndex = match.index + fullMatch.length;
   }
