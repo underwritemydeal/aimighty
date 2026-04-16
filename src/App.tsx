@@ -43,9 +43,12 @@ function App() {
     if (p === '/privacy') return 'privacy';
     if (p === '/terms') return 'terms';
     // Everything else (/, /app, etc):
-    //   session → conversation/belief-selector (resolved in useEffect below)
-    //   no session → auth screen. No landing page. No welcome screen.
-    return isLoggedIn() ? 'loading' : 'auth';
+    //   session        → conversation/belief-selector (resolved in useEffect)
+    //   no session + visited before → auth screen
+    //   no session + first ever visit → landing page (shown once)
+    if (isLoggedIn()) return 'loading';
+    if (localStorage.getItem('aimighty_has_visited')) return 'auth';
+    return 'landing';
   });
   const [selectedBelief, setSelectedBelief] = useState<BeliefSystem | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -264,23 +267,11 @@ function App() {
         {currentScreen === 'landing' && (
           <LandingPage
             onEnterApp={() => {
+              localStorage.setItem('aimighty_has_visited', '1');
               if (typeof window !== 'undefined') {
                 window.history.pushState({}, '', '/app');
               }
-              // If already logged in (edge case), go to conversation.
-              // Otherwise go to auth.
-              if (user) {
-                const lastBeliefId = getLastBelief();
-                const savedBelief = lastBeliefId ? beliefSystems.find(b => b.id === lastBeliefId) : null;
-                if (savedBelief) {
-                  setSelectedBelief(savedBelief);
-                  transitionTo('conversation');
-                } else {
-                  transitionTo('belief-selector');
-                }
-              } else {
-                transitionTo('auth');
-              }
+              transitionTo('auth');
             }}
             onNavigate={(screen) => {
               if (typeof window !== 'undefined') {
