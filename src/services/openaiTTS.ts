@@ -305,8 +305,13 @@ export function stop(): void {
 
 interface QueuedSentence {
   text: string;
-  audioUrl: string | null;   // null = still fetching
+  audioUrl: string | null;   // null = still fetching; '' = fetch failed
   words: string[];
+  // P2-3: if the OpenAI TTS proxy 429s (or otherwise fails), we fall
+  // back to browser speechSynthesis for this sentence so the user is
+  // not met with silence. The language is needed for voice selection.
+  language: string;
+  fallback: boolean;
   onStart?: (wordCount: number) => void;
   onWord?: (wordIndex: number) => void;
   onEnd?: () => void;
@@ -346,6 +351,8 @@ export function enqueueSentence(
     text,
     audioUrl: null,
     words,
+    language,
+    fallback: false,
     onStart: callbacks?.onStart,
     onWord: callbacks?.onWord,
     onEnd: callbacks?.onEnd,
@@ -363,16 +370,27 @@ export function enqueueSentence(
     body: JSON.stringify({ text, beliefSystem, character, language }),
   }, 20000)
     .then((r) => {
-      console.log(`[TTS-TIMING] sentence HEADERS t+${Date.now() - fetchStart}ms "${snippet}…"`);
-      return r.ok ? r.blob() : Promise.reject(new Error(`TTS ${r.status}`));
+      console.log(`[TTS-TIMING] sentence HEADERS t+${Date.now() - fetchStart}ms status=${r.status} "${snippet}…"`);
+      // P2-3: any non-2xx (especially 429 rate limit) -> fall back to browser TTS.
+      if (!r.ok) {
+        entry.fallback = true;
+        return Promise.reject(new Error(`TTS ${r.status}`));
+      }
+      return r.blob();
     })
     .then((blob) => {
+      if (!blob) return;
       console.log(`[TTS-TIMING] sentence BLOB t+${Date.now() - fetchStart}ms (${blob.size}B) "${snippet}…"`);
-      if (blob.size < 100) throw new Error('Audio too small');
+      if (blob.size < 100) {
+        entry.fallback = true;
+        throw new Error('Audio too small');
+      }
       entry.audioUrl = URL.createObjectURL(blob);
     })
     .catch((e) => {
-      console.error('[TTS-Queue] Fetch failed for sentence:', e);
+      console.error('[TTS-Queue] Fetch failed for sentence, will use browser fallback:', e);
+      // Leave audioUrl null; playNextInQueue sees fallback=true and routes to speechSynthesis.
+      entry.fallback = true;
       entry.audioUrl = '';
     });
 
@@ -417,9 +435,17 @@ async function playNextInQueue(): Promise<void> {
   const waitMs = Date.now() - waitStart;
   console.log(`[TTS-TIMING] playNextInQueue waited ${waitMs}ms for fetch "${entry.text.slice(0, 32)}…"`);
 
-  if (!entry.audioUrl) {
-    queuePlaying = false;
+  // P2-3: OpenAI TTS failed (e.g. 429). Fall back to browser speechSynthesis
+  // so the user still hears the sentence. No word-level highlighting here —
+  // browser TTS doesn't expose per-word events reliably cross-platform.
+  if (entry.fallback || !entry.audioUrl) {
+    if (entry.fallback) {
+      console.log('[TTS-Queue] Using browser TTS fallback for sentence');
+      entry.onStart?.(entry.words.length);
+      await fallbackBrowserTTS(entry.text, entry.language);
+    }
     entry.onEnd?.();
+    queuePlaying = false;
     playNextInQueue();
     return;
   }
