@@ -8,6 +8,8 @@
  * then reuse it for all subsequent TTS playback.
  */
 
+import { fetchWithTimeout } from './fetchWithTimeout';
+
 const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 
 // Voice enabled state with localStorage persistence
@@ -227,11 +229,12 @@ export async function speakWithOpenAI(
   try {
     console.log('[TTS] Fetching from worker... (t+%dms)', Date.now() - ttsStartTime);
 
-    const response = await fetch(`${WORKER_URL}/tts`, {
+    // 20s time-to-headers budget. Audio body can stream for any duration.
+    const response = await fetchWithTimeout(`${WORKER_URL}/tts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, beliefSystem, character, language }),
-    });
+    }, 20000);
 
     console.log('[TTS] Worker responded (t+%dms), status:', Date.now() - ttsStartTime, response.status);
 
@@ -355,11 +358,12 @@ export function enqueueSentence(
   const snippet = text.slice(0, 32).replace(/\n/g, ' ');
   console.log(`[TTS-TIMING] sentence FIRED (t=0) "${snippet}…" (${text.length}ch)`);
 
-  entry.fetchPromise = fetch(`${WORKER_URL}/tts`, {
+  // 20s time-to-headers budget for per-sentence TTS fetch.
+  entry.fetchPromise = fetchWithTimeout(`${WORKER_URL}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, beliefSystem, character, language }),
-  })
+  }, 20000)
     .then((r) => {
       console.log(`[TTS-TIMING] sentence HEADERS t+${Date.now() - fetchStart}ms "${snippet}…"`);
       return r.ok ? r.blob() : Promise.reject(new Error(`TTS ${r.status}`));
@@ -388,11 +392,12 @@ export function prewarmTts(beliefSystem: string, character: string, language: st
   if (typeof window === 'undefined') return;
   console.log('[TTS-TIMING] prewarm firing');
   const t0 = Date.now();
-  fetch(`${WORKER_URL}/tts`, {
+  // 10s budget — prewarm is best-effort, don't hold connections for long.
+  fetchWithTimeout(`${WORKER_URL}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text: 'Welcome.', beliefSystem, character, language }),
-  })
+  }, 10000)
     .then((r) => {
       console.log(`[TTS-TIMING] prewarm headers t+${Date.now() - t0}ms status=${r.status}`);
       return r.ok ? r.blob() : null;
