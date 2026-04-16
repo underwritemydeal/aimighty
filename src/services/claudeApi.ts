@@ -3,6 +3,8 @@
  * Handles streaming communication with the Cloudflare Worker
  */
 
+import { fetchWithTimeout } from './fetchWithTimeout';
+
 // HARDCODED worker URL - this is the deployed Cloudflare Worker
 // Using hardcoded URL because VITE env vars may not be available at build time
 const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
@@ -55,14 +57,15 @@ export async function sendMessage(
 
   try {
     console.log('[ClaudeAPI] Sending fetch request...');
-    const response = await fetch(WORKER_URL, {
+    // 30s time-to-headers budget. Body streams indefinitely once connected.
+    const response = await fetchWithTimeout(WORKER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-User-Id': userId,
       },
       body: JSON.stringify(requestBody),
-    });
+    }, 30000);
 
     console.log('=== CLAUDE API RESPONSE ===');
     console.log('[ClaudeAPI] Response status:', response.status);
@@ -201,11 +204,12 @@ export async function summarizeConversation(
   belief: string
 ): Promise<{ summary: string; mood: string; topics: string[]; followUp: string } | null> {
   try {
-    const resp = await fetch(`${WORKER_URL}/summarize-conversation`, {
+    // 15s budget — this is a non-streaming JSON response.
+    const resp = await fetchWithTimeout(`${WORKER_URL}/summarize-conversation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, belief }),
-    });
+    }, 15000);
     if (!resp.ok) return null;
     return await resp.json();
   } catch (e) {
@@ -220,9 +224,9 @@ export async function summarizeConversation(
 export async function checkApiHealth(): Promise<boolean> {
   try {
     console.log('[ClaudeAPI] Checking API health at:', WORKER_URL);
-    const response = await fetch(WORKER_URL, {
+    const response = await fetchWithTimeout(WORKER_URL, {
       method: 'GET',
-    });
+    }, 5000);
     const data = await response.json();
     console.log('[ClaudeAPI] Health check response:', data);
     return response.ok;
