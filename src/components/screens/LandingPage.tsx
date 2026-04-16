@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { beliefSystems } from '../../data/beliefSystems';
 import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designSystem';
+import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -141,11 +142,12 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
     if (!signupEmail.trim()) return;
     setSignupState('loading');
     try {
-      const r = await fetch(`${WORKER_URL}/email-signup`, {
+      // 10s budget — short-path signup endpoint.
+      const r = await fetchWithTimeout(`${WORKER_URL}/email-signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: signupEmail.trim(), belief: signupBelief }),
-      });
+      }, 10000);
       const data = await r.json();
       if (r.ok && data.success) {
         setSignupState('success');
