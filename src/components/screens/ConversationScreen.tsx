@@ -746,6 +746,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // Synchronous send guard — prevents double-tap on mobile from firing two
   // parallel requests before React commits the state flush (P0-2).
   const isSendingRef = useRef(false);
+  // Stable per-conversation id so Divine memory checkpoints from the SAME
+  // session overwrite each other but a new session adds a new entry even
+  // on the same calendar day (closes P1-3).
+  const sessionIdRef = useRef<string>(
+    `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  );
 
   const isInputEnabled = state === 'idle';
 
@@ -1104,6 +1110,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                     mood: note.mood,
                     topics: note.topics || [],
                     followUp: note.followUp || '',
+                    sessionId: sessionIdRef.current,
                   });
                 }
               })
@@ -1271,6 +1278,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               mood: note.mood,
               topics: note.topics || [],
               followUp: note.followUp || '',
+              sessionId: sessionIdRef.current,
             });
           }
         })

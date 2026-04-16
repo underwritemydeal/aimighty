@@ -193,6 +193,13 @@ export interface MemoryNote {
   mood: string;
   topics: string[];
   followUp?: string;
+  /**
+   * Optional per-conversation id. When present, same-session checkpoints
+   * overwrite the existing entry; a new session pushes a new entry even
+   * within the same calendar day. This preserves long-session history
+   * instead of collapsing everything to the last summary of the day.
+   */
+  sessionId?: string;
 }
 
 export function getMemories(beliefId: string): MemoryNote[] {
@@ -208,8 +215,15 @@ export function getMemories(beliefId: string): MemoryNote[] {
 
 export function saveMemory(beliefId: string, note: MemoryNote): void {
   const list = getMemories(beliefId);
-  // If most recent entry is same day, overwrite (checkpoint)
-  if (list.length > 0 && list[list.length - 1].date === note.date) {
+  const last = list[list.length - 1];
+  // Overwrite only when the note belongs to the SAME conversation session.
+  // Falls back to same-day overwrite for legacy notes that predate sessionId
+  // (so we don't double-write on the first post-migration checkpoint).
+  const sameSession =
+    !!last && !!note.sessionId && last.sessionId === note.sessionId;
+  const legacySameDay =
+    !!last && !last.sessionId && !note.sessionId && last.date === note.date;
+  if (sameSession || legacySameDay) {
     list[list.length - 1] = note;
   } else {
     list.push(note);
