@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { signUp, signIn, isValidEmail, getRememberMe } from '../../services/auth';
+import { signUp, signIn, isValidEmail, getRememberMe, getLastEmail, hasSignedInBefore } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
 
@@ -42,8 +42,12 @@ const EyeIcon = memo(function EyeIcon({ visible }: { visible: boolean }) {
 
 export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: AuthScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
-  const [mode, setMode] = useState<AuthMode>('signup');
-  const [email, setEmail] = useState('');
+  // Returning visitors default to the Sign In tab with their email pre-filled.
+  // First-time visitors still see Create Account.
+  const [mode, setMode] = useState<AuthMode>(() =>
+    hasSignedInBefore() ? 'login' : 'signup'
+  );
+  const [email, setEmail] = useState(() => getLastEmail());
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');

@@ -1293,14 +1293,26 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // Track the iOS on-screen keyboard height via visualViewport. When the
   // keyboard opens, window.innerHeight stays the same but visualViewport.height
   // shrinks. We push the fixed input bar up by the difference so it's never
-  // hidden under the keyboard. Falls back to 0 (no offset) on browsers without
-  // visualViewport, which is the current broken behaviour but unchanged there.
+  // hidden under the keyboard.
+  //
+  // On iOS Safari there is an additional ~44px "form accessory bar" (domain
+  // pill + prev/next/done) that overlays the top of the keyboard and is NOT
+  // subtracted from visualViewport.height. Without compensating for it, the
+  // input bar floats directly behind that accessory bar and the text the user
+  // just typed is half-clipped. We add an IOS_ACCESSORY_BAR_HEIGHT buffer for
+  // iOS devices so the bar clears both the keyboard and the accessory overlay.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const vv = window.visualViewport;
     if (!vv) return;
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const IOS_ACCESSORY_BAR_HEIGHT = 44;
     const syncKeyboardOffset = () => {
-      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      // Only add the accessory-bar buffer when the keyboard is actually open.
+      const kb = rawKb > 0 && isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
       document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
     };
     syncKeyboardOffset();

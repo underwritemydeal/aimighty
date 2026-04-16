@@ -101,14 +101,30 @@ export function isSupported(): boolean {
   return supported;
 }
 
+// Cached SpeechRecognition instance. iOS Safari prompts for microphone
+// permission on every NEW SpeechRecognition construction, so we reuse the
+// same instance across startListening calls for the lifetime of the page.
+// Subsequent .start() calls on an already-granted instance do not re-prompt.
+let cachedRecognition: SpeechRecognition | null = null;
+
 /**
- * Initialize speech recognition
- * Handles both standard and webkit-prefixed APIs (for Safari)
+ * Initialize or reuse a speech recognition instance.
+ * Handles both standard and webkit-prefixed APIs (for Safari).
  */
 function getRecognition(language: string = 'en'): SpeechRecognition | null {
   if (!isSupported()) {
     log('Speech recognition not supported');
     return null;
+  }
+
+  // Reuse the cached instance if we have one — only update its language.
+  if (cachedRecognition) {
+    const bcp47Code = languageToBCP47[language] || 'en-US';
+    if (cachedRecognition.lang !== bcp47Code) {
+      cachedRecognition.lang = bcp47Code;
+      log('Speech recognition language updated:', bcp47Code);
+    }
+    return cachedRecognition;
   }
 
   try {
@@ -124,7 +140,8 @@ function getRecognition(language: string = 'en'): SpeechRecognition | null {
     instance.lang = bcp47Code;
     log('Speech recognition language:', bcp47Code);
 
-    log('Speech recognition initialized');
+    cachedRecognition = instance;
+    log('Speech recognition initialized (and cached for reuse)');
     return instance;
   } catch (error) {
     log('Failed to initialize speech recognition:', error);
