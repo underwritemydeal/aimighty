@@ -302,7 +302,10 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
             >
               Every belief. One voice.
             </p>
-            <p
+            {/* a11y/SEO: hero tagline is the document's primary heading.
+                Styled as-before via inline styles so the <h1> default
+                browser sizing doesn't leak in. */}
+            <h1
               style={{
                 fontFamily: fonts.display,
                 fontWeight: fontWeights.light,
@@ -314,7 +317,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               }}
             >
               Speak to the divine — your way.
-            </p>
+            </h1>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
