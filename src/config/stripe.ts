@@ -26,17 +26,20 @@ export function isStripeConfigured(): boolean {
 
 const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 
+import { fetchWithTimeout } from '../services/fetchWithTimeout';
+
 export async function startCheckout(priceId: string, userId: string, email: string): Promise<void> {
   if (!priceId) {
     alert('Payment coming soon.');
     return;
   }
   try {
-    const resp = await fetch(`${WORKER_URL}/create-checkout-session`, {
+    // 10s budget — this redirects to Stripe, just getting the session URL.
+    const resp = await fetchWithTimeout(`${WORKER_URL}/create-checkout-session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ priceId, userId, email }),
-    });
+    }, 10000);
     if (!resp.ok) {
       alert('Unable to start checkout. Please try again later.');
       return;
@@ -56,7 +59,8 @@ export async function startCheckout(priceId: string, userId: string, email: stri
 export async function fetchUserTier(userId: string): Promise<'free' | 'believer' | 'divine'> {
   if (!userId) return 'free';
   try {
-    const r = await fetch(`${WORKER_URL}/user-tier?userId=${encodeURIComponent(userId)}`);
+    // 5s budget — fast worker lookup. Longer delays mean network is unhealthy.
+    const r = await fetchWithTimeout(`${WORKER_URL}/user-tier?userId=${encodeURIComponent(userId)}`, {}, 5000);
     if (!r.ok) return 'free';
     const data = await r.json();
     return (data.tier as 'free' | 'believer' | 'divine') || 'free';
