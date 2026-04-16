@@ -700,14 +700,35 @@ function dailyEmailHtml(opts: {
 </body></html>`;
 }
 
-async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: number; skipped: number }> {
+/**
+ * Retry a fetch once on transient failures (network error, 429, 5xx).
+ * Short fixed backoff (500ms) because we're inside a long batch loop and
+ * cron wall-clock is bounded — we don't want to stall the whole batch on
+ * one flaky subscriber.
+ */
+async function fetchWithOneRetry(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    const r = await fetch(url, init);
+    if (r.ok) return r;
+    if (r.status !== 429 && r.status < 500) return r; // 4xx isn't transient
+    await new Promise((ok) => setTimeout(ok, 500));
+    return await fetch(url, init);
+  } catch {
+    await new Promise((ok) => setTimeout(ok, 500));
+    return await fetch(url, init); // allowed to throw — caller's try/catch handles it
+  }
+}
+
+async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: number; skipped: number; failed: number }> {
   if (!env.ARTICLES || !env.RESEND_API_KEY) {
-    return { sent: 0, skipped: 0 };
+    return { sent: 0, skipped: 0, failed: 0 };
   }
   const listJson = await env.ARTICLES.get('email-subscribers-list');
   const list: string[] = listJson ? JSON.parse(listJson) : [];
   let sent = 0;
-  let skipped = 0;
+  let skipped = 0; // inactive / missing record — expected
+  let failed = 0; // transient fetch/Resend errors after retry — worth alerting on
+  const failures: string[] = [];
 
   const day = new Date().getUTCDay(); // 0=Sun
   const subjects = [
@@ -721,6 +742,10 @@ async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: n
   ];
   const subject = subjects[day] || 'Your daily wisdom';
 
+  // P1-7: isolate each subscriber so one failure never aborts the batch.
+  // Each per-email failure is counted separately from 'skipped' so the
+  // summary log (picked up by Cloudflare logs / alerting) shows real
+  // delivery problems vs. inactive subscribers.
   for (const email of list) {
     try {
       const recordJson = await env.ARTICLES.get(`email-subscriber:${email}`);
@@ -729,8 +754,12 @@ async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: n
       if (!record.active) { skipped++; continue; }
 
       const belief = normalizeBeliefId(record.belief || 'protestant');
-      const daily = await fetch(`${origin}/daily-content?belief=${belief}`);
-      if (!daily.ok) { skipped++; continue; }
+      const daily = await fetchWithOneRetry(`${origin}/daily-content?belief=${belief}`);
+      if (!daily.ok) {
+        failed++;
+        failures.push(`${email}:content-${daily.status}`);
+        continue;
+      }
       const dj = await daily.json() as {
         prayer: string;
         sacredText: { reference: string; text: string; reflection: string };
@@ -753,7 +782,7 @@ async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: n
         unsubscribeUrl,
       });
 
-      const resendResp = await fetch('https://api.resend.com/emails', {
+      const resendResp = await fetchWithOneRetry('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${env.RESEND_API_KEY}`,
@@ -767,14 +796,31 @@ async function sendDailyEmailsBatch(env: Env, origin: string): Promise<{ sent: n
         }),
       });
 
-      if (resendResp.ok) sent++;
-      else skipped++;
+      if (resendResp.ok) {
+        sent++;
+      } else {
+        failed++;
+        failures.push(`${email}:resend-${resendResp.status}`);
+      }
     } catch (e) {
       console.error('[DAILY-EMAIL]', email, e);
-      skipped++;
+      failed++;
+      failures.push(`${email}:exception`);
     }
   }
-  return { sent, skipped };
+
+  // Structured end-of-batch summary. Cloudflare log search on
+  // "[DAILY-EMAIL-BATCH]" surfaces every run; non-zero `failed` is the
+  // signal to investigate. Failure list is truncated to keep logs sane.
+  console.log('[DAILY-EMAIL-BATCH]', JSON.stringify({
+    total: list.length,
+    sent,
+    skipped,
+    failed,
+    sampleFailures: failures.slice(0, 20),
+  }));
+
+  return { sent, skipped, failed };
 }
 
 // ═══════════════════════════════════════════════════════════════
