@@ -291,7 +291,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
             </form>
             {newsletterState === 'error' && (
               <p style={{ marginTop: '8px', fontSize: '0.75rem', color: '#ef4444' }}>
-                Something went wrong — try again
+                The connection is briefly strained. One more breath, then try again.
               </p>
             )}
           </div>

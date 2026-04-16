@@ -81,7 +81,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
         if (result.success && result.user) {
           onAuthSuccess(result.user);
         } else {
-          setError(result.error || 'Something went wrong');
+          setError(result.error || 'The connection is briefly strained. One more breath, then try again.');
         }
       } else {
         const result = await signIn(email, password, rememberMe);
@@ -92,7 +92,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
         }
       }
     } catch {
-      setError('Something went wrong');
+      setError('The connection is briefly strained. One more breath, then try again.');
     } finally {
       setIsLoading(false);
     }

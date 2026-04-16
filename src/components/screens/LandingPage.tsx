@@ -154,11 +154,11 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
         setSignupMessage(data.message || 'Check your inbox');
       } else {
         setSignupState('error');
-        setSignupMessage(data.error || 'Something went wrong — try again');
+        setSignupMessage(data.error || 'The connection is briefly strained. One more breath, then try again.');
       }
     } catch {
       setSignupState('error');
-      setSignupMessage('Something went wrong — try again');
+      setSignupMessage('The connection is briefly strained. One more breath, then try again.');
     }
   };
 
