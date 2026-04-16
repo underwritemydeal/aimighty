@@ -13,7 +13,7 @@ import { ArticlePage } from './components/screens/ArticlePage';
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
 import { getLastBelief, setLastBelief, clearLastBelief, setDivine } from './services/tierService';
 import { safeSetItem, safeGetItem } from './services/safeStorage';
-import { pollUserTierUntilPaid } from './config/stripe';
+import { pollUserTierUntilPaid, fetchUserTier } from './config/stripe';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -108,6 +108,32 @@ function App() {
           // First-time login — show BeliefSelector
           setCurrentScreen('belief-selector');
         }
+
+        // P1-1: Reconcile server tier BEFORE we reveal the UI.
+        // getTier() reads localStorage first, so a Believer/Divine whose
+        // localStorage was cleared (new device, incognito clean, etc.)
+        // would otherwise see the Free 3-message cap on first interaction.
+        // fetchUserTier has its own 5s timeout; we let it finish (success
+        // or timeout → 'free' fallback) before un-gating render. In the
+        // timeout case we simply trust the cached localStorage tier.
+        let cancelled = false;
+        fetchUserTier(existingUser.id)
+          .then((serverTier) => {
+            if (cancelled) return;
+            // Mirror server tier into localStorage so getTier() returns it.
+            // 'divine' flips the explicit flag; 'believer' clears it so
+            // getTier() falls through to the logged-in default; 'free'
+            // from the server means we do not override the cached value
+            // (preserves recently-upgraded users whose KV row has expired).
+            if (serverTier === 'divine') setDivine(true);
+            else if (serverTier === 'believer') setDivine(false);
+          })
+          .finally(() => {
+            if (!cancelled) setIsInitialized(true);
+          });
+        return () => {
+          cancelled = true;
+        };
       }
     }
 
