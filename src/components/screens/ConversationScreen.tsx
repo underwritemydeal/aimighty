@@ -767,9 +767,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     setVoiceEnabled(newEnabled);
   }, [voiceEnabled]);
 
-  // Initialize audio on first interaction
+  // Initialize audio on first interaction.
+  // P1-5: initAudio() only preconnects — it does NOT satisfy iOS Safari's
+  // gesture-unlock requirement. Without calling unlockMobileAudio() here,
+  // the very first TTS sentence (Divine greeting) can arrive outside the
+  // user-gesture window and be silently blocked. Run the silent-MP3
+  // unlock synchronously inside the first tap/touch so subsequent
+  // programmatic audio.play() calls are permitted.
   useEffect(() => {
     const handleInteraction = () => {
+      unlockMobileAudio();
       initAudio();
       document.removeEventListener('click', handleInteraction);
       document.removeEventListener('touchstart', handleInteraction);
