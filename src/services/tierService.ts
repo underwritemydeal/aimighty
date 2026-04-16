@@ -4,6 +4,7 @@
  */
 import type { Tier } from '../types';
 import { isLoggedIn, hasReachedFreeLimit, getCurrentUser } from './auth';
+import { safeSetItem, safeGetItem, safeRemoveItem } from './safeStorage';
 
 const TIER_KEY = 'aimighty_tier';
 const DAILY_KEY = 'aimighty_daily';
@@ -15,13 +16,13 @@ const LAST_BELIEF_KEY = 'aimighty_last_belief';
 // Returning users skip BeliefSelector and land directly in their last conversation.
 // Cleared via "Switch Belief" in the dropdown menu.
 export function getLastBelief(): string | null {
-  try { return localStorage.getItem(LAST_BELIEF_KEY); } catch { return null; }
+  return safeGetItem(LAST_BELIEF_KEY);
 }
 export function setLastBelief(beliefId: string): void {
-  try { localStorage.setItem(LAST_BELIEF_KEY, beliefId); } catch { /* ignore */ }
+  safeSetItem(LAST_BELIEF_KEY, beliefId);
 }
 export function clearLastBelief(): void {
-  try { localStorage.removeItem(LAST_BELIEF_KEY); } catch { /* ignore */ }
+  safeRemoveItem(LAST_BELIEF_KEY);
 }
 
 // ───── Admin bypass ─────
@@ -46,8 +47,8 @@ const ADMIN_DAILY_LIMIT = 999;
 
 /** Promote local "I am Divine" flag — MVP. Real payment wiring replaces this. */
 export function setDivine(isDivine: boolean): void {
-  if (isDivine) localStorage.setItem(TIER_KEY, 'divine');
-  else localStorage.removeItem(TIER_KEY);
+  if (isDivine) safeSetItem(TIER_KEY, 'divine');
+  else safeRemoveItem(TIER_KEY);
 }
 
 /**
@@ -62,7 +63,7 @@ export function getTier(): Tier {
   if (!user) return 'free';
   // Admins always get Divine, no matter what
   if (isAdmin(user.email)) return 'divine';
-  const override = localStorage.getItem(TIER_KEY);
+  const override = safeGetItem(TIER_KEY);
   if (override === 'divine') return 'divine';
   // Free tier has a lifetime cap; once hit, downgrade to free for UI gating
   if (hasReachedFreeLimit() && !user.isPremium && override !== 'believer') {
@@ -86,7 +87,7 @@ function todayStr(): string {
 
 export function getDailyRecord(): DailyRecord {
   try {
-    const raw = localStorage.getItem(DAILY_KEY);
+    const raw = safeGetItem(DAILY_KEY);
     if (!raw) return { date: todayStr(), count: 0, tier: getTier() };
     const parsed = JSON.parse(raw) as DailyRecord;
     if (parsed.date !== todayStr()) {
@@ -124,7 +125,7 @@ export function incrementDailyCount(): void {
   rec.count += 1;
   rec.tier = tier;
   rec.date = todayStr();
-  localStorage.setItem(DAILY_KEY, JSON.stringify(rec));
+  safeSetItem(DAILY_KEY, JSON.stringify(rec));
 }
 
 // ───── Streak ─────
@@ -137,7 +138,7 @@ export interface StreakRecord {
 
 export function getStreak(): StreakRecord {
   try {
-    const raw = localStorage.getItem(STREAK_KEY);
+    const raw = safeGetItem(STREAK_KEY);
     if (!raw) return { currentStreak: 0, lastConversationDate: null, longestStreak: 0 };
     return JSON.parse(raw) as StreakRecord;
   } catch {
@@ -164,7 +165,7 @@ export function bumpStreak(): StreakRecord {
   if (rec.currentStreak > rec.longestStreak) {
     rec.longestStreak = rec.currentStreak;
   }
-  localStorage.setItem(STREAK_KEY, JSON.stringify(rec));
+  safeSetItem(STREAK_KEY, JSON.stringify(rec));
   return rec;
 }
 
@@ -196,7 +197,7 @@ export interface MemoryNote {
 
 export function getMemories(beliefId: string): MemoryNote[] {
   try {
-    const raw = localStorage.getItem(MEMORY_PREFIX + beliefId);
+    const raw = safeGetItem(MEMORY_PREFIX + beliefId);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -215,7 +216,7 @@ export function saveMemory(beliefId: string, note: MemoryNote): void {
   }
   // Keep last 5
   while (list.length > 5) list.shift();
-  localStorage.setItem(MEMORY_PREFIX + beliefId, JSON.stringify(list));
+  safeSetItem(MEMORY_PREFIX + beliefId, JSON.stringify(list));
 }
 
 /** Text block to prepend to system prompt via user message. */
