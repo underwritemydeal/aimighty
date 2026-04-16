@@ -165,8 +165,20 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Cinematic staggered entrance
+  // Cinematic staggered entrance.
+  // Users with prefers-reduced-motion get the final state immediately —
+  // the CSS reduced-motion override caps transition/animation durations
+  // but these setTimeout delays are JS-driven and would otherwise still
+  // keep the screen near-blank for 3.1s on vestibular-sensitive users.
   useEffect(() => {
+    const reduceMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      setPhase(5);
+      return;
+    }
     const timers = [
       setTimeout(() => setPhase(1), 100),    // Start fade in
       setTimeout(() => setPhase(2), 1600),   // Image visible
