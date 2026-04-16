@@ -13,6 +13,8 @@ import {
   streakMilestone,
   saveMemory,
   formatMemoryContext,
+  getCharacterForBelief,
+  setCharacterForBelief,
 } from '../../services/tierService';
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
@@ -732,10 +734,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [articleLoading, setArticleLoading] = useState(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
-  // Default character per belief: sbnr/taoism/pantheism speak with the Divine Feminine (mary/coral)
-  const [character, setCharacter] = useState<Character>(() => {
+  // Default character per belief: sbnr/taoism/pantheism speak with the Divine Feminine (mary/coral).
+  // P2-4: restore persisted character if the user previously chose one for this belief.
+  const [character, setCharacterState] = useState<Character>(() => {
+    const stored = getCharacterForBelief(belief.id);
+    if (stored === 'god' || stored === 'jesus' || stored === 'mary') return stored;
     return ['sbnr', 'taoism', 'pantheism'].includes(belief.id) ? 'mary' : 'god';
   });
+  // Persist character choice per belief so "switch to Jesus" survives tab close.
+  const setCharacter = useCallback((next: Character) => {
+    setCharacterState(next);
+    setCharacterForBelief(belief.id, next);
+  }, [belief.id]);
   const [controlsHidden, setControlsHidden] = useState(false);
   const [replayingMessageId, setReplayingMessageId] = useState<string | null>(null);
 

@@ -11,6 +11,7 @@ const DAILY_KEY = 'aimighty_daily';
 const STREAK_KEY = 'aimighty_streak';
 const MEMORY_PREFIX = 'aimighty_memory_';
 const LAST_BELIEF_KEY = 'aimighty_last_belief';
+const CHARACTER_PREFIX = 'aimighty_character_';
 
 // ───── Last belief memory ─────
 // Returning users skip BeliefSelector and land directly in their last conversation.
@@ -23,6 +24,16 @@ export function setLastBelief(beliefId: string): void {
 }
 export function clearLastBelief(): void {
   safeRemoveItem(LAST_BELIEF_KEY);
+}
+
+// ───── Character memory (per belief) ─────
+// Users can pick god / jesus / mary per belief. Persist the choice so a
+// returning user lands back on the voice they last used.
+export function getCharacterForBelief(beliefId: string): string | null {
+  return safeGetItem(`${CHARACTER_PREFIX}${beliefId}`);
+}
+export function setCharacterForBelief(beliefId: string, character: string): void {
+  safeSetItem(`${CHARACTER_PREFIX}${beliefId}`, character);
 }
 
 // ───── Admin bypass ─────
