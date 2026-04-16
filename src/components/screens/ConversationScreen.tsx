@@ -224,8 +224,12 @@ const CharacterSelector = memo(function CharacterSelector({
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors hover:bg-white/5"
-        style={{ color: 'rgba(255,255,255,0.5)' }}
+        className="flex items-center gap-1 px-2 rounded-lg transition-colors hover:bg-white/5"
+        style={{
+          // WCAG 2.5.5: 44px minimum touch height. Glyph is unchanged.
+          minHeight: '44px',
+          color: 'rgba(255,255,255,0.5)',
+        }}
         aria-label="Select voice character"
       >
         <span style={{ fontSize: '0.7rem', letterSpacing: '0.05em' }}>
@@ -1395,8 +1399,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           <button
             onClick={onBack}
             aria-label="Go back"
-            className="p-2 -ml-2 rounded-lg transition-colors hover:bg-white/5"
-            style={{ color: 'rgba(255,255,255,0.6)' }}
+            className="flex items-center justify-center -ml-2 rounded-lg transition-colors hover:bg-white/5"
+            style={{
+              // WCAG 2.5.5 / Apple HIG: 44x44 minimum hit area.
+              // Icon glyph is unchanged; padding grows the tap target.
+              width: '44px',
+              height: '44px',
+              color: 'rgba(255,255,255,0.6)',
+            }}
           >
             <BackIcon />
           </button>
@@ -1406,8 +1416,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             {/* Tappable belief name */}
             <button
               onClick={() => setShowBeliefModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors hover:bg-white/5"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
+              className="flex items-center gap-1.5 px-3 rounded-full transition-colors hover:bg-white/5"
+              style={{
+                // WCAG 2.5.5: 44px minimum height for touch. Horizontal
+                // padding already comfortable via px-3.
+                minHeight: '44px',
+                color: 'rgba(255,255,255,0.5)',
+              }}
             >
               <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 300, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
                 {belief.name}
@@ -1434,8 +1449,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               aria-label={voiceEnabled ? 'Mute voice' : 'Enable voice'}
               className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 active:bg-white/10"
               style={{
-                width: '40px',
-                height: '40px',
+                width: '44px',
+                height: '44px',
                 color: voiceEnabled ? 'rgba(255,255,255,0.7)' : '#d4af37',
               }}
             >
@@ -1447,8 +1462,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 aria-label="Menu"
                 className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 active:bg-white/10"
                 style={{
-                  width: '40px',
-                  height: '40px',
+                  width: '44px',
+                  height: '44px',
                   color: 'rgba(255,255,255,0.7)',
                 }}
               >
