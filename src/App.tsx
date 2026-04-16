@@ -39,7 +39,13 @@ function App() {
     if (typeof window === 'undefined') return 'welcome';
     const p = window.location.pathname;
     if (articleRoute) return 'article';
-    if (p === '/' || p === '') return 'landing';
+    if (p === '/' || p === '') {
+      // Returning logged-in users skip the landing page entirely and go
+      // straight into the app. The session-restore useEffect below will
+      // then promote them to conversation or belief-selector.
+      if (isLoggedIn()) return 'welcome';
+      return 'landing';
+    }
     if (p === '/about') return 'about';
     if (p === '/privacy') return 'privacy';
     if (p === '/terms') return 'terms';
@@ -85,6 +91,10 @@ function App() {
 
       if (existingUser) {
         setUser(existingUser);
+        // Update URL to /app so the user sees the app path, not /
+        if (window.location.pathname === '/' || window.location.pathname === '') {
+          window.history.replaceState({}, '', '/app');
+        }
 
         // Prefer `aimighty_last_belief` (set on every conversation start).
         // Fall back to legacy session.beliefSystemId for backward compat.
