@@ -1,6 +1,6 @@
 export const BRAND = {
   name: 'AImighty',
-  tagline: 'Every belief. One voice.',
+  tagline: "You've always wanted to. Now you can.",
   domain: 'aimighty.me',
 } as const;
 

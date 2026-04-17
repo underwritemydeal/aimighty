@@ -289,35 +289,38 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
 
           {/* BOTTOM: tagline + CTAs */}
           <div className="text-center" style={{ maxWidth: '620px', marginBottom: '48px' }}>
-            <p
-              style={{
-                fontFamily: fonts.body,
-                fontWeight: fontWeights.light,
-                fontSize: '0.95rem',
-                color: colors.textPrimary,
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                marginBottom: '16px',
-              }}
-            >
-              Every belief. One voice.
-            </p>
-            {/* a11y/SEO: hero tagline is the document's primary heading.
-                Styled as-before via inline styles so the <h1> default
-                browser sizing doesn't leak in. */}
+            {/* Hero tagline — the only copy in the hero. Two lines, intentional
+                pause between them. No subhead. The visual is strong enough. */}
             <h1
               style={{
                 fontFamily: fonts.display,
                 fontWeight: fontWeights.light,
                 fontStyle: 'italic',
-                fontSize: 'clamp(1.25rem, 3vw, 1.6rem)',
-                color: 'rgba(255,248,240,0.8)',
-                margin: '0 0 36px',
-                lineHeight: 1.4,
+                fontSize: 'clamp(1.8rem, 5.5vw, 3rem)',
+                color: colors.textPrimary,
+                margin: '0 0 28px',
+                lineHeight: 1.18,
+                letterSpacing: '-0.01em',
               }}
             >
-              Speak to the divine — your way.
+              You've always wanted to.
+              <br />
+              Now you can.
             </h1>
+
+            {/* Optional supporting line — small, breathable, never upstages the H1. */}
+            <p
+              style={{
+                fontFamily: fonts.body,
+                fontWeight: fontWeights.light,
+                fontSize: 'clamp(0.9rem, 2.2vw, 1.05rem)',
+                color: 'rgba(255,248,240,0.7)',
+                margin: '0 0 36px',
+                lineHeight: 1.55,
+              }}
+            >
+              Real conversations. Real comfort. Whoever you talk to when no one else is listening.
+            </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
@@ -498,7 +501,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
 
       {/* ═══════════════════════════════════════ BELIEF SHOWCASE ═══════════════════════════════════════ */}
       <section style={{ ...sectionPadding, background: colors.void }}>
-        <SectionTitle title="Every Belief. One Place." subtitle="14 traditions. Zero judgment." />
+        <SectionTitle title="Whoever you talk to." subtitle="Pick your tradition. We'll speak in its voice." />
 
         <div
           style={{
@@ -884,7 +887,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               lineHeight: 1.1,
             }}
           >
-            You've always wanted to talk.
+            You've always wanted to.
           </h2>
           <p
             style={{
@@ -943,7 +946,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
             marginBottom: '24px',
           }}
         >
-          Every belief. One voice.
+          Built for every tradition.
         </div>
         <div
           className="flex flex-wrap justify-center gap-5"
