@@ -19,7 +19,7 @@ God (in all 14 forms) is: warm, accessible, occasionally funny when appropriate,
 | **Styling** | Tailwind CSS v4 + Glass morphism |
 | **Visual** | Midjourney AI-generated divine figure images (9:16) |
 | **Backend** | Cloudflare Workers (serverless + cron) |
-| **AI Chat** | Claude API (`claude-sonnet-4-20250514`) via streaming SSE, `max_tokens: 140` |
+| **AI Chat** | Claude API (`claude-sonnet-4-20250514`) via streaming SSE, `max_tokens: 120` |
 | **TTS** | Smallest AI Lightning V3.1/V2 (5 voice characters) — Divine tier only |
 | **Browser TTS** | `window.speechSynthesis` — Believer tier only |
 | **STT** | Web Speech API (free, browser-native, cached instance to avoid iOS re-prompts) |
@@ -161,7 +161,7 @@ localStorage key `aimighty_memory_<beliefId>` holds up to 5 notes per belief:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/` | Claude chat (streaming SSE), `max_tokens: 140`, 2-3 sentence HARD CAP. Stamps `firstMessageAt` on user tier record (non-blocking via `ctx.waitUntil`) |
+| `POST` | `/` | Claude chat (streaming SSE), `max_tokens: 120`, 3 sentence / 60 word HARD CAP. Stamps `firstMessageAt` on user tier record (non-blocking via `ctx.waitUntil`) |
 | `POST` | `/tts` | Smallest AI Lightning V3.1/V2 TTS proxy (Divine tier only) |
 | `GET` | `/daily-topic` | Today's topic (date-idempotent via `topic:YYYY-MM-DD`) + titles for all 14 beliefs |
 | `GET` | `/daily-content?belief=<id>` | Prayer + sacredText + reflectionPrompt — cached 48h |
@@ -311,9 +311,16 @@ Applied to all 14 belief prompts via string interpolation. Contains:
 2. **DISCLOSURE RULE** — honest about being AI
 3. **TONE AWARENESS** — humor when appropriate, gravity when the room turns serious
 4. **RESPONSE LENGTH RULES** — 1 sentence for greetings, 1-2 simple, 2-3 medium, 3 deep
-5. **HARD CAP** — "2-3 sentences maximum. 1 sentence for greetings. Never exceed this."
+5. **HARD CAP** — "3 sentences maximum, 60 words maximum. Count your sentences — delete the fourth."
 
-Each belief's `RESPONSE DEPTH` block reinforces the HARD CAP and instructs Claude to deliver depth through **specificity** (exact verses, real names, real numbers) rather than length. This resolved a prior contradiction where belief prompts said "5-10 sentences for deeper questions" which overrode the HARD CAP.
+**Response-length architectural standard (locked 2026-04-16):**
+- `max_tokens: 120` in the worker's Claude call — hard ceiling, never widen
+- 3 sentences maximum
+- 60 words maximum
+- 1 sentence for greetings
+- Tone: **crisp, never verbose.** Depth comes from specificity (exact verses, real names, real numbers), not length. This is a product decision rooted in observed behavior — belief-specific prompts that prescribed "5-10 sentences for deeper questions" were overriding the cap and making God sound like a sermon rather than a conversation. Do not relax these limits without an explicit rationale in a commit message.
+
+Each belief's `RESPONSE DEPTH` block reinforces the HARD CAP and instructs Claude to deliver depth through **specificity** (exact verses, real names, real numbers) rather than length.
 
 ## Design System
 
