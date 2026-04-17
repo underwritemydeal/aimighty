@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1080" width="1080" height="1080" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="t d">
+  <title id="t">AImighty · AI + halo logomark</title>
+  <desc id="d">Stylized AI wordmark in Cormorant Garamond with a tilted Byzantine halo in champagne gold on a cosmic black background.</desc>
+  <defs>
+    <style type="text/css">
+      @font-face{
+        font-family:'Cormorant Garamond';
+        font-weight:600;
+        font-style:normal;
+        src:url(data:font/woff2;base64,d09GMgABAAAAAANYABAAAAAAB0AAAAL/AAQAQgAAAAAAAAAAAAAAAAAAAAAAAAAAGhYbcBxkBmA/U1RBVEQAPBEICoJ0gksBNgIkAxALCgAEIAWELAcgDAcb+QUIrgriMddQK+So0fKyruRXlxpixQTPkx71/mQWcFbQ2VkA3UEqr4NYQjVYQRV5yN+9w8/WhaZkRRGiIghEmy4KamBqvq7gU4TVl5mhwdrvWftf+qrjz/819aI8PVroBI+0F6V7H2jZVA04HuiBr/R4oPMZDAeiM890+qixo9FlnIjIa/189+EIcAYAihAGIcBRmhJ6qJk0i8BlfKCLwHWguZPA3RrqIZAG/P8vgGzNAz3YAwFCU+wJe4o3DQKFEgqAEAaFUm+KJSYxUO90aCEZ8RAAINOkKhNHLex7b2MXLagJW2Ku6ypQfipQt5oHTNwjZSbDJwAvSPHn5L/DLcrV14f/vYYeJQgQgFyqHzAZhLCngDcFoqiztW1InKD9sLrEGaG5E4AU+QkGocIFAAGggAG8GQR40+KALU0o5epzMJFvXkIASG7mfy0ADcCeD9YCOwAALfQk1SfolLnLPe+0abnjxgeO3XNsBc0XD4mx4uCFxP0r/VA607n9BOSFnUvAbPRc5NGUBanzTu30GuPq3cyF+/CZf/rLTgs5Hh+pnFXA7ajIJwEPE5H510MehVwrgPA0MuqpPxR0MiIxr+jz7s2vt3G2CbkbYr4N0c46fcnil77zHa6UulCvmOi75nsFDdXOfJ7a+PK5L8YbAARoFU+7y5e6Ff2yN4xPAK/XEgDwwZ5X/3+jfiVgSwEQHExBvRKVf3caZzau45c5ppJoHdkvzGckzVluOdmIQRoH4Ah4sshwRFZcvZQNNd5talW2ERgJkq20qOoRG5xjCLATvhx2xje/0gXH2E+lXn3GDWjXqs0QU4Y06bKZZmnTzCQY0L0BSw+K0wz4YodmjZ3lhg1puycHmeK0amdpWIOUMdmrW6pK1kStQjsLavRmpwelmYX741uAWpab7s74BU1MkzVr0m5YtxmatRrWxTIgS4o0adIVmmKqKaoVjtnZ1mRojt/8olcPkytNnAY0N/yAL1RviKVLu0Yz9Opm6WEA4P9hMiztl+T/mlN6Cw==) format('woff2');
+      }
+      .ai{font-family:'Cormorant Garamond','EB Garamond',Garamond,serif;font-weight:600;}
+    </style>
+
+    <radialGradient id="bg" cx="52%" cy="40%" r="75%">
+      <stop offset="0%"   stop-color="#100b04" stop-opacity="0.85"/>
+      <stop offset="55%"  stop-color="#050402" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="haloGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#e2c899" stop-opacity="0.38"/>
+      <stop offset="45%"  stop-color="#d4b882" stop-opacity="0.22"/>
+      <stop offset="80%"  stop-color="#bfa067" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#bfa067" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#fff5dc" stop-opacity="1"/>
+      <stop offset="18%"  stop-color="#e2c899" stop-opacity="0.95"/>
+      <stop offset="38%"  stop-color="#d4b882" stop-opacity="0.80"/>
+      <stop offset="55%"  stop-color="#bfa067" stop-opacity="0.60"/>
+      <stop offset="72%"  stop-color="#d4b882" stop-opacity="0.85"/>
+      <stop offset="90%"  stop-color="#fff5dc" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#e2c899" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="letterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#e2c899"/>
+      <stop offset="45%"  stop-color="#d4b882"/>
+      <stop offset="100%" stop-color="#bfa067"/>
+    </linearGradient>
+
+    <filter id="bloomSoft" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="32"/>
+    </filter>
+    <filter id="bloomMid" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+    <filter id="bloomTight" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="1080" fill="#000000"/>
+  <rect width="1080" height="1080" fill="url(#bg)"/>
+
+  <!-- Warm radial bloom behind halo -->
+  <ellipse cx="570" cy="480" rx="268" ry="153" transform="rotate(-17,570,480)" fill="url(#haloGlow)" opacity="0.88"/>
+
+  <!-- Byzantine tilted halo -->
+  <g transform="translate(570,480) rotate(-17)">
+    <!-- Upper/visible arc: bloom stack -->
+    <path d="M -168 0 A 168 88 0 0 0 168 0" fill="none" stroke="url(#ringGrad)" stroke-width="28" opacity="0.55" filter="url(#bloomSoft)"/>
+    <path d="M -168 0 A 168 88 0 0 0 168 0" fill="none" stroke="url(#ringGrad)" stroke-width="12" opacity="0.85" filter="url(#bloomMid)"/>
+    <path d="M -168 0 A 168 88 0 0 0 168 0" fill="none" stroke="url(#ringGrad)" stroke-width="5"  opacity="0.98" filter="url(#bloomTight)"/>
+    <path d="M -168 0 A 168 88 0 0 0 168 0" fill="none" stroke="#fff5dc" stroke-width="1.8" opacity="0.95"/>
+    <!-- Lower/hidden arc -->
+    <path d="M -168 0 A 168 88 0 0 1 168 0" fill="none" stroke="#bfa067" stroke-width="2"   opacity="0.5"/>
+    <path d="M -168 0 A 168 88 0 0 1 168 0" fill="none" stroke="#d4b882" stroke-width="0.8" opacity="0.8"/>
+  </g>
+
+  <!-- AI wordmark -->
+  <text class="ai" x="540" y="830" text-anchor="middle" font-size="480" fill="url(#letterGrad)" letter-spacing="-4">AI</text>
+</svg>

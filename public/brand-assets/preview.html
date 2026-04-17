@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>AImighty · Brand Asset Preview</title>
+<title>AImighty · Final Brand Assets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -11,12 +11,13 @@
   :root {
     --void: #030308;
     --void-soft: #0a0a12;
-    --gold: #c9a96e;
-    --gold-hi: #d4b882;
-    --gold-lo: #b8985a;
+    --gold: #d4b882;
+    --gold-hi: #e2c899;
+    --gold-lo: #bfa067;
+    --gold-core: #fff5dc;
     --text: rgba(245, 240, 232, 0.95);
     --text-dim: rgba(245, 240, 232, 0.55);
-    --hairline: rgba(212, 175, 55, 0.18);
+    --hairline: rgba(212, 184, 130, 0.22);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--void); color: var(--text); }
@@ -36,21 +37,20 @@
   .logo {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 500;
-    font-size: 38px;
+    font-size: 42px;
     letter-spacing: 1px;
   }
   .logo .ai { color: var(--gold); }
-  .logo .mighty { color: var(--text); }
   h1 {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 500;
-    font-size: 26px;
-    margin: 18px 0 6px;
+    font-size: 28px;
+    margin: 16px 0 6px;
     letter-spacing: 0.5px;
   }
   header p { margin: 4px 0; color: var(--text-dim); font-size: 15px; }
   main { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
-  section { margin-bottom: 56px; }
+  section { margin-bottom: 48px; }
   h2 {
     font-family: 'Cormorant Garamond', serif;
     font-weight: 500;
@@ -58,7 +58,7 @@
     color: var(--gold);
     border-bottom: 1px solid var(--hairline);
     padding-bottom: 10px;
-    margin: 0 0 24px;
+    margin: 0 0 20px;
     letter-spacing: 1px;
     text-transform: uppercase;
   }
@@ -66,12 +66,12 @@
     background: var(--void-soft);
     border: 1px solid var(--hairline);
     border-radius: 10px;
-    padding: 18px 20px;
-    color: var(--text-dim);
+    padding: 20px 22px;
+    color: var(--text);
     font-size: 15px;
   }
   .intro strong { color: var(--gold-hi); font-weight: 500; }
-  figure { margin: 0 0 28px; }
+  figure { margin: 0 0 24px; }
   figure img {
     display: block; width: 100%; height: auto;
     border: 1px solid rgba(245,240,232,0.06);
@@ -79,142 +79,127 @@
     background: #000;
   }
   figcaption {
-    text-align: center;
     color: var(--text-dim);
-    font-size: 14px;
+    font-size: 13px;
     margin-top: 10px;
     letter-spacing: 1px;
+    display: flex; justify-content: space-between; align-items: center;
   }
-  .variant-head {
-    display: flex; justify-content: space-between; align-items: baseline;
-    margin-bottom: 8px;
+  figcaption a {
+    color: var(--gold); text-decoration: none; font-size: 12px;
+    border: 1px solid var(--hairline); padding: 6px 12px; border-radius: 4px;
   }
-  .variant-head .name {
-    font-family: 'Cormorant Garamond', serif; font-weight: 500;
-    font-size: 22px; color: var(--text);
+  .swatches { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 20px; }
+  .swatch { flex: 1 0 140px; text-align: center; }
+  .swatch .chip {
+    width: 100%; aspect-ratio: 1.3/1; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
   }
-  .variant-head .hex {
-    font-family: 'Outfit', sans-serif; font-weight: 400;
-    color: var(--gold); font-size: 14px; letter-spacing: 3px;
+  .swatch .lbl { font-size: 12px; color: var(--text-dim); letter-spacing: 1.5px; margin-top: 6px; display: block; text-transform: uppercase; }
+  .swatch .hex { font-size: 11px; color: var(--gold); letter-spacing: 2px; }
+  ul.links { list-style: none; padding: 0; margin: 0; }
+  ul.links li { padding: 12px 0; border-bottom: 1px solid rgba(245,240,232,0.06); }
+  ul.links a {
+    color: var(--gold-hi); text-decoration: none;
+    font-family: 'Outfit', sans-serif; font-size: 14px;
+    letter-spacing: 1px; display: flex; justify-content: space-between;
   }
-  .variant-desc { color: var(--text-dim); font-size: 14px; margin: 0 0 12px; }
-  .swatch-row { display: flex; gap: 8px; margin: 6px 0 16px; }
-  .swatch { width: 44px; height: 44px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); }
-  .swatch-lbl { font-size: 11px; color: var(--text-dim); letter-spacing: 1px; text-align: center; margin-top: 4px; display: block; }
-  .swatch-wrap { text-align: center; }
-  .cta-note {
-    text-align: center; font-family: 'Cormorant Garamond', serif;
-    font-style: italic; color: var(--gold-hi);
-    font-size: 20px; margin: 24px 0 8px;
-  }
-  .cta-sub { text-align: center; color: var(--text-dim); font-size: 14px; }
+  ul.links span.arr { color: var(--text-dim); }
   footer {
     border-top: 1px solid var(--hairline);
     margin-top: 40px; padding: 28px 20px;
     text-align: center; color: var(--text-dim); font-size: 12px;
     letter-spacing: 2px;
   }
-  a { color: var(--gold-hi); }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo"><span class="ai">AI</span><span class="mighty">mighty</span></div>
-  <h1>Brand Asset Preview</h1>
-  <p>Gold variation review · pre-final-asset build</p>
+  <div class="logo"><span class="ai">AI</span><span>mighty</span></div>
+  <h1>Final Brand Assets</h1>
+  <p>Champagne gold · Byzantine halo · ready for launch</p>
 </header>
 
 <main>
 
   <section>
     <div class="intro">
-      <strong>Step 1 of 2.</strong> Pick one of three gold tones below.
-      Once you tell me which (A, B, or C), I'll build the 5 final assets
-      — profile pic (SVG+PNG), social banner, launch verticals, and the video end card —
-      using the approved palette and push them to this same preview page.
-      <br/><br/>
-      <strong style="color:#e2c899">Rev 2:</strong> Halo redesigned as a tilted 3D neon ring with warm bloom (no more flat moon disc) per the reference image.
+      <strong>Approved set.</strong> Five PNGs + master SVG rendered with the
+      champagne palette (#D4B882) and halo rev 3. Download any asset with
+      the button on its caption, or open <a href="/brand-assets/README.md" style="color:var(--gold-hi)">README.md</a>
+      for the full palette spec.
     </div>
   </section>
 
   <section>
-    <h2>Side-by-side</h2>
+    <h2>Palette</h2>
+    <div class="swatches">
+      <div class="swatch"><div class="chip" style="background:#d4b882"></div><span class="lbl">GOLD</span><span class="hex">#D4B882</span></div>
+      <div class="swatch"><div class="chip" style="background:#e2c899"></div><span class="lbl">GOLD HI</span><span class="hex">#E2C899</span></div>
+      <div class="swatch"><div class="chip" style="background:#bfa067"></div><span class="lbl">GOLD LO</span><span class="hex">#BFA067</span></div>
+      <div class="swatch"><div class="chip" style="background:#fff5dc"></div><span class="lbl">CORE</span><span class="hex">#FFF5DC</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>1 · Profile pic</h2>
     <figure>
-      <img src="/brand-assets/preview/gold-comparison.png" alt="Three gold variations, side by side, on black" />
-      <figcaption>Full comparison · 3240&nbsp;×&nbsp;1600 · black background</figcaption>
+      <img src="/brand-assets/profile-1080.png?v=final" alt="Profile 1080×1080" />
+      <figcaption><span>1080 × 1080 · X / IG / LinkedIn avatar</span><a href="/brand-assets/profile-1080.png" download>Download PNG</a></figcaption>
+    </figure>
+    <figure>
+      <img src="/brand-assets/mark.svg?v=final" alt="Master SVG logomark" />
+      <figcaption><span>Master SVG · scales infinitely · embedded font</span><a href="/brand-assets/mark.svg" download>Download SVG</a></figcaption>
     </figure>
   </section>
 
   <section>
-    <h2>Variant A · Antique aged gold</h2>
-    <div class="variant-head">
-      <span class="name">Byzantine, warm, Vatican</span>
-      <span class="hex">#C9A96E</span>
-    </div>
-    <p class="variant-desc">
-      Richest of the three. Closest to worn gold leaf on an icon panel.
-      Reads as unambiguously "gold" without drifting toward yellow.
-    </p>
-    <div class="swatch-row">
-      <div class="swatch-wrap"><div class="swatch" style="background:#d4b882"></div><span class="swatch-lbl">HILIGHT</span></div>
-      <div class="swatch-wrap"><div class="swatch" style="background:#c9a96e"></div><span class="swatch-lbl">BASE</span></div>
-      <div class="swatch-wrap"><div class="swatch" style="background:#b8985a"></div><span class="swatch-lbl">SHADOW</span></div>
-    </div>
+    <h2>2 · Social banner</h2>
     <figure>
-      <img src="/brand-assets/preview/profile-variant-A-antique.png" alt="Variant A profile pic" />
+      <img src="/brand-assets/social-banner-1500x500.png?v=final" alt="Banner 1500×500" />
+      <figcaption><span>1500 × 500 · X header / LinkedIn</span><a href="/brand-assets/social-banner-1500x500.png" download>Download PNG</a></figcaption>
     </figure>
   </section>
 
   <section>
-    <h2>Variant B · Champagne gold</h2>
-    <div class="variant-head">
-      <span class="name">Softer, premium, Hermès</span>
-      <span class="hex">#D4B882</span>
-    </div>
-    <p class="variant-desc">
-      Lighter and more refined. Feels luxurious and modern without losing warmth.
-      Still clearly gold, but moves toward pale honey.
-    </p>
-    <div class="swatch-row">
-      <div class="swatch-wrap"><div class="swatch" style="background:#e2c899"></div><span class="swatch-lbl">HILIGHT</span></div>
-      <div class="swatch-wrap"><div class="swatch" style="background:#d4b882"></div><span class="swatch-lbl">BASE</span></div>
-      <div class="swatch-wrap"><div class="swatch" style="background:#bfa067"></div><span class="swatch-lbl">SHADOW</span></div>
-    </div>
+    <h2>3 · Launch vertical</h2>
     <figure>
-      <img src="/brand-assets/preview/profile-variant-B-champagne.png" alt="Variant B profile pic" />
+      <img src="/brand-assets/launch-vertical-1080x1920.png?v=final" alt="Vertical 1080×1920" />
+      <figcaption><span>1080 × 1920 · IG/TikTok/YT story</span><a href="/brand-assets/launch-vertical-1080x1920.png" download>Download PNG</a></figcaption>
     </figure>
   </section>
 
   <section>
-    <h2>Variant C · Ivory gold</h2>
-    <div class="variant-head">
-      <span class="name">Washed, quietest, manuscript</span>
-      <span class="hex">#DDC9A0</span>
-    </div>
-    <p class="variant-desc">
-      Most washed out. Reads almost bone/vellum — sacred manuscript energy.
-      Loses a little presence at small sizes but feels the most ancient.
-    </p>
-    <div class="swatch-row">
-      <div class="swatch-wrap"><div class="swatch" style="background:#ebdbbb"></div><span class="swatch-lbl">HILIGHT</span></div>
-      <div class="swatch-wrap"><div class="swatch" style="background:#ddc9a0"></div><span class="swatch-lbl">BASE</span></div>
-      <div class="swatch-wrap"><div class="swatch" style="background:#c2ae89"></div><span class="swatch-lbl">SHADOW</span></div>
-    </div>
+    <h2>4 · Launch square</h2>
     <figure>
-      <img src="/brand-assets/preview/profile-variant-C-ivory.png" alt="Variant C profile pic" />
+      <img src="/brand-assets/launch-square-1080.png?v=final" alt="Square 1080×1080" />
+      <figcaption><span>1080 × 1080 · IG / X feed</span><a href="/brand-assets/launch-square-1080.png" download>Download PNG</a></figcaption>
     </figure>
   </section>
 
   <section>
-    <p class="cta-note">"Every belief. One voice."</p>
-    <p class="cta-sub">Reply with A, B, or C to approve the gold — I'll build the rest.</p>
+    <h2>5 · Video end card</h2>
+    <figure>
+      <img src="/brand-assets/end-card-1080x1920.png?v=final" alt="End card 1080×1920" />
+      <figcaption><span>1080 × 1920 · pure black · minimal</span><a href="/brand-assets/end-card-1080x1920.png" download>Download PNG</a></figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Reference files</h2>
+    <ul class="links">
+      <li><a href="/brand-assets/README.md">README.md — palette + font spec<span class="arr">→</span></a></li>
+      <li><a href="/brand-assets/CLAUDE-CODE-HANDOFF.md">CLAUDE-CODE-HANDOFF.md — paste into desktop Claude Code<span class="arr">→</span></a></li>
+      <li><a href="/brand-assets/mark.svg">mark.svg — master logomark (vector)<span class="arr">→</span></a></li>
+      <li><a href="/brand-assets/halo-rev.html">halo-rev.html — halo rev 3 deep-dive<span class="arr">→</span></a></li>
+    </ul>
   </section>
 
 </main>
 
 <footer>
-  AIMIGHTY &nbsp;·&nbsp; BRAND&nbsp;ASSETS&nbsp;PREVIEW &nbsp;·&nbsp; APR&nbsp;2026
+  AIMIGHTY · FINAL&nbsp;BRAND&nbsp;SET · APR&nbsp;2026
 </footer>
 
 </body>
