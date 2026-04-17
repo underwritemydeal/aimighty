@@ -21,6 +21,8 @@ import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type Belie
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import { openBillingPortal } from '../../config/stripe';
+import { CaptureMoment } from '../CaptureMoment';
+import { track } from '../../utils/analytics';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -192,6 +194,64 @@ const ReplaySpeakerIcon = memo(function ReplaySpeakerIcon() {
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
     </svg>
+  );
+});
+
+// Capture This Moment affordance — rendered under every settled God reply.
+// Fires a single `capture_button_shown` impression per mount so we can
+// measure the funnel (shown → tapped → completed → shared) per belief.
+// Intentionally quiet styling: thin outline, uppercase micro-label,
+// accent-tinted. Reverence over conversion.
+const CaptureButton = memo(function CaptureButton({
+  messageId,
+  beliefId,
+  accentColor,
+  onTap,
+}: {
+  messageId: string;
+  beliefId: string;
+  accentColor: string;
+  onTap: () => void;
+}) {
+  useEffect(() => {
+    track('capture_button_shown', { belief: beliefId, message_id: messageId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messageId]);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onTap();
+      }}
+      aria-label="Capture this moment"
+      style={{
+        display: 'block',
+        margin: '20px auto 0',
+        background: 'transparent',
+        border: `1px solid ${accentColor}33`,
+        color: `${accentColor}cc`,
+        fontFamily: "'Outfit', system-ui, sans-serif",
+        fontSize: '11px',
+        fontWeight: 500,
+        letterSpacing: '0.12em',
+        textTransform: 'uppercase',
+        padding: '8px 14px',
+        borderRadius: '999px',
+        cursor: 'pointer',
+        opacity: 0.75,
+        transition: 'opacity 200ms ease, border-color 200ms ease',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.opacity = '1';
+        e.currentTarget.style.borderColor = `${accentColor}66`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.opacity = '0.75';
+        e.currentTarget.style.borderColor = `${accentColor}33`;
+      }}
+    >
+      Capture this moment
+    </button>
   );
 });
 
@@ -761,8 +821,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   }, [belief.id]);
   const [controlsHidden, setControlsHidden] = useState(false);
   const [replayingMessageId, setReplayingMessageId] = useState<string | null>(null);
+  // Capture This Moment overlay state — holds the exact {question, reply}
+  // pair the user wants to turn into a shareable. Null means no overlay.
+  const [capturing, setCapturing] = useState<{ question: string; reply: string } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  // Tracks whether the text input currently has focus. We only apply
+  // the iOS keyboard offset when the input is focused AND the viewport
+  // shrinkage is big enough to actually be a keyboard — this kills
+  // phantom offsets from URL-bar collapse/expand and pinch-zoom that
+  // otherwise float the input bar 40-100px above the screen bottom.
+  const isInputFocusedRef = useRef(false);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1413,10 +1482,26 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const IOS_ACCESSORY_BAR_HEIGHT = 44;
+    // A real on-screen keyboard shrinks the visual viewport by >150px on
+    // every modern mobile device. Anything below that is URL-bar chrome
+    // shifting, pinch-zoom, or rubber-band scroll — NOT a keyboard —
+    // and must not move the input bar.
+    const KEYBOARD_THRESHOLD_PX = 150;
     const syncKeyboardOffset = () => {
+      // Gate on focus first: if the user isn't typing, keep the bar flush
+      // to the bottom regardless of what visualViewport reports. This
+      // single check eliminates the most common "floating bar" bug on iOS.
+      if (!isInputFocusedRef.current) {
+        document.documentElement.style.setProperty('--kb-offset', '0px');
+        return;
+      }
       const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      if (rawKb < KEYBOARD_THRESHOLD_PX) {
+        document.documentElement.style.setProperty('--kb-offset', '0px');
+        return;
+      }
       // Only add the accessory-bar buffer when the keyboard is actually open.
-      const kb = rawKb > 0 && isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
+      const kb = isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
       document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
     };
     syncKeyboardOffset();
@@ -1427,6 +1512,37 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       vv.removeEventListener('scroll', syncKeyboardOffset);
       document.documentElement.style.removeProperty('--kb-offset');
     };
+  }, []);
+
+  // Focus/blur handlers for the text input. These update the focus ref
+  // AND re-trigger a sync so the offset applies/clears immediately —
+  // otherwise there's a frame of lag between the keyboard animating in
+  // and the input bar rising, and the user sees their tap vanish.
+  const handleInputFocus = useCallback(() => {
+    isInputFocusedRef.current = true;
+    showControls();
+    // Fire a sync on the next frame so visualViewport has time to settle.
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      const vv = window.visualViewport;
+      requestAnimationFrame(() => {
+        const isIOS =
+          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        if (rawKb >= 150) {
+          const kb = isIOS ? rawKb + 44 : rawKb;
+          document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
+        }
+      });
+    }
+  }, []);
+
+  const handleInputBlur = useCallback(() => {
+    isInputFocusedRef.current = false;
+    // Reset offset immediately on blur — don't wait for the visualViewport
+    // resize event to catch up, which on iOS can take 300-500ms and leaves
+    // the input bar floating during the keyboard dismiss animation.
+    document.documentElement.style.setProperty('--kb-offset', '0px');
   }, []);
 
   const remainingMessages = getRemainingFreeMessages();
@@ -1639,7 +1755,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               gap: '24px',
             }}
           >
-            {displayMessages.map((message, index) => (
+            {displayMessages.map((message, index) => {
+              // The capture affordance shows on every God reply that has a
+              // preceding user question AND isn't currently streaming. The
+              // very first message (God's greeting) has no preceding
+              // question, so we skip it — nothing to "capture" yet.
+              const priorUser = index > 0 && displayMessages[index - 1].role === 'user'
+                ? displayMessages[index - 1]
+                : null;
+              const isStreamingThis = streamingMessageId.current === message.id;
+              const canCapture =
+                message.role === 'assistant' &&
+                priorUser != null &&
+                !isStreamingThis &&
+                message.content.trim().length > 0;
+              return (
               <div
                 key={message.id}
                 className="flex"
@@ -1693,6 +1823,27 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                     }}
                   >
                     {renderDivineContent(message, accentColor)}
+                    {/* Capture This Moment affordance — appears under every
+                        God reply that has a preceding user question. A subtle
+                        text button, not a big gradient CTA; reverence over
+                        conversion. */}
+                    {canCapture && priorUser && (
+                      <CaptureButton
+                        messageId={message.id}
+                        beliefId={belief.id}
+                        accentColor={accentColor}
+                        onTap={() => {
+                          track('capture_button_tapped', {
+                            belief: belief.id,
+                            message_id: message.id,
+                          });
+                          setCapturing({
+                            question: priorUser.content,
+                            reply: message.content,
+                          });
+                        }}
+                      />
+                    )}
                     {/* Replay speaker icon - only show if message has audioUrl */}
                     {message.audioUrl && (
                       <button
@@ -1726,7 +1877,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {/* Thinking dots */}
             {state === 'sending' && (
@@ -1840,7 +1992,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                onFocus={showControls}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
                 placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
                 disabled={!isInputEnabled}
                 maxLength={500}
@@ -2293,6 +2446,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* Capture This Moment overlay — rendered at the root so the
+          conversation-screen click handlers don't intercept its taps. */}
+      {capturing && (
+        <CaptureMoment
+          question={capturing.question}
+          reply={capturing.reply}
+          beliefId={belief.id}
+          onClose={() => setCapturing(null)}
+        />
+      )}
     </div>
   );
 }

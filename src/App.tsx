@@ -16,6 +16,7 @@ import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } 
 import { getLastBelief, setLastBelief, clearLastBelief, setDivine } from './services/tierService';
 import { safeGetItem } from './services/safeStorage';
 import { pollUserTierUntilPaid, fetchUserTier } from './config/stripe';
+import { preloadCaptureFonts } from './utils/captureImage';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -72,6 +73,13 @@ function App() {
     const stored = safeGetItem(LANGUAGE_STORAGE_KEY);
     return (stored as LanguageCode) || defaultLanguage;
   });
+
+  // Warm the Capture-This-Moment fonts in the background so the first
+  // share tap has fonts ready. Non-blocking, no await — it's fine if
+  // this finishes after the landing page renders.
+  useEffect(() => {
+    preloadCaptureFonts();
+  }, []);
 
   // Set initial document direction and restore session on mount
   useEffect(() => {
