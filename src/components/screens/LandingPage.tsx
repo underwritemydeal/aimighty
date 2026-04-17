@@ -655,6 +655,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
                 { t: 'Premium AI voice — warm, human', ok: true },
                 { t: 'God remembers you', ok: true },
                 { t: 'Personalized Daily Blessing', ok: true },
+                { t: 'Daily Belief Study — three questions for conversation', ok: true },
                 { t: 'Cinematic word-by-word text', ok: true },
               ]}
             />
