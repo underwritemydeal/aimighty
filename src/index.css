@@ -7,12 +7,12 @@
    ============================================ */
 :root {
   /* Brand Colors */
-  --color-gold: #d4af37;
-  --color-gold-rgb: 212, 175, 55;
-  --color-gold-light: #e8c84a;
-  --color-gold-dark: #b8962e;
-  --color-gold-glow: rgba(212, 175, 55, 0.15);
-  --color-gold-glow-strong: rgba(212, 175, 55, 0.3);
+  --color-gold: #d4b882;
+  --color-gold-rgb: 212, 184, 130;
+  --color-gold-light: #e2c899;
+  --color-gold-dark: #bfa067;
+  --color-gold-glow: rgba(212, 184, 130, 0.15);
+  --color-gold-glow-strong: rgba(212, 184, 130, 0.3);
 
   /* Background Colors */
   --color-void: #030308;
@@ -112,7 +112,7 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
-  --shadow-glow-gold: 0 0 40px rgba(212, 175, 55, 0.3), 0 0 80px rgba(212, 175, 55, 0.15), 0 0 120px rgba(212, 175, 55, 0.05);
+  --shadow-glow-gold: 0 0 40px rgba(212, 184, 130, 0.3), 0 0 80px rgba(212, 184, 130, 0.15), 0 0 120px rgba(212, 184, 130, 0.05);
 
   /* Borders */
   --radius-sm: 4px;

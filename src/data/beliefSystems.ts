@@ -19,8 +19,8 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Protestant',
     icon: '✝️',
     description: 'Connect with the God of the Bible',
-    themeColor: '#d4af37',
-    accentColor: '#d4af37', // gold
+    themeColor: '#d4b882',
+    accentColor: '#d4b882', // gold
     particleColor: '#ffd700',
     backgroundGradient: ['#1a1a0a', '#2a2000'],
     category: 'religious',
@@ -61,8 +61,8 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Jewish',
     icon: '✡️',
     description: 'Speak with Adonai, the God of Israel',
-    themeColor: '#d4af37',
-    accentColor: '#d4af37', // gold
+    themeColor: '#d4b882',
+    accentColor: '#d4b882', // gold
     particleColor: '#ffd700',
     backgroundGradient: ['#1a1a0a', '#2a2000'],
     category: 'religious',
@@ -89,8 +89,8 @@ export const beliefSystems: CategorizedBeliefSystem[] = [
     subtitle: 'Buddhist',
     icon: '☸️',
     description: 'Find wisdom on the path to enlightenment',
-    themeColor: '#d4af37',
-    accentColor: '#d4af37', // gold
+    themeColor: '#d4b882',
+    accentColor: '#d4b882', // gold
     particleColor: '#fcd34d',
     backgroundGradient: ['#1a1a00', '#282000'],
     category: 'religious',

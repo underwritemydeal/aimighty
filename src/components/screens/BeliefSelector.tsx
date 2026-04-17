@@ -88,7 +88,7 @@ const BeliefCard = memo(function BeliefCard({
           isStaged
             ? theme.glow.replace(/[\d.]+\)$/, '0.65)')
             : isCurrent
-            ? 'rgba(212, 175, 55, 0.35)'
+            ? 'rgba(212, 184, 130, 0.35)'
             : isActive
             ? 'rgba(255, 255, 255, 0.14)'
             : 'rgba(255, 255, 255, 0.06)'
@@ -153,7 +153,7 @@ const BeliefCard = memo(function BeliefCard({
                 fontFamily: 'var(--font-body, Outfit)',
                 fontWeight: 400,
                 fontSize: '0.7rem',
-                color: 'rgba(212, 175, 55, 0.85)',
+                color: 'rgba(212, 184, 130, 0.85)',
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
               }}
@@ -284,7 +284,7 @@ export function BeliefSelector({
         className="fixed inset-0"
         style={{
           background:
-            'radial-gradient(ellipse 80% 60% at 50% 20%, rgba(212, 175, 55, 0.06) 0%, rgba(3,3,8,0) 60%), var(--color-void)',
+            'radial-gradient(ellipse 80% 60% at 50% 20%, rgba(212, 184, 130, 0.06) 0%, rgba(3,3,8,0) 60%), var(--color-void)',
         }}
         aria-hidden="true"
       />
@@ -438,11 +438,11 @@ export function BeliefSelector({
             borderRadius: '999px',
             border: 'none',
             minWidth: '240px',
-            background: continueEnabled ? '#d4af37' : 'rgba(212, 175, 55, 0.18)',
+            background: continueEnabled ? '#d4b882' : 'rgba(212, 184, 130, 0.18)',
             color: continueEnabled ? '#0a0a0f' : 'rgba(255,248,240,0.4)',
             cursor: continueEnabled ? 'pointer' : 'not-allowed',
             boxShadow: continueEnabled
-              ? '0 10px 40px rgba(212,175,55,0.28), 0 0 0 1px rgba(212,175,55,0.6) inset'
+              ? '0 10px 40px rgba(212,184,130,0.28), 0 0 0 1px rgba(212,184,130,0.6) inset'
               : 'none',
             transition: 'background 180ms ease, color 180ms ease, box-shadow 220ms ease',
           }}

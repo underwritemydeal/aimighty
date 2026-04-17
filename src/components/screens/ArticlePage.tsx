@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { beliefSystems } from '../../data/beliefSystems';
 import { normalizeBeliefId } from '../../config/beliefSystems';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
+import { colors, fonts, fontWeights } from '../../styles/designSystem';
 
 interface ArticlePageProps {
   belief: string;
@@ -38,7 +39,7 @@ export function ArticlePage({ belief, slug: _slug, onBackToHome, onEnterApp }: A
 
   const normalized = normalizeBeliefId(belief);
   const beliefData = beliefSystems.find((b) => b.id === normalized);
-  const accentColor = beliefData?.accentColor || '#d4af37';
+  const accentColor = beliefData?.accentColor || '#d4b882';
   const imagePath = beliefData?.imagePath || `/images/avatars/${normalized}.jpg`;
 
   useEffect(() => {
@@ -165,14 +166,14 @@ export function ArticlePage({ belief, slug: _slug, onBackToHome, onEnterApp }: A
           </button>
           <div
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: fonts.display,
               fontSize: '1.05rem',
-              fontWeight: 300,
+              fontWeight: fontWeights.medium,
               letterSpacing: '0.05em',
             }}
           >
-            <span style={{ color: '#d4af37' }}>AI</span>
-            <span style={{ color: 'rgba(255,248,240,0.95)' }}>mighty</span>
+            <span style={{ color: colors.gold }}>AI</span>
+            <span style={{ color: colors.textPrimary }}>mighty</span>
           </div>
           <button
             onClick={onEnterApp}

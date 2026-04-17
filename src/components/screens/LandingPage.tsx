@@ -372,7 +372,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              color: 'rgba(212,175,55,0.6)',
+              color: 'rgba(212,184,130,0.6)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',

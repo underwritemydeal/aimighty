@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
             marginBottom: '24px',
           }}
         >
-          <span style={{ color: '#d4af37' }}>AI</span>
+          <span style={{ color: '#d4b882' }}>AI</span>
           <span>mighty</span>
         </div>
 
@@ -107,7 +107,7 @@ export class ErrorBoundary extends Component<Props, State> {
               padding: '14px 28px',
               minHeight: '44px',
               borderRadius: '999px',
-              background: '#d4af37',
+              background: '#d4b882',
               color: '#0a0a0f',
               fontFamily: 'var(--font-body, Outfit, system-ui, sans-serif)',
               fontSize: '0.95rem',
@@ -130,7 +130,7 @@ export class ErrorBoundary extends Component<Props, State> {
               fontFamily: 'var(--font-body, Outfit, system-ui, sans-serif)',
               fontSize: '0.95rem',
               fontWeight: 500,
-              border: '1px solid rgba(212, 175, 55, 0.4)',
+              border: '1px solid rgba(212, 184, 130, 0.4)',
               cursor: 'pointer',
             }}
           >

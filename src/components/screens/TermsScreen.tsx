@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { colors, fonts, fontWeights } from '../../styles/designSystem';
 
 interface TermsScreenProps {
   onBack: () => void;
@@ -35,14 +36,14 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
         className="fixed top-5 left-1/2 z-20"
         style={{
           transform: 'translateX(-50%)',
-          fontFamily: 'var(--font-display)',
+          fontFamily: fonts.display,
           fontSize: '1.1rem',
-          fontWeight: 300,
+          fontWeight: fontWeights.medium,
           letterSpacing: '0.05em',
         }}
       >
-        <span style={{ color: '#d4af37' }}>AI</span>
-        <span style={{ color: 'rgba(255,248,240,0.95)' }}>mighty</span>
+        <span style={{ color: colors.gold }}>AI</span>
+        <span style={{ color: colors.textPrimary }}>mighty</span>
       </div>
       {/* Back button */}
       <nav
@@ -80,7 +81,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-3xl)',
               fontWeight: 300,
-              color: '#d4af37',
+              color: '#d4b882',
             }}
           >
             Terms of Service
@@ -122,11 +123,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               By creating an account, accessing, or using the Service, you agree to be bound by these Terms. If you do not agree to these Terms, do not use the Service.
             </p>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 1 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 1. NATURE OF THE SERVICE — IMPORTANT DISCLAIMER
               </h2>
 
@@ -185,11 +186,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 2 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 2. ELIGIBILITY
               </h2>
 
@@ -215,11 +216,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 3 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 3. ACCOUNTS AND REGISTRATION
               </h2>
 
@@ -245,11 +246,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 4 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 4. SUBSCRIPTION PLANS AND BILLING
               </h2>
 
@@ -298,11 +299,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 5 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 5. ACCEPTABLE USE
               </h2>
 
@@ -340,11 +341,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 6 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 6. INTELLECTUAL PROPERTY
               </h2>
 
@@ -377,11 +378,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 7 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 7. PRIVACY
               </h2>
               <p>
@@ -389,11 +390,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 8 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 8. DISCLAIMERS AND LIMITATION OF LIABILITY
               </h2>
 
@@ -443,11 +444,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 9 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 9. INDEMNIFICATION
               </h2>
               <p>
@@ -463,11 +464,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </ul>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 10 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 10. DISPUTE RESOLUTION
               </h2>
 
@@ -507,11 +508,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 11 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 11. SAFETY AND CRISIS RESOURCES
               </h2>
 
@@ -528,8 +529,8 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               <div
                 className="p-4 rounded-xl mt-4"
                 style={{
-                  background: 'rgba(212, 175, 55, 0.1)',
-                  border: '1px solid rgba(212, 175, 55, 0.3)',
+                  background: 'rgba(212, 184, 130, 0.1)',
+                  border: '1px solid rgba(212, 184, 130, 0.3)',
                 }}
               >
                 <ul className="space-y-2">
@@ -548,11 +549,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 12 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 12. AI DISCLOSURE AND TRANSPARENCY
               </h2>
 
@@ -589,11 +590,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 13 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 13. TERMINATION
               </h2>
 
@@ -619,11 +620,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 14 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 14. MODIFICATIONS TO TERMS
               </h2>
               <p>
@@ -631,11 +632,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 15 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 15. GENERAL PROVISIONS
               </h2>
 
@@ -675,22 +676,22 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 16 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 16. CONTACT INFORMATION
               </h2>
               <p>If you have questions about these Terms, please contact us:</p>
               <div className="mt-4">
                 <p><strong>AImighty LLC</strong></p>
-                <p>Email: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4af37' }}>legal@aimightyme.com</a></p>
-                <p>Website: <a href="https://aimightyme.com" style={{ color: '#d4af37' }}>https://aimightyme.com</a></p>
+                <p>Email: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4b882' }}>legal@aimightyme.com</a></p>
+                <p>Website: <a href="https://aimightyme.com" style={{ color: '#d4b882' }}>https://aimightyme.com</a></p>
               </div>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             <p className="text-center italic" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
               By using AImighty, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.

@@ -116,7 +116,7 @@ const MenuIcon = memo(function MenuIcon() {
 // Gold flame SVG for the streak row — replaces the 🔥 emoji
 const FlameIcon = memo(function FlameIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4b882" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
     </svg>
   );
@@ -629,7 +629,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           background: 'rgba(8, 8, 16, 0.96)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(212, 175, 55, 0.25)',
+          border: '1px solid rgba(212, 184, 130, 0.25)',
           borderRadius: '16px',
           minWidth: '220px',
           padding: '8px 0',
@@ -642,7 +642,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
         {item('Sacred Text', onSacredText)}
         {item('Reflection', onReflection)}
 
-        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <div
           className="flex items-center gap-2"
@@ -675,7 +675,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           </button>
         )}
 
-        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <button
           onClick={() => { onNavigate?.('terms'); onClose(); }}
@@ -706,7 +706,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           Privacy Policy
         </button>
 
-        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <button
           onClick={() => { onSignOut(); onClose(); }}
@@ -721,8 +721,8 @@ const SettingsDropdown = memo(function SettingsDropdown({
 
         <style>{`
           .menu-item:hover {
-            background: rgba(212, 175, 55, 0.08) !important;
-            border-left-color: #d4af37 !important;
+            background: rgba(212, 184, 130, 0.08) !important;
+            border-left-color: #d4b882 !important;
           }
         `}</style>
       </div>
@@ -1682,7 +1682,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               style={{
                 width: '44px',
                 height: '44px',
-                color: voiceEnabled ? 'rgba(255,255,255,0.7)' : '#d4af37',
+                color: voiceEnabled ? 'rgba(255,255,255,0.7)' : '#d4b882',
               }}
             >
               <SpeakerIcon muted={!voiceEnabled} />
@@ -2236,7 +2236,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               background: 'rgba(8,8,16,0.96)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(212,175,55,0.35)',
+              border: '1px solid rgba(212,184,130,0.35)',
               borderRadius: '16px',
               color: 'rgba(255,248,240,0.95)',
               fontSize: '0.9rem',
@@ -2253,7 +2253,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 style={{
                   padding: '10px 22px',
                   borderRadius: '8px',
-                  background: '#d4af37',
+                  background: '#d4b882',
                   color: '#0a0a0f',
                   fontSize: '0.85rem',
                   fontWeight: 500,

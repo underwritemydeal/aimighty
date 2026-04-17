@@ -11,13 +11,14 @@ export const colors = {
   voidSoft: 'rgba(10, 10, 18, 1)',
   voidOverlay: 'rgba(3, 3, 8, 0.92)',
 
-  gold: '#d4af37',
-  goldLight: '#e8c84a',
-  goldDark: '#b8962e',
-  goldFaint: 'rgba(212, 175, 55, 0.15)',
-  goldBorder: 'rgba(212, 175, 55, 0.2)',
-  goldBorderActive: 'rgba(212, 175, 55, 0.6)',
-  goldBorderStrong: 'rgba(212, 175, 55, 0.8)',
+  gold: '#d4b882',
+  goldLight: '#e2c899',
+  goldDark: '#bfa067',
+  goldCore: '#fff5dc',
+  goldFaint: 'rgba(212, 184, 130, 0.15)',
+  goldBorder: 'rgba(212, 184, 130, 0.2)',
+  goldBorderActive: 'rgba(212, 184, 130, 0.6)',
+  goldBorderStrong: 'rgba(212, 184, 130, 0.8)',
 
   textPrimary: 'rgba(255, 248, 240, 0.95)',
   textSecondary: 'rgba(255, 248, 240, 0.6)',
@@ -51,8 +52,8 @@ export const fontWeights = {
 
 // ───── Shadows ─────
 export const shadows = {
-  goldGlow: '0 0 30px rgba(212, 175, 55, 0.15)',
-  goldGlowStrong: '0 0 40px rgba(212, 175, 55, 0.25)',
+  goldGlow: '0 0 30px rgba(212, 184, 130, 0.15)',
+  goldGlowStrong: '0 0 40px rgba(212, 184, 130, 0.25)',
   card: '0 8px 32px rgba(0, 0, 0, 0.3)',
   cardHover: '0 12px 48px rgba(0, 0, 0, 0.5)',
 } as const;

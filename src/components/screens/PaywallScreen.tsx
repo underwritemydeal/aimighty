@@ -153,7 +153,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                   style={{
                     padding: '8px 20px',
                     borderRadius: '999px',
-                    background: billingCycle === cycle ? '#d4af37' : 'transparent',
+                    background: billingCycle === cycle ? '#d4b882' : 'transparent',
                     color: billingCycle === cycle ? '#0a0a0f' : 'rgba(255,255,255,0.7)',
                     fontFamily: 'var(--font-body, Outfit)',
                     fontSize: '0.85rem',
@@ -231,8 +231,8 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
               maxWidth: '620px',
               margin: '32px auto 0',
               padding: '16px 20px',
-              background: 'rgba(212,175,55,0.04)',
-              border: '1px solid rgba(212,175,55,0.15)',
+              background: 'rgba(212,184,130,0.04)',
+              border: '1px solid rgba(212,184,130,0.15)',
               borderRadius: '12px',
               fontFamily: 'var(--font-body, Outfit)',
               fontSize: '0.78rem',
@@ -240,7 +240,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
               color: 'rgba(255,248,240,0.6)',
             }}
           >
-            <strong style={{ color: 'rgba(212,175,55,0.9)', fontWeight: 500 }}>
+            <strong style={{ color: 'rgba(212,184,130,0.9)', fontWeight: 500 }}>
               All sales final once used.
             </strong>{' '}
             By purchasing, you expressly consent to immediate performance of
@@ -252,18 +252,18 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
             message, email{' '}
             <a
               href="mailto:support@aimightyme.com"
-              style={{ color: 'rgba(212,175,55,0.9)', textDecoration: 'underline' }}
+              style={{ color: 'rgba(212,184,130,0.9)', textDecoration: 'underline' }}
             >
               support@aimightyme.com
             </a>{' '}
             within 14 days for a full refund. You can cancel anytime in{' '}
-            <strong style={{ color: 'rgba(212,175,55,0.9)', fontWeight: 500 }}>
+            <strong style={{ color: 'rgba(212,184,130,0.9)', fontWeight: 500 }}>
               Manage Subscription
             </strong>{' '}
             (in the menu once signed in) to stop future renewals.{' '}
             <a
               href="/terms"
-              style={{ color: 'rgba(212,175,55,0.9)', textDecoration: 'underline' }}
+              style={{ color: 'rgba(212,184,130,0.9)', textDecoration: 'underline' }}
             >
               Full terms
             </a>
@@ -328,7 +328,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                 style={{
                   padding: '12px 24px',
                   borderRadius: '999px',
-                  background: '#d4af37',
+                  background: '#d4b882',
                   color: '#0a0a0f',
                   fontSize: '0.85rem',
                   fontWeight: 500,
@@ -383,9 +383,9 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
       style={{
         padding: '28px 24px',
         opacity: grayed ? 0.6 : 1,
-        border: highlight ? '1px solid #d4af37' : '1px solid rgba(255,255,255,0.08)',
+        border: highlight ? '1px solid #d4b882' : '1px solid rgba(255,255,255,0.08)',
         background: highlight
-          ? 'linear-gradient(160deg, rgba(212,175,55,0.12), rgba(3,3,8,0.85))'
+          ? 'linear-gradient(160deg, rgba(212,184,130,0.12), rgba(3,3,8,0.85))'
           : 'rgba(3,3,8,0.7)',
       }}
     >
@@ -396,7 +396,7 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
             top: '-10px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: '#d4af37',
+            background: '#d4b882',
             color: '#0a0a0f',
             fontFamily: 'var(--font-body, Outfit)',
             fontSize: '0.65rem',
@@ -422,13 +422,13 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
         {name}
       </h3>
       <div className="mb-4">
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 600, color: '#d4af37' }}>{price}</span>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 600, color: '#d4b882' }}>{price}</span>
         <span style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', marginLeft: '6px' }}>{priceNote}</span>
       </div>
       <ul className="mb-6" style={{ listStyle: 'none', padding: 0 }}>
         {features.map((f, i) => (
           <li key={i} className="flex items-start gap-2" style={{ marginBottom: '10px' }}>
-            <span style={{ color: f.ok ? '#d4af37' : 'rgba(255,255,255,0.35)', fontSize: '0.9rem', lineHeight: 1.3 }}>
+            <span style={{ color: f.ok ? '#d4b882' : 'rgba(255,255,255,0.35)', fontSize: '0.9rem', lineHeight: 1.3 }}>
               {f.ok ? '✓' : '✕'}
             </span>
             <span style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '0.82rem', color: f.ok ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.38)', lineHeight: 1.4 }}>
@@ -442,7 +442,7 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
         className="w-full rounded-xl transition-opacity"
         style={{
           height: '44px',
-          background: highlight ? '#d4af37' : 'rgba(255,255,255,0.06)',
+          background: highlight ? '#d4b882' : 'rgba(255,255,255,0.06)',
           color: highlight ? '#0a0a0f' : 'rgba(255,255,255,0.85)',
           border: highlight ? 'none' : '1px solid rgba(255,255,255,0.12)',
           fontFamily: 'var(--font-body, Outfit)',

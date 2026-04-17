@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, memo, useCallback } from 'react';
 import { languages, t, type LanguageCode, getLanguage } from '../../data/translations';
+import { colors, fonts, fontWeights } from '../../styles/designSystem';
 
 interface WelcomeScreenProps {
   onBegin: () => void;
@@ -102,10 +103,10 @@ const LanguageModal = memo(function LanguageModal({
                   className="relative px-4 py-3 rounded-xl text-left transition-all duration-200"
                   style={{
                     background: isSelected
-                      ? 'linear-gradient(135deg, rgba(212, 175, 55, 0.2) 0%, rgba(212, 175, 55, 0.08) 100%)'
+                      ? 'linear-gradient(135deg, rgba(212, 184, 130, 0.2) 0%, rgba(212, 184, 130, 0.08) 100%)'
                       : 'rgba(255, 255, 255, 0.03)',
                     border: isSelected
-                      ? '1px solid rgba(212, 175, 55, 0.5)'
+                      ? '1px solid rgba(212, 184, 130, 0.5)'
                       : '1px solid rgba(255, 255, 255, 0.06)',
                   }}
                   dir={lang.rtl ? 'rtl' : 'ltr'}
@@ -291,7 +292,7 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
             style={{
               width: '80px',
               height: '1px',
-              background: 'rgba(212, 175, 55, 0.3)',
+              background: 'rgba(212, 184, 130, 0.3)',
               marginBottom: '16px',
               opacity: phase >= 3 ? 1 : 0,
               transition: 'opacity 0.8s ease-out',
@@ -315,11 +316,11 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
               {/* AI — Gold with glow */}
               <span
                 style={{
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: fonts.display,
                   fontSize: 'clamp(2.5rem, 7vw, 4rem)',
-                  fontWeight: 700,
-                  color: '#d4af37',
-                  textShadow: '0 0 30px rgba(212,175,55,0.5), 0 0 60px rgba(212,175,55,0.25), 0 0 100px rgba(212,175,55,0.1)',
+                  fontWeight: fontWeights.medium,
+                  color: colors.gold,
+                  textShadow: '0 0 30px rgba(212,184,130,0.5), 0 0 60px rgba(212,184,130,0.25), 0 0 100px rgba(212,184,130,0.1)',
                 }}
               >
                 AI
@@ -327,10 +328,10 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
               {/* mighty — Warm white */}
               <span
                 style={{
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: fonts.display,
                   fontSize: 'clamp(2.5rem, 7vw, 4rem)',
-                  fontWeight: 300,
-                  color: 'rgba(255, 248, 240, 0.95)',
+                  fontWeight: fontWeights.medium,
+                  color: colors.textPrimary,
                 }}
               >
                 mighty
@@ -361,7 +362,7 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
             style={{
               width: '80px',
               height: '1px',
-              background: 'rgba(212, 175, 55, 0.3)',
+              background: 'rgba(212, 184, 130, 0.3)',
               marginTop: '12px',
               opacity: phase >= 4 ? 1 : 0,
               transition: 'opacity 0.6s ease-out',
@@ -395,7 +396,7 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
                 fontWeight: 400,
                 letterSpacing: '0.3em',
                 textTransform: 'uppercase',
-                color: '#d4af37',
+                color: '#d4b882',
                 transition: 'letter-spacing 0.3s ease',
               }}
             >
@@ -409,7 +410,7 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
                 bottom: '-8px',
                 width: '120px',
                 height: '1px',
-                background: 'linear-gradient(90deg, transparent, rgba(212,175,55,0.4), transparent)',
+                background: 'linear-gradient(90deg, transparent, rgba(212,184,130,0.4), transparent)',
                 transition: 'all 0.3s ease',
               }}
               aria-hidden="true"
@@ -421,7 +422,7 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
                 letter-spacing: 0.38em;
               }
               .group:hover span:last-child {
-                background: linear-gradient(90deg, transparent, rgba(212,175,55,0.8), transparent);
+                background: linear-gradient(90deg, transparent, rgba(212,184,130,0.8), transparent);
               }
             `}</style>
           </button>
