@@ -48,6 +48,10 @@ export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMom
   const [phase, setPhase] = useState<Phase>('chrome-fade');
   const [busy, setBusy] = useState<null | 'saving' | 'sharing'>(null);
   const [errorToast, setErrorToast] = useState<string | null>(null);
+  // Set to true when the user cancels; used by the phase-advance timers
+  // to bail out instead of stepping the animation forward behind a
+  // closing overlay (which would cause a flicker as it unmounts).
+  const isClosingRef = useRef(false);
 
   // Blob cache — we only render the canvas once per mount, regardless of
   // whether the user hits Save, Share, or both. Canvas render is ~150ms
@@ -75,19 +79,31 @@ export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMom
   // unmounts mid-animation (e.g. user navigates away).
   useEffect(() => {
     track('capture_initiated', { belief: beliefId, question_length: question.length, reply_length: reply.length });
+    // Each phase-advance bails if the user has cancelled in the meantime,
+    // otherwise the overlay visually snaps forward (e.g. chrome-fade →
+    // glow-bloom) while the reverse-animation is trying to run, producing
+    // a one-frame flicker on slow devices.
+    const advance = (next: Phase) => {
+      if (isClosingRef.current) return;
+      setPhase(next);
+    };
     const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => setPhase('glow-bloom'), 200));
-    timers.push(setTimeout(() => setPhase('reposition'), 600));
-    timers.push(setTimeout(() => setPhase('hold'), 1000));
-    timers.push(setTimeout(() => setPhase('actions'), 1600));
-    timers.push(setTimeout(() => track('capture_completed', { belief: beliefId }), 1600));
+    timers.push(setTimeout(() => advance('glow-bloom'), 200));
+    timers.push(setTimeout(() => advance('reposition'), 600));
+    timers.push(setTimeout(() => advance('hold'), 1000));
+    timers.push(setTimeout(() => advance('actions'), 1600));
+    timers.push(setTimeout(() => {
+      if (isClosingRef.current) return;
+      track('capture_completed', { belief: beliefId });
+    }, 1600));
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Close handling — play reverse animation then call the parent's onClose.
   const handleClose = useCallback(() => {
-    if (phase === 'closing') return;
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
     track('capture_cancelled', { belief: beliefId, stage: phase });
     setPhase('closing');
     setTimeout(() => onClose(), 400);
@@ -327,8 +343,9 @@ export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMom
           right: 0,
           display: 'flex',
           justifyContent: 'center',
-          gap: '12px',
-          padding: '0 20px',
+          flexWrap: 'wrap',
+          gap: 'clamp(6px, 2vw, 12px)',
+          padding: '0 16px',
           opacity: actionsOpacity,
           transform: actionsTransform,
           transition: `opacity 400ms ${EASE}, transform 400ms ${EASE}`,
@@ -398,9 +415,11 @@ function ActionButton({ label, onClick, disabled, theme, variant }: ActionButton
   const base = {
     fontFamily: "'Outfit', system-ui, sans-serif",
     fontWeight: 500,
-    fontSize: '15px',
+    // Clamp so buttons tighten on narrow phones (iPhone SE 375px) without
+    // shrinking on tablet/desktop where breathing room is fine.
+    fontSize: 'clamp(13px, 3.8vw, 15px)',
     letterSpacing: '0.02em',
-    padding: '12px 22px',
+    padding: 'clamp(10px, 2.6vw, 12px) clamp(14px, 4vw, 22px)',
     borderRadius: '999px',
     cursor: disabled ? 'default' : 'pointer',
     transition: 'opacity 200ms ease, transform 150ms ease',
