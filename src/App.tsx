@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { LandingPage } from './components/screens/LandingPage';
 // Route-level code splitting: keep LandingPage eager (most common entry,
 // LCP-critical); lazy-load everything else so the landing bundle stays small.
@@ -13,10 +13,13 @@ const PrivacyScreen = lazy(() => import('./components/screens/PrivacyScreen').th
 const TermsScreen = lazy(() => import('./components/screens/TermsScreen').then(m => ({ default: m.TermsScreen })));
 const ArticlePage = lazy(() => import('./components/screens/ArticlePage').then(m => ({ default: m.ArticlePage })));
 import { getCurrentUser, getSession, updateSessionBelief, isLoggedIn, signOut } from './services/auth';
-import { getLastBelief, setLastBelief, clearLastBelief, setDivine } from './services/tierService';
+import { getLastBelief, setLastBelief, setDivine } from './services/tierService';
 import { safeGetItem } from './services/safeStorage';
 import { pollUserTierUntilPaid, fetchUserTier } from './config/stripe';
 import { preloadCaptureFonts } from './utils/captureImage';
+import { clearBeliefConversation } from './utils/resetConversation';
+import { track } from './utils/analytics';
+import { OtherBeliefsConfirm } from './components/OtherBeliefsConfirm';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -243,12 +246,66 @@ function App() {
     setCurrentScreen('conversation');
   }, []);
 
-  // Explicit "Switch Belief" from the dropdown clears last-belief memory
-  // so BeliefSelector gets shown again
+  // Other Beliefs flow — triggered from the hamburger menu.
+  //
+  // Step 1: tap menu → fire `other_beliefs_opened` → land on the warm
+  //         confirmation screen. Conversation + memory are NOT touched yet.
+  // Step 2a: tap "Stay here" → fire `belief_switch_cancelled` → return to
+  //          the current conversation.
+  // Step 2b: tap "Yes, explore" → transition to the picker in "switch" mode
+  //          with the current belief highlighted.
+  // Step 3: pick a new belief in the picker → `handleSwitchBeliefFromPicker`
+  //          fires `belief_switch_confirmed`, clears the old belief's
+  //          memory + character preference (via `clearBeliefConversation`),
+  //          then lets React remount `ConversationScreen` (its `key` prop is
+  //          `selectedBelief.id`, so a different id wipes displayMessages for
+  //          free). The opening message for the new belief renders fresh.
   const handleSwitchBelief = useCallback(() => {
-    clearLastBelief();
-    transitionTo('belief-selector');
+    if (selectedBelief) {
+      track('other_beliefs_opened', { current_belief: selectedBelief.id });
+    }
+    transitionTo('other-beliefs-confirm');
+  }, [selectedBelief]);
+
+  const handleCancelOtherBeliefs = useCallback(() => {
+    if (selectedBelief) {
+      track('belief_switch_cancelled', { current_belief: selectedBelief.id });
+    }
+    transitionTo('conversation');
+  }, [selectedBelief]);
+
+  const handleConfirmOtherBeliefs = useCallback(() => {
+    transitionTo('other-beliefs-picker');
   }, []);
+
+  // Session-level confusion signal. The spec says >3 switches in a single
+  // session is a red flag we want to see in the data.
+  const switchCountRef = useRef(0);
+
+  const handleSwitchBeliefFromPicker = useCallback((newBelief: BeliefSystem) => {
+    const fromId = selectedBelief?.id ?? null;
+    // Tapping the already-current belief in the picker falls through the
+    // BeliefSelector's own cancel path; if it somehow reaches here, treat
+    // it as a no-op rather than wiping state.
+    if (fromId === newBelief.id) {
+      transitionTo('conversation');
+      return;
+    }
+    if (fromId) {
+      clearBeliefConversation(fromId);
+    }
+    switchCountRef.current += 1;
+    track('belief_switch_confirmed', {
+      from: fromId,
+      to: newBelief.id,
+      session_switch_count: switchCountRef.current,
+      confusion_signal: switchCountRef.current > 3,
+    });
+    setSelectedBelief(newBelief);
+    updateSessionBelief(newBelief.id);
+    setLastBelief(newBelief.id);
+    transitionTo('conversation');
+  }, [selectedBelief]);
 
   const handleBeliefWelcomeComplete = () => {
     transitionTo('conversation');
@@ -460,6 +517,29 @@ function App() {
             onSignOut={handleSignOut}
             onNavigate={(screen) => transitionTo(screen)}
             language={language}
+          />
+        )}
+
+        {/* Other Beliefs flow — confirmation + picker in "switch" mode.
+            The conversation is preserved in state (not unmounted) so a
+            cancel drops the user right back into their running chat. */}
+        {currentScreen === 'other-beliefs-confirm' && selectedBelief && (
+          <OtherBeliefsConfirm
+            currentBelief={selectedBelief}
+            onConfirm={handleConfirmOtherBeliefs}
+            onCancel={handleCancelOtherBeliefs}
+          />
+        )}
+
+        {currentScreen === 'other-beliefs-picker' && selectedBelief && (
+          <BeliefSelector
+            onSelect={handleSwitchBeliefFromPicker}
+            onBack={handleCancelOtherBeliefs}
+            language={language}
+            onSignOut={handleSignOut}
+            mode="switch"
+            currentBeliefId={selectedBelief.id}
+            onCancel={handleCancelOtherBeliefs}
           />
         )}
 

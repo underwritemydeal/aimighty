@@ -662,7 +662,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           className="menu-item"
           style={baseItemStyle}
         >
-          Switch Belief
+          Other Beliefs
         </button>
 
         {!isFree && (
