@@ -338,7 +338,7 @@ export function ArticlePage({ belief, slug: _slug, onBackToHome, onEnterApp }: A
             fontSize: '0.8rem',
           }}
         >
-          <div>© 2026 AImighty · Every belief. One voice.</div>
+          <div>© 2026 AImighty · Built for every tradition.</div>
         </footer>
       </div>
     </div>
