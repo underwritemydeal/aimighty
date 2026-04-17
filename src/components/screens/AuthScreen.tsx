@@ -2,7 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { signUp, signIn, isValidEmail, getRememberMe, getLastEmail } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
-import { colors, fonts, fontWeights } from '../../styles/designSystem';
+import { Wordmark } from '../Wordmark';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -182,27 +182,8 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
         >
           {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="flex items-baseline justify-center select-none">
-              <span
-                style={{
-                  fontFamily: fonts.display,
-                  fontSize: '1.5rem',
-                  fontWeight: fontWeights.medium,
-                  color: colors.gold,
-                }}
-              >
-                AI
-              </span>
-              <span
-                style={{
-                  fontFamily: fonts.display,
-                  fontSize: '1.5rem',
-                  fontWeight: fontWeights.medium,
-                  color: colors.textPrimary,
-                }}
-              >
-                mighty
-              </span>
+            <h1 className="select-none" style={{ margin: 0 }}>
+              <Wordmark size="md" style={{ fontSize: '1.5rem' }} />
             </h1>
           </div>
 

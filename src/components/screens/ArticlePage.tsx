@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { beliefSystems } from '../../data/beliefSystems';
 import { normalizeBeliefId } from '../../config/beliefSystems';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
-import { colors, fonts, fontWeights } from '../../styles/designSystem';
+import { Wordmark } from '../Wordmark';
 
 interface ArticlePageProps {
   belief: string;
@@ -164,17 +164,7 @@ export function ArticlePage({ belief, slug: _slug, onBackToHome, onEnterApp }: A
           >
             ← Home
           </button>
-          <div
-            style={{
-              fontFamily: fonts.display,
-              fontSize: '1.05rem',
-              fontWeight: fontWeights.medium,
-              letterSpacing: '0.05em',
-            }}
-          >
-            <span style={{ color: colors.gold }}>AI</span>
-            <span style={{ color: colors.textPrimary }}>mighty</span>
-          </div>
+          <Wordmark size="sm" />
           <button
             onClick={onEnterApp}
             className="px-3 py-2 rounded-lg"

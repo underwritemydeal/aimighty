@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, memo, useCallback } from 'react';
 import { languages, t, type LanguageCode, getLanguage } from '../../data/translations';
-import { colors, fonts, fontWeights } from '../../styles/designSystem';
+import { Wordmark } from '../Wordmark';
 
 interface WelcomeScreenProps {
   onBegin: () => void;
@@ -308,34 +308,8 @@ export function WelcomeScreen({ onBegin, language, onLanguageChange, onNavigate 
               transition: 'all 0.8s ease-out',
             }}
           >
-            <h1
-              id="welcome-heading"
-              className="flex items-baseline justify-center select-none"
-              style={{ letterSpacing: '0.08em' }}
-            >
-              {/* AI — Gold with glow */}
-              <span
-                style={{
-                  fontFamily: fonts.display,
-                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
-                  fontWeight: fontWeights.medium,
-                  color: colors.gold,
-                  textShadow: '0 0 30px rgba(212,184,130,0.5), 0 0 60px rgba(212,184,130,0.25), 0 0 100px rgba(212,184,130,0.1)',
-                }}
-              >
-                AI
-              </span>
-              {/* mighty — Warm white */}
-              <span
-                style={{
-                  fontFamily: fonts.display,
-                  fontSize: 'clamp(2.5rem, 7vw, 4rem)',
-                  fontWeight: fontWeights.medium,
-                  color: colors.textPrimary,
-                }}
-              >
-                mighty
-              </span>
+            <h1 id="welcome-heading" className="select-none" style={{ margin: 0 }}>
+              <Wordmark size="lg" haloGlow />
             </h1>
           </div>
 

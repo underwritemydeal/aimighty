@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { colors, fonts, fontWeights } from '../../styles/designSystem';
+import { Wordmark } from '../Wordmark';
 
 interface PrivacyScreenProps {
   onBack: () => void;
@@ -35,16 +35,9 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
       {/* AImighty logo — top center */}
       <div
         className="fixed top-5 left-1/2 z-20"
-        style={{
-          transform: 'translateX(-50%)',
-          fontFamily: fonts.display,
-          fontSize: '1.1rem',
-          fontWeight: fontWeights.medium,
-          letterSpacing: '0.05em',
-        }}
+        style={{ transform: 'translateX(-50%)' }}
       >
-        <span style={{ color: colors.gold }}>AI</span>
-        <span style={{ color: colors.textPrimary }}>mighty</span>
+        <Wordmark size="sm" style={{ fontSize: '1.1rem' }} />
       </div>
       {/* Back button */}
       <nav
