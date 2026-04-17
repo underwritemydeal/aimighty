@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { sendMessage, summarizeConversation, type Message } from '../../services/claudeApi';
-import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue, prewarmTts } from '../../services/openaiTTS';
+import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue, prewarmTts, resumeAudio, isAudioPaused } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import {
@@ -20,6 +20,7 @@ import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
+import { openBillingPortal } from '../../config/stripe';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -510,6 +511,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onReflection,
   onSignOut,
   onNavigate,
+  onManageSubscription,
   tier,
   streakText,
   onUpgrade,
@@ -523,6 +525,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onReflection: () => void;
   onSignOut: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
+  onManageSubscription: () => void;
   tier: 'free' | 'believer' | 'divine';
   streakText: string;
   onUpgrade: () => void;
@@ -600,6 +603,16 @@ const SettingsDropdown = memo(function SettingsDropdown({
         >
           Switch Belief
         </button>
+
+        {!isFree && (
+          <button
+            onClick={() => { onManageSubscription(); onClose(); }}
+            className="menu-item"
+            style={baseItemStyle}
+          >
+            Manage Subscription
+          </button>
+        )}
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
 
@@ -1381,12 +1394,55 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     };
   }, []);
 
+  // Track the iOS on-screen keyboard height via visualViewport. When the
+  // keyboard opens, window.innerHeight stays the same but visualViewport.height
+  // shrinks. We push the fixed input bar up by the difference so it's never
+  // hidden under the keyboard.
+  //
+  // On iOS Safari there is an additional ~44px "form accessory bar" (domain
+  // pill + prev/next/done) that overlays the top of the keyboard and is NOT
+  // subtracted from visualViewport.height. Without compensating for it, the
+  // input bar floats directly behind that accessory bar and the text the user
+  // just typed is half-clipped. We add an IOS_ACCESSORY_BAR_HEIGHT buffer for
+  // iOS devices so the bar clears both the keyboard and the accessory overlay.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const isIOS =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const IOS_ACCESSORY_BAR_HEIGHT = 44;
+    const syncKeyboardOffset = () => {
+      const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      // Only add the accessory-bar buffer when the keyboard is actually open.
+      const kb = rawKb > 0 && isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
+      document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
+    };
+    syncKeyboardOffset();
+    vv.addEventListener('resize', syncKeyboardOffset);
+    vv.addEventListener('scroll', syncKeyboardOffset);
+    return () => {
+      vv.removeEventListener('resize', syncKeyboardOffset);
+      vv.removeEventListener('scroll', syncKeyboardOffset);
+      document.documentElement.style.removeProperty('--kb-offset');
+    };
+  }, []);
+
   const remainingMessages = getRemainingFreeMessages();
   const actualImagePath = imageError ? fallbackImagePath : imagePath;
 
-  // Handle any tap on the screen to unlock audio
+  // Handle any tap on the screen.
+  //   1. Unlock mobile audio (no-op after first unlock — MUST early-return
+  //      inside unlockMobileAudio or this kills playing audio).
+  //   2. If audio is currently paused (e.g. iOS backgrounding, tab switch,
+  //      or manual pause), resume from where it left off. Tap-to-resume.
+  //   3. Never stop playing audio — uninterrupted divine voice.
   const handleScreenTap = useCallback(() => {
     unlockMobileAudio();
+    if (isAudioPaused()) {
+      resumeAudio();
+    }
   }, []);
 
   return (
@@ -1537,6 +1593,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 onReflection={() => setShowReflectionModal(true)}
                 onSignOut={onSignOut || (() => {})}
                 onNavigate={onNavigate}
+                onManageSubscription={() => { void openBillingPortal(user.id); }}
                 tier={tier}
                 streakText={formatStreak(streak)}
                 onUpgrade={onPaywall}
@@ -1722,21 +1779,24 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         )}
 
-        {/* Input controls - fixed at bottom, slides off during TTS for clean cinematic view */}
+        {/* Input controls — fixed at bottom, slides off during TTS for clean
+            cinematic view. The `bottom` offset uses a CSS var set by the
+            visualViewport listener above so the bar floats above the iOS
+            on-screen keyboard instead of being covered by it. */}
         <div
           className="shrink-0"
           style={{
             position: 'fixed',
             left: 0,
             right: 0,
-            bottom: 0,
+            bottom: 'var(--kb-offset, 0px)',
             zIndex: 20,
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
             paddingTop: '12px',
             background: 'linear-gradient(to top, rgba(3,3,8,0.92) 0%, rgba(3,3,8,0.7) 60%, rgba(3,3,8,0) 100%)',
             opacity: controlsHidden ? 0 : (isVisible ? 1 : 0),
             transform: controlsHidden ? 'translateY(100%)' : 'translateY(0)',
-            transition: 'opacity 0.3s ease, transform 0.3s ease',
+            transition: 'opacity 0.3s ease, transform 0.3s ease, bottom 0.2s ease',
             pointerEvents: controlsHidden ? 'none' : 'auto',
           }}
         >

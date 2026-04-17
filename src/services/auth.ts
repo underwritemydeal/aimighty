@@ -42,6 +42,37 @@ const USER_STORAGE_KEY = 'aimighty_user';
 const SESSION_STORAGE_KEY = 'aimighty_session';
 const ACCOUNTS_STORAGE_KEY = 'aimighty_accounts';
 const REMEMBER_ME_KEY = 'aimighty_remember_me';
+const LAST_EMAIL_KEY = 'aimighty_last_email';
+
+/**
+ * Stores the email the user last authenticated with (sign up or sign in).
+ * Used by AuthScreen to auto-populate the email field and default to the
+ * sign-in tab for returning visitors.
+ */
+export function setLastEmail(email: string): void {
+  try {
+    localStorage.setItem(LAST_EMAIL_KEY, email.toLowerCase());
+  } catch {
+    // localStorage may be disabled — non-fatal
+  }
+}
+
+export function getLastEmail(): string {
+  try {
+    return localStorage.getItem(LAST_EMAIL_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * True iff this device has ever successfully signed in or signed up.
+ * AuthScreen uses this to default to the "Sign In" tab for returning users
+ * instead of making everyone switch from the sign-up default.
+ */
+export function hasSignedInBefore(): boolean {
+  return getLastEmail() !== '';
+}
 
 // Helper to get storage (localStorage if remembered, sessionStorage if not)
 function getStorage(): Storage {
@@ -261,6 +292,7 @@ export async function signUp(email: string, password: string, rememberMe: boolea
     lastActive: Date.now(),
   };
   saveSession(session, rememberMe);
+  setLastEmail(email);
 
   return { success: true, user };
 }
@@ -313,6 +345,7 @@ export async function signIn(email: string, password: string, rememberMe: boolea
     lastActive: Date.now(),
   };
   saveSession(session, rememberMe);
+  setLastEmail(email);
 
   return { success: true, user };
 }

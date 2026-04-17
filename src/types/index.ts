@@ -39,6 +39,7 @@ export interface User {
 }
 
 export type Screen =
+  | 'loading'
   | 'landing'
   | 'article'
   | 'welcome'

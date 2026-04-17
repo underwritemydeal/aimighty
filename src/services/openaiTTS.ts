@@ -54,7 +54,13 @@ function getPersistentAudio(): HTMLAudioElement {
  * Call this SYNCHRONOUSLY in onClick/onTouchEnd handlers.
  */
 export function unlockMobileAudio(): void {
-  console.log('[TTS Mobile] unlockMobileAudio called, already unlocked:', audioUnlocked);
+  // CRITICAL: early-return if already unlocked. Before this guard, every tap
+  // on the conversation screen was setting the persistent audio element's src
+  // to a silent MP3 — instantly killing whatever TTS response was playing.
+  // This is the root cause of "tap stops the voice".
+  if (audioUnlocked) return;
+
+  console.log('[TTS Mobile] unlockMobileAudio called (first unlock)');
 
   const audio = getPersistentAudio();
 
@@ -279,7 +285,8 @@ export async function speakWithOpenAI(
 }
 
 /**
- * Stop current audio playback
+ * Stop current audio playback and clear the sentence queue. This is a full
+ * stop — use pauseAudio() + resumeAudio() if you want reversible pause.
  */
 export function stop(): void {
   if (persistentAudio) {
@@ -295,6 +302,79 @@ export function stop(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     speechSynthesis.cancel();
   }
+}
+
+/**
+ * Pause current audio playback WITHOUT resetting currentTime. The queue stays
+ * intact. A subsequent resumeAudio() call will pick up from where it left off.
+ */
+export function pauseAudio(): void {
+  if (persistentAudio && !persistentAudio.paused && !persistentAudio.ended) {
+    persistentAudio.pause();
+    console.log('[TTS] audio paused at', persistentAudio.currentTime);
+  }
+}
+
+/**
+ * Resume audio that was previously paused by pauseAudio() or by the iOS Safari
+ * backgrounding interruption. Returns true if a resume actually happened.
+ * No-op if there's nothing to resume (never played, already playing, or ended).
+ */
+export function resumeAudio(): boolean {
+  if (!persistentAudio) return false;
+  // Conditions to resume: currently paused, not ended, and has some playback
+  // progress (so we know this isn't just a freshly-initialized element).
+  if (
+    persistentAudio.paused &&
+    !persistentAudio.ended &&
+    persistentAudio.currentTime > 0 &&
+    persistentAudio.src
+  ) {
+    const at = persistentAudio.currentTime;
+    persistentAudio.play().then(
+      () => console.log('[TTS] audio resumed from', at),
+      (e) => console.warn('[TTS] resume failed:', e)
+    );
+    return true;
+  }
+  return false;
+}
+
+/**
+ * True iff there is a paused-but-not-ended audio that can be resumed.
+ * Used by screen-tap handlers to decide whether to resume speech on tap.
+ */
+export function isAudioPaused(): boolean {
+  if (!persistentAudio) return false;
+  return (
+    persistentAudio.paused &&
+    !persistentAudio.ended &&
+    persistentAudio.currentTime > 0 &&
+    persistentAudio.src.length > 0
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TTS TEXT CLEANING — runs ONLY on the string sent to the TTS
+// engine, never on what is displayed in the chat UI.
+// ═══════════════════════════════════════════════════════════════
+
+function cleanTextForTTS(text: string): string {
+  // Fix 2: Remove scripture citations like John 3:16 or Romans 8:28-30
+  text = text.replace(/\b(John|Matthew|Luke|Mark|Acts|Romans|Genesis|Exodus|Psalm|Psalms|Proverbs|Isaiah|Revelation|Quran|Surah|Hadith|Gita|Bhagavad)\s+\d+:\d+[-\d]*/gi, '');
+
+  // Remove parenthetical or bracketed citations like (John 3:16) or [Romans 8:28]
+  text = text.replace(/[\(\[][^\)\]]*\d+:\d+[^\)\]]*[\)\]]/g, '');
+
+  // Fix 3: Convert standalone ALL-CAPS words (2+ letters) to title case
+  text = text.replace(/\b([A-Z]{2,})\b/g, (match) => {
+    return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+  });
+
+  // Clean up double spaces left behind
+  text = text.replace(/\s{2,}/g, ' ').trim();
+
+  return text;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -346,9 +426,11 @@ export function enqueueSentence(
     return;
   }
 
-  const words = text.trim().split(/\s+/);
+  // Clean the text for TTS only — UI still shows the original
+  const ttsText = cleanTextForTTS(text);
+  const words = ttsText.split(/\s+/).filter(Boolean);
   const entry: QueuedSentence = {
-    text,
+    text: ttsText,
     audioUrl: null,
     words,
     language,
@@ -360,14 +442,14 @@ export function enqueueSentence(
   };
 
   const fetchStart = Date.now();
-  const snippet = text.slice(0, 32).replace(/\n/g, ' ');
-  console.log(`[TTS-TIMING] sentence FIRED (t=0) "${snippet}…" (${text.length}ch)`);
+  const snippet = ttsText.slice(0, 32).replace(/\n/g, ' ');
+  console.log(`[TTS-TIMING] sentence FIRED (t=0) "${snippet}…" (${ttsText.length}ch)`);
 
   // 20s time-to-headers budget for per-sentence TTS fetch.
   entry.fetchPromise = fetchWithTimeout(`${WORKER_URL}/tts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, beliefSystem, character, language }),
+    body: JSON.stringify({ text: ttsText, beliefSystem, character, language }),
   }, 20000)
     .then((r) => {
       console.log(`[TTS-TIMING] sentence HEADERS t+${Date.now() - fetchStart}ms status=${r.status} "${snippet}…"`);
@@ -457,19 +539,13 @@ async function playNextInQueue(): Promise<void> {
   audio.src = entry.audioUrl;
   audio.volume = 1.0;
 
-  // Word highlighting via time progression
+  // Sentence-level highlighting: highlight all words at once when audio
+  // starts, clear on end. Word-by-word highlighting is disabled because
+  // Smallest AI Lightning does not return word-level timestamps and
+  // client-side estimation (duration / wordCount) drifts out of sync.
   entry.onStart?.(entry.words.length);
-
-  let lastWordIdx = -1;
-  audio.ontimeupdate = () => {
-    if (!audio.duration || isNaN(audio.duration)) return;
-    const progress = audio.currentTime / audio.duration;
-    const idx = Math.min(entry.words.length - 1, Math.floor(progress * entry.words.length));
-    if (idx !== lastWordIdx) {
-      lastWordIdx = idx;
-      entry.onWord?.(idx);
-    }
-  };
+  // Signal all words highlighted immediately
+  entry.onWord?.(entry.words.length - 1);
 
   audio.onended = () => {
     audio.ontimeupdate = null;

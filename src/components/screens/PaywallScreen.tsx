@@ -221,6 +221,55 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
             />
           </div>
 
+          {/* Refund + withdrawal-waiver disclosure. This language is legally
+              meaningful: it is the express consent that allows EU/UK customers
+              to waive their statutory 14-day right of withdrawal under
+              Directive 2011/83/EU Art. 16(m) and UK CCR 2013. */}
+          <div
+            className="text-center"
+            style={{
+              maxWidth: '620px',
+              margin: '32px auto 0',
+              padding: '16px 20px',
+              background: 'rgba(212,175,55,0.04)',
+              border: '1px solid rgba(212,175,55,0.15)',
+              borderRadius: '12px',
+              fontFamily: 'var(--font-body, Outfit)',
+              fontSize: '0.78rem',
+              lineHeight: 1.6,
+              color: 'rgba(255,248,240,0.6)',
+            }}
+          >
+            <strong style={{ color: 'rgba(212,175,55,0.9)', fontWeight: 500 }}>
+              All sales final once used.
+            </strong>{' '}
+            By purchasing, you expressly consent to immediate performance of
+            the digital service and acknowledge that you lose your right of
+            withdrawal (including the EU/UK 14-day right under Directive
+            2011/83/EU Art. 16(m)) as soon as you send your first message.
+            Monthly and annual subscriptions are non-refundable once you send
+            any message. If you change your mind <em>before</em> sending any
+            message, email{' '}
+            <a
+              href="mailto:support@aimightyme.com"
+              style={{ color: 'rgba(212,175,55,0.9)', textDecoration: 'underline' }}
+            >
+              support@aimightyme.com
+            </a>{' '}
+            within 14 days for a full refund. You can cancel anytime in{' '}
+            <strong style={{ color: 'rgba(212,175,55,0.9)', fontWeight: 500 }}>
+              Manage Subscription
+            </strong>{' '}
+            (in the menu once signed in) to stop future renewals.{' '}
+            <a
+              href="/terms"
+              style={{ color: 'rgba(212,175,55,0.9)', textDecoration: 'underline' }}
+            >
+              Full terms
+            </a>
+            .
+          </div>
+
           {/* Newsletter fallback */}
           <div
             className="mt-12 text-center"

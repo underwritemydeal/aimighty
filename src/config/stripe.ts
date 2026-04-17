@@ -94,3 +94,43 @@ export async function pollUserTierUntilPaid(
   }
   return 'free';
 }
+
+/**
+ * Opens the Stripe Billing Portal for the user in the current tab so they can
+ * self-serve cancellation, update their payment method, or download invoices.
+ * Required for compliance with California SB-313 and FTC Click-to-Cancel.
+ */
+export async function openBillingPortal(userId: string): Promise<void> {
+  if (!userId) {
+    alert('Please sign in to manage your subscription.');
+    return;
+  }
+  try {
+    // 10s budget — getting the portal session URL from the worker.
+    const resp = await fetchWithTimeout(`${WORKER_URL}/create-portal-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    }, 10000);
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      if (resp.status === 404) {
+        alert(
+          'We could not find an active subscription on file. If you believe this is an error, email support@aimightyme.com.'
+        );
+        return;
+      }
+      alert(data.error || 'Unable to open subscription management. Please try again.');
+      return;
+    }
+    const data = await resp.json();
+    if (data.portalUrl) {
+      window.location.href = data.portalUrl;
+    } else {
+      alert('Unable to open subscription management.');
+    }
+  } catch (e) {
+    console.error('[Stripe] portal failed:', e);
+    alert('Unable to open subscription management.');
+  }
+}

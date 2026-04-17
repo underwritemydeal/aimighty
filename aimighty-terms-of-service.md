@@ -76,30 +76,51 @@ Each individual may maintain only one account. Creating multiple accounts to cir
 
 ## 4. SUBSCRIPTION PLANS AND BILLING
 
-### 4.1 Free Trial
+### 4.1 Free Tier
 
-New users receive a limited free trial consisting of 3 messages. After the free trial, continued use of the Service requires a paid subscription.
+New users receive a free Seeker tier consisting of 3 messages total for the lifetime of the account. No payment method is required. After you exhaust your 3 free messages, continued use of the Service requires a paid subscription.
 
 ### 4.2 Subscription Tiers
 
 We offer the following subscription tiers, which may be modified from time to time:
 
-- **Believer ($4.99/month or $39.99/year):** 2 conversations per day, 10 exchanges per conversation, text responses with browser-based voice output, all 14 belief systems, Midjourney-generated image backgrounds.
-- **Divine ($14.99/month or $119.99/year):** 2 conversations per day, 10 exchanges per conversation, premium AI voice output (OpenAI TTS), character voice selection (God, Jesus, Mary, and belief-specific equivalents), conversation history, content library access, all Believer features.
+- **Seeker (Free):** 3 messages total (lifetime), access to all 14 belief systems, text-only responses, no voice output.
+- **Believer ($4.99/month or $47.00/year):** 10 messages per day, browser-based voice output, access to all 14 belief systems, daily spiritual content (prayer, sacred text, reflection prompt).
+- **Divine ($14.99/month or $119.00/year):** 20 messages per day, premium AI voice output, character voice selection (God, Jesus, Mary, and belief-specific equivalents), conversation memory across sessions, daily spiritual content, all Believer features.
 
 ### 4.3 Billing and Renewal
 
 Subscriptions are billed in advance on a monthly or annual basis depending on the plan you select. Your subscription will automatically renew at the end of each billing period unless you cancel before the renewal date. You authorize us to charge your payment method on file for the applicable subscription fee at each renewal.
 
-### 4.4 Cancellation
+### 4.4 Cancellation and Refund Policy
 
-You may cancel your subscription at any time through your account settings or by contacting us at support@aimightyme.com. Cancellation takes effect at the end of your current billing period. No refunds will be issued for partial billing periods. After cancellation, you will retain access to your subscription features until the end of your current billing period.
+**All subscription purchases are final once the subscription has been used.** By purchasing a monthly or annual subscription and checking the "I agree to the Terms of Service" box at checkout, you acknowledge and agree that:
 
-### 4.5 Free Trial Period
+1. **Monthly subscriptions are non-refundable.** Once you are charged for a monthly billing period, that payment is final. You may cancel to stop future renewals, but you will not receive a refund for the current or any past billing period.
 
-If you sign up for a free trial period that requires a payment method on file, you will be charged the applicable subscription fee at the end of the trial period unless you cancel before the trial expires. We will notify you before any charges are applied.
+2. **Annual subscriptions are non-refundable once used.** Annual subscriptions offer a significant discount relative to monthly pricing in exchange for a twelve-month commitment. Once you are charged for an annual subscription, that payment is final for the full twelve-month term. You may cancel to stop future renewals, but you will not receive a prorated or partial refund under any circumstances, including but not limited to: changing your mind after using the Service, no longer wishing to use the Service, dissatisfaction with the content or AI responses, or technical issues that do not prevent use of the Service.
 
-### 4.6 Price Changes
+3. **Unused-subscription exception (changed mind, zero usage).** As a courtesy, if you purchase a subscription and then change your mind **before sending any messages to the Service under that subscription**, you may request a full refund by emailing support@aimightyme.com within fourteen (14) days of purchase. We verify this exception automatically: our system records the timestamp of your first message, and eligibility is confirmed only if that timestamp is null. Once you send even a single message under the subscription, this exception no longer applies and the purchase becomes final under the rules above.
+
+4. **Self-service cancellation.** You may cancel your subscription at any time in the Service via **Menu → Manage Subscription**, which opens the Stripe Billing Portal and lets you cancel with a single click. You may also email support@aimightyme.com. Cancellation takes effect at the end of your current billing period (monthly or annual). You will retain access to your subscription features until the end of the billing period you have already paid for. Cancellation does not trigger a refund; it only prevents future renewal charges.
+
+5. **Chargebacks.** Initiating a chargeback or payment dispute in violation of this policy may result in immediate and permanent termination of your account and forfeiture of any remaining subscription time. Because our system keeps a timestamped record of your first message, we can definitively demonstrate usage to your card issuer in the event of a dispute.
+
+### 4.5 Right of Withdrawal — EU, UK, EEA Customers
+
+If you are a consumer located in the European Union, the United Kingdom, Iceland, Liechtenstein, or Norway, you have a statutory right to withdraw from a digital-services contract within fourteen (14) days under Directive 2011/83/EU (the Consumer Rights Directive), Article 16(m), and the UK Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013, Regulation 37.
+
+**By checking the "I agree to the Terms of Service" box at checkout and sending your first message, you expressly consent to the immediate performance of the Service and acknowledge that you thereby lose your right of withdrawal.** This is the explicit consent required by Article 16(m) of Directive 2011/83/EU. This waiver becomes effective only when you send your first message; until that moment, you retain your full right of withdrawal and may request a full refund by emailing support@aimightyme.com.
+
+This waiver is consistent with, and does not restrict, any other consumer rights you may have under applicable mandatory law in your jurisdiction, including rights relating to conformity of the digital service, statutory guarantees, or protection against unfair contract terms.
+
+### 4.6 California, US, and Auto-Renewal Disclosures
+
+If you are a consumer located in California, your subscription is governed by California Business and Professions Code §§17600–17606 (the Automatic Renewal Law). Subscriptions offered by AImighty are automatic-renewing subscriptions. At checkout, we disclose to you: (a) that the subscription will continue until you cancel, (b) the full recurring charge amount, (c) the length of the renewal term, and (d) the cancellation mechanism. You may cancel at any time via **Menu → Manage Subscription** in the Service (which opens the Stripe Billing Portal) or by emailing support@aimightyme.com. This satisfies California's requirement that cancellation be available through the same medium used to purchase the subscription.
+
+Residents of other US states with auto-renewal statutes — including but not limited to New York (GBL §527-a), Florida, Illinois, Oregon, and Vermont — are entitled to equivalent disclosure and cancellation rights, which this policy provides.
+
+### 4.7 Price Changes
 
 We reserve the right to change subscription prices at any time. Any price changes will be communicated to you at least 30 days in advance and will take effect at the start of your next billing period. Your continued use of the Service after the price change constitutes your acceptance of the new pricing.
 
