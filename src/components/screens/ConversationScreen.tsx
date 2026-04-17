@@ -19,6 +19,7 @@ import {
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
+import { getOpeningMessageForBelief } from '../../config/openingMessages';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import { openBillingPortal } from '../../config/stripe';
 import { CaptureMoment } from '../CaptureMoment';
@@ -2461,7 +2462,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   );
 }
 
-// Greeting messages - uses canonical config with normalization
+// Greeting messages.
+// Per the belief-first spec, each tradition now has a hand-crafted opening
+// message that sounds native to that belief. We prefer those over the
+// legacy shorter greetings. The legacy `getGreetingForBelief` path remains
+// as a fallback so an unregistered belief id still gets a warm line.
 function getGreeting(beliefId: string): string {
-  return getGreetingForBelief(normalizeBeliefId(beliefId));
+  const canonical = normalizeBeliefId(beliefId);
+  return getOpeningMessageForBelief(canonical) ?? getGreetingForBelief(canonical);
 }
