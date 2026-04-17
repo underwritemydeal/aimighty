@@ -1,6 +1,25 @@
-import { useState, useEffect, memo } from 'react';
-import { beliefSystems, categoryLabels, type BeliefCategory, type CategorizedBeliefSystem } from '../../data/beliefSystems';
-import { t, type LanguageCode } from '../../data/translations';
+/**
+ * Belief picker — the magic moment of onboarding.
+ *
+ * Per the belief-first spec, this is where a user discovers the app has
+ * THEIR tradition. Design choices follow from that:
+ *
+ * - Header reads "Who do you talk to?" — a question, not a menu label.
+ * - Each card is a name + a one-line descriptor in the tradition's own
+ *   voice, plus a color block pulled from `beliefThemes` so the palette
+ *   already hints at the conversation that follows.
+ * - Tap-to-stage, then a single Continue commits. Prevents mis-taps on
+ *   mobile and lets us animate a glow on the selected card before the
+ *   screen transitions.
+ * - Same component serves signup AND "Other Beliefs" switch. In switch
+ *   mode, the current belief is highlighted and tapping it cancels.
+ */
+import { useState, useEffect, useMemo, memo } from 'react';
+import { beliefSystems } from '../../data/beliefSystems';
+import { type LanguageCode } from '../../data/translations';
+import { getThemeForBelief } from '../../config/beliefThemes';
+import { getDescriptorForBelief } from '../../config/beliefDescriptors';
+import { normalizeBeliefId } from '../../config/beliefSystems';
 import type { BeliefSystem } from '../../types';
 
 interface BeliefSelectorProps {
@@ -8,169 +27,156 @@ interface BeliefSelectorProps {
   onBack: () => void;
   language: LanguageCode;
   onSignOut: () => void;
+  /** When set, that belief is shown as "current" and tapping it cancels. */
+  currentBeliefId?: string;
+  /** "switch" mode: label the CTA "Switch" and enable cancel-back. */
+  mode?: 'signup' | 'switch';
+  /** Switch-mode cancel (Stay here). If omitted, falls back to onBack. */
+  onCancel?: () => void;
 }
 
-// Preload image when card is hovered
-function preloadImage(src: string) {
-  const img = new Image();
-  img.src = src;
-}
-
-// Belief card with Midjourney image background
+// Color-block + descriptor card. No image — just the belief's palette,
+// typography, and a single evocative line. The color block is the quiet
+// visual cue the spec calls for.
 const BeliefCard = memo(function BeliefCard({
   belief,
-  index,
   isVisible,
+  index,
+  isStaged,
+  isCurrent,
   onSelect,
 }: {
-  belief: CategorizedBeliefSystem;
-  index: number;
+  belief: BeliefSystem;
   isVisible: boolean;
+  index: number;
+  isStaged: boolean;
+  isCurrent: boolean;
   onSelect: () => void;
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const isActive = isHovered || isFocused;
+  const theme = useMemo(() => getThemeForBelief(belief.id), [belief.id]);
+  const descriptor = useMemo(
+    () => getDescriptorForBelief(normalizeBeliefId(belief.id)),
+    [belief.id]
+  );
+  const isActive = isHovered || isFocused || isStaged;
 
   return (
     <button
       onClick={onSelect}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        preloadImage(belief.imagePath);
-      }}
+      onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onFocus={() => setIsFocused(true)}
       onBlur={() => setIsFocused(false)}
-      aria-label={`Select ${belief.name}`}
-      className="w-full text-left belief-card"
+      aria-label={`${belief.name} — ${descriptor}${isCurrent ? ' (your current tradition)' : ''}`}
+      aria-pressed={isStaged}
       style={{
-        height: '130px',
-        backgroundImage: `url(${belief.imagePath})`,
-        borderColor: isActive ? `${belief.accentColor}66` : 'rgba(255, 255, 255, 0.08)',
+        width: '100%',
+        minHeight: '88px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        padding: '16px 18px',
+        textAlign: 'left',
+        background: isStaged
+          ? `linear-gradient(90deg, ${theme.glow.replace(/[\d.]+\)$/, '0.18)')} 0%, rgba(255,255,255,0.04) 100%)`
+          : isActive
+          ? 'rgba(255, 255, 255, 0.035)'
+          : 'rgba(255, 255, 255, 0.015)',
+        border: `1px solid ${
+          isStaged
+            ? theme.glow.replace(/[\d.]+\)$/, '0.65)')
+            : isCurrent
+            ? 'rgba(212, 175, 55, 0.35)'
+            : isActive
+            ? 'rgba(255, 255, 255, 0.14)'
+            : 'rgba(255, 255, 255, 0.06)'
+        }`,
+        borderRadius: '14px',
+        cursor: 'pointer',
         opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-        transition: `all 0.4s ease`,
-        transitionDelay: `${150 + index * 40}ms`,
+        transform: isVisible ? 'translateY(0)' : 'translateY(12px)',
+        // Transition everything except the stage-triggered glow, which
+        // we want to animate faster so the Continue button feels reactive.
+        transition:
+          `opacity 0.4s ease ${150 + index * 30}ms,` +
+          `transform 0.4s ease ${150 + index * 30}ms,` +
+          'background 180ms ease, border-color 180ms ease, box-shadow 220ms ease',
+        boxShadow: isStaged
+          ? `0 0 0 1px ${theme.glow.replace(/[\d.]+\)$/, '0.35)')} inset, 0 8px 32px ${theme.glow.replace(/[\d.]+\)$/, '0.2)')}`
+          : 'none',
       }}
     >
-      {/* Dark overlay that lightens on hover */}
+      {/* Color block — the belief's glow color, muted. Tells the eye this
+          tradition has a palette before the words even register. */}
       <div
-        className="absolute inset-0"
-        style={{
-          background: isActive ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.55)',
-          transition: 'background 0.4s ease',
-        }}
         aria-hidden="true"
+        style={{
+          flexShrink: 0,
+          width: '10px',
+          alignSelf: 'stretch',
+          borderRadius: '3px',
+          background: isStaged
+            ? theme.glow.replace(/[\d.]+\)$/, '0.85)')
+            : theme.glow.replace(/[\d.]+\)$/, '0.55)'),
+          boxShadow: isStaged
+            ? `0 0 16px ${theme.glow.replace(/[\d.]+\)$/, '0.6)')}`
+            : 'none',
+          transition: 'background 180ms ease, box-shadow 220ms ease',
+        }}
       />
 
-      {/* Card content */}
-      <div className="belief-card-content">
-        {/* Top row: subtitle label */}
-        <div className="flex justify-end">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: '10px',
+            flexWrap: 'wrap',
+          }}
+        >
           <span
-            className="text-caps"
             style={{
-              fontSize: '0.7rem',
-              letterSpacing: '0.1em',
-              color: isActive ? belief.accentColor : 'rgba(255, 255, 255, 0.5)',
-              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-              transition: 'color 0.3s ease',
-            }}
-          >
-            {belief.subtitle}
-          </span>
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Bottom: name and description */}
-        <div>
-          <h3
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.1rem',
-              fontWeight: 600,
-              color: '#fff',
-              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-              marginBottom: '4px',
+              fontFamily: 'var(--font-body, Outfit)',
+              fontWeight: 500,
+              fontSize: '1.05rem',
+              color: 'rgba(255, 248, 240, 0.96)',
+              letterSpacing: '-0.005em',
             }}
           >
             {belief.name}
-          </h3>
-          {belief.selfDescription && (
-            <p
+          </span>
+          {isCurrent && (
+            <span
               style={{
                 fontFamily: 'var(--font-body, Outfit)',
-                fontSize: '0.75rem',
-                fontWeight: 300,
-                color: 'rgba(255, 255, 255, 0.7)',
-                textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-                lineHeight: 1.3,
-                marginBottom: '4px',
+                fontWeight: 400,
+                fontSize: '0.7rem',
+                color: 'rgba(212, 175, 55, 0.85)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
               }}
             >
-              {belief.selfDescription}
-            </p>
+              Current
+            </span>
           )}
-          <p
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '0.85rem',
-              fontWeight: 300,
-              color: 'rgba(255, 255, 255, 0.55)',
-              textShadow: '0 2px 8px rgba(0,0,0,0.8)',
-              lineHeight: 1.4,
-            }}
-          >
-            {belief.description}
-          </p>
         </div>
+        <p
+          style={{
+            marginTop: '4px',
+            fontFamily: 'var(--font-display, Cormorant Garamond)',
+            fontStyle: 'italic',
+            fontWeight: 300,
+            fontSize: '0.95rem',
+            color: 'rgba(255, 248, 240, 0.68)',
+            lineHeight: 1.35,
+          }}
+        >
+          {descriptor}
+        </p>
       </div>
     </button>
-  );
-});
-
-// Category section header
-const CategoryHeader = memo(function CategoryHeader({
-  category,
-  isVisible,
-  delay,
-  isFirst,
-  language,
-}: {
-  category: BeliefCategory;
-  isVisible: boolean;
-  delay: number;
-  isFirst: boolean;
-  language: LanguageCode;
-}) {
-  const categoryKey = `beliefs.${category}` as const;
-  return (
-    <div
-      style={{
-        marginTop: isFirst ? '0' : '32px',
-        marginBottom: '16px',
-        opacity: isVisible ? 0.4 : 0,
-        transition: `opacity 0.5s ease`,
-        transitionDelay: `${delay}ms`,
-      }}
-    >
-      <h2
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: '0.7rem',
-          fontWeight: 300,
-          letterSpacing: '0.15em',
-          textTransform: 'uppercase',
-          color: 'rgba(255, 255, 255, 0.4)',
-          textAlign: 'center',
-        }}
-      >
-        {t(categoryKey, language) || categoryLabels[category]}
-      </h2>
-    </div>
   );
 });
 
@@ -186,6 +192,7 @@ const LogoutIcon = memo(function LogoutIcon() {
       strokeWidth="1.2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
@@ -206,24 +213,63 @@ const BackIcon = memo(function BackIcon() {
       strokeWidth="1.2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <path d="M19 12H5M12 19l-7-7 7-7" />
     </svg>
   );
 });
 
-export function BeliefSelector({ onSelect, onBack, language, onSignOut }: BeliefSelectorProps) {
+export function BeliefSelector({
+  onSelect,
+  onBack,
+  onSignOut,
+  currentBeliefId,
+  mode = 'signup',
+  onCancel,
+}: BeliefSelectorProps) {
   const [isVisible, setIsVisible] = useState(false);
+  // Stage the user's tap here; Continue commits it. This is the two-step
+  // interaction the spec asks for — tap to highlight + glow, then Continue.
+  const [stagedId, setStagedId] = useState<string | null>(
+    mode === 'switch' && currentBeliefId ? currentBeliefId : null
+  );
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 150);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setIsVisible(true), 100);
+    return () => clearTimeout(t);
   }, []);
 
-  // Group beliefs by category
-  const religious = beliefSystems.filter(b => b.category === 'religious');
-  const spiritual = beliefSystems.filter(b => b.category === 'spiritual');
-  const philosophical = beliefSystems.filter(b => b.category === 'philosophical');
+  // 2-col desktop per spec ("2-3 col desktop"). 2 is the cleaner grid for
+  // ~88px cards at typical laptop widths — 3 columns compresses the
+  // descriptor line uncomfortably. Bump to 3 only at very wide breakpoints.
+  const handleCardTap = (belief: BeliefSystem) => {
+    // Tapping the already-staged card in switch mode un-stages it.
+    if (mode === 'switch' && stagedId === belief.id && currentBeliefId === belief.id) {
+      setStagedId(null);
+      return;
+    }
+    setStagedId(belief.id);
+  };
+
+  const handleContinue = () => {
+    if (!stagedId) return;
+    // In switch mode, picking the current belief = cancel (no-op reset).
+    if (mode === 'switch' && stagedId === currentBeliefId) {
+      (onCancel ?? onBack)();
+      return;
+    }
+    const picked = beliefSystems.find((b) => b.id === stagedId);
+    if (picked) onSelect(picked);
+  };
+
+  const continueEnabled =
+    !!stagedId &&
+    // In switch mode, the stage must differ from the current belief for
+    // Continue to actually do something (otherwise it's a cancel).
+    (mode !== 'switch' || stagedId !== currentBeliefId);
+
+  const continueLabel = mode === 'switch' ? 'Switch tradition' : 'Continue';
 
   return (
     <div
@@ -232,23 +278,14 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
       role="main"
       aria-labelledby="belief-heading"
     >
-      {/* Subtle darkened background */}
+      {/* Muted ambient background — no more mashup scrim. A soft void keeps
+          the focus on the cards and the emotion of the question. */}
       <div
         className="fixed inset-0"
         style={{
-          backgroundImage: 'url(/images/avatars/hero-mashup-desktop.jpg)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          opacity: 0.1,
-          filter: 'blur(20px)',
+          background:
+            'radial-gradient(ellipse 80% 60% at 50% 20%, rgba(212, 175, 55, 0.06) 0%, rgba(3,3,8,0) 60%), var(--color-void)',
         }}
-        aria-hidden="true"
-      />
-
-      {/* Dark overlay */}
-      <div
-        className="fixed inset-0"
-        style={{ background: 'rgba(3, 3, 8, 0.9)' }}
         aria-hidden="true"
       />
 
@@ -256,23 +293,23 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
       <div className="relative z-10 overflow-y-auto" style={{ minHeight: '100dvh' }}>
         <div
           style={{
-            maxWidth: '640px',
+            maxWidth: '760px',
             margin: '0 auto',
-            padding: '80px 20px 100px 20px',
+            padding: '72px 20px 140px',
           }}
         >
-          {/* Back button */}
+          {/* Back button (signup mode → sign out; switch mode → cancel) */}
           <nav
             className="fixed top-4 left-4 z-20"
             style={{
               opacity: isVisible ? 1 : 0,
               transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
-              transition: `all 0.5s ease`,
+              transition: 'all 0.5s ease',
             }}
           >
             <button
-              onClick={onBack}
-              aria-label={t('common.back', language)}
+              onClick={mode === 'switch' ? (onCancel ?? onBack) : onBack}
+              aria-label={mode === 'switch' ? 'Cancel' : 'Back'}
               className="flex items-center gap-2 py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
               style={{ color: 'rgba(255, 255, 255, 0.5)' }}
             >
@@ -280,143 +317,148 @@ export function BeliefSelector({ onSelect, onBack, language, onSignOut }: Belief
             </button>
           </nav>
 
-          {/* Sign out button */}
-          <div
-            className="fixed top-4 right-4 z-20"
-            style={{
-              opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
-              transition: `all 0.5s ease`,
-            }}
-          >
-            <button
-              onClick={onSignOut}
-              aria-label="Sign out"
-              className="py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
-              style={{ color: 'rgba(255, 255, 255, 0.4)' }}
+          {/* Sign out button — hidden in switch mode (the cancel arrow already
+              handles escape) */}
+          {mode !== 'switch' && (
+            <div
+              className="fixed top-4 right-4 z-20"
+              style={{
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(-10px)',
+                transition: 'all 0.5s ease',
+              }}
             >
-              <LogoutIcon />
-            </button>
-          </div>
+              <button
+                onClick={onSignOut}
+                aria-label="Sign out"
+                className="py-2 px-3 rounded-lg transition-colors hover:bg-white/5"
+                style={{ color: 'rgba(255, 255, 255, 0.4)' }}
+              >
+                <LogoutIcon />
+              </button>
+            </div>
+          )}
 
-          {/* Header */}
+          {/* Header — the question that makes this the magic moment. */}
           <header
             className="text-center"
             style={{
               marginBottom: '12px',
               opacity: isVisible ? 1 : 0,
-              transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-              transition: `all 0.6s ease`,
+              transform: isVisible ? 'translateY(0)' : 'translateY(16px)',
+              transition: 'all 0.6s ease',
             }}
           >
             <h1
               id="belief-heading"
               style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(1.5rem, 5vw, 2.25rem)',
+                fontFamily: 'var(--font-display, Cormorant Garamond)',
                 fontWeight: 300,
-                letterSpacing: '0.02em',
+                fontStyle: 'italic',
+                fontSize: 'clamp(1.9rem, 6vw, 2.75rem)',
+                color: 'rgba(255, 248, 240, 0.95)',
+                letterSpacing: '-0.01em',
+                lineHeight: 1.15,
+                margin: 0,
               }}
             >
-              <span style={{ color: 'var(--color-text-primary)' }}>{t('beliefs.chooseYour', language)} </span>
-              <span
-                style={{
-                  fontWeight: 500,
-                  color: '#d4af37',
-                  textShadow: '0 0 30px rgba(212,175,55,0.25), 0 0 60px rgba(212,175,55,0.1)',
-                }}
-              >
-                {t('beliefs.path', language)}
-              </span>
+              Who do you talk to?
             </h1>
           </header>
 
-          {/* Subtitle */}
           <p
             className="text-center"
             style={{
-              marginBottom: '32px',
-              opacity: isVisible ? 0.6 : 0,
-              transition: `opacity 0.6s ease`,
-              transitionDelay: '100ms',
-              fontFamily: 'var(--font-display)',
-              fontSize: '0.9rem',
+              maxWidth: '520px',
+              margin: '0 auto 36px',
+              opacity: isVisible ? 0.72 : 0,
+              transition: 'opacity 0.6s ease 120ms',
+              fontFamily: 'var(--font-body, Outfit)',
               fontWeight: 300,
-              letterSpacing: '0.05em',
-              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.95rem',
+              color: 'rgba(255, 248, 240, 0.7)',
+              lineHeight: 1.55,
             }}
           >
-            {t('beliefs.selectTradition', language)}
+            Pick the tradition that feels closest to you. You can always explore others later.
           </p>
 
-          {/* Cards */}
-          <div>
-            {/* Religious Traditions */}
-            <section role="region" aria-label={t('beliefs.religious', language)}>
-              <CategoryHeader category="religious" isVisible={isVisible} delay={150} isFirst={true} language={language} />
-              <div className="flex flex-col gap-3">
-                {religious.map((belief, index) => (
-                  <BeliefCard
-                    key={belief.id}
-                    belief={belief}
-                    index={index}
-                    isVisible={isVisible}
-                    onSelect={() => onSelect(belief)}
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* Spiritual Paths */}
-            <section role="region" aria-label={t('beliefs.spiritual', language)}>
-              <CategoryHeader category="spiritual" isVisible={isVisible} delay={400} isFirst={false} language={language} />
-              <div className="flex flex-col gap-3">
-                {spiritual.map((belief, index) => (
-                  <BeliefCard
-                    key={belief.id}
-                    belief={belief}
-                    index={index + religious.length}
-                    isVisible={isVisible}
-                    onSelect={() => onSelect(belief)}
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* Philosophical Frameworks */}
-            <section role="region" aria-label={t('beliefs.philosophical', language)}>
-              <CategoryHeader category="philosophical" isVisible={isVisible} delay={550} isFirst={false} language={language} />
-              <div className="flex flex-col gap-3">
-                {philosophical.map((belief, index) => (
-                  <BeliefCard
-                    key={belief.id}
-                    belief={belief}
-                    index={index + religious.length + spiritual.length}
-                    isVisible={isVisible}
-                    onSelect={() => onSelect(belief)}
-                  />
-                ))}
-              </div>
-            </section>
-          </div>
-
-          {/* Footer */}
-          <p
-            className="text-center"
+          {/* 14 cards in a responsive grid — no categorization, the spec
+              reframes this as a personal choice, not a taxonomy. */}
+          <div
             style={{
-              marginTop: '32px',
-              opacity: isVisible ? 0.3 : 0,
-              transition: `opacity 0.6s ease`,
-              transitionDelay: '800ms',
-              fontFamily: 'var(--font-display)',
-              fontSize: 'var(--text-xs)',
-              color: 'var(--color-text-muted)',
+              display: 'grid',
+              gap: '12px',
             }}
+            className="belief-grid"
           >
-            {t('beliefs.trainedOn', language)}
-          </p>
+            {beliefSystems.map((belief, index) => (
+              <BeliefCard
+                key={belief.id}
+                belief={belief}
+                index={index}
+                isVisible={isVisible}
+                isStaged={stagedId === belief.id}
+                isCurrent={currentBeliefId === belief.id}
+                onSelect={() => handleCardTap(belief)}
+              />
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Floating Continue bar — sticky footer pinned to the viewport bottom
+          with safe-area padding. Grayed out until a card is staged. */}
+      <div
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: '16px 20px calc(env(safe-area-inset-bottom, 0px) + 16px)',
+          background:
+            'linear-gradient(180deg, rgba(3,3,8,0) 0%, rgba(3,3,8,0.85) 30%, rgba(3,3,8,0.98) 100%)',
+          zIndex: 30,
+          display: 'flex',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <button
+          onClick={handleContinue}
+          disabled={!continueEnabled}
+          aria-disabled={!continueEnabled}
+          style={{
+            pointerEvents: 'auto',
+            fontFamily: 'var(--font-body, Outfit)',
+            fontWeight: 500,
+            fontSize: '1rem',
+            letterSpacing: '0.01em',
+            padding: '14px 36px',
+            borderRadius: '999px',
+            border: 'none',
+            minWidth: '240px',
+            background: continueEnabled ? '#d4af37' : 'rgba(212, 175, 55, 0.18)',
+            color: continueEnabled ? '#0a0a0f' : 'rgba(255,248,240,0.4)',
+            cursor: continueEnabled ? 'pointer' : 'not-allowed',
+            boxShadow: continueEnabled
+              ? '0 10px 40px rgba(212,175,55,0.28), 0 0 0 1px rgba(212,175,55,0.6) inset'
+              : 'none',
+            transition: 'background 180ms ease, color 180ms ease, box-shadow 220ms ease',
+          }}
+        >
+          {continueLabel}
+        </button>
+      </div>
+
+      <style>{`
+        .belief-grid {
+          grid-template-columns: 1fr;
+        }
+        @media (min-width: 720px) {
+          .belief-grid { grid-template-columns: 1fr 1fr; }
+        }
+      `}</style>
     </div>
   );
 }
