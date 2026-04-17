@@ -47,6 +47,8 @@ export type Screen =
   | 'belief-selector'
   | 'belief-welcome'
   | 'conversation'
+  | 'other-beliefs-confirm'
+  | 'other-beliefs-picker'
   | 'about'
   | 'privacy'
   | 'terms'
