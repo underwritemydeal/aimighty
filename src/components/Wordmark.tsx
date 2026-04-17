@@ -21,7 +21,6 @@ const sizeMap: Record<WordmarkSize, { fontSize: string; letterSpacing: string }>
 export function Wordmark({ size = 'md', haloGlow = false, style, className }: WordmarkProps) {
   const { fontSize, letterSpacing } = sizeMap[size];
   const rawId = useId().replace(/:/g, '');
-  const ringId = `wm-ring-${rawId}`;
   const glowId = `wm-glow-${rawId}`;
 
   return (
@@ -50,7 +49,7 @@ export function Wordmark({ size = 'md', haloGlow = false, style, className }: Wo
             : undefined,
         }}
       >
-        <Halo ringId={ringId} glowId={glowId} />
+        <Halo glowId={glowId} />
         AI
       </span>
       <span style={{ color: colors.textPrimary }}>mighty</span>
@@ -58,62 +57,48 @@ export function Wordmark({ size = 'md', haloGlow = false, style, className }: Wo
   );
 }
 
-function Halo({ ringId, glowId }: { ringId: string; glowId: string }) {
+function Halo({ glowId }: { glowId: string }) {
   return (
     <svg
-      viewBox="0 0 200 120"
+      viewBox="0 0 100 50"
       aria-hidden="true"
       focusable="false"
       style={{
         position: 'absolute',
-        left: '52%',
-        top: '-0.55em',
+        left: '72%',
+        top: '-0.65em',
         transform: 'translateX(-50%)',
-        width: '1.55em',
+        width: '1.2em',
         height: 'auto',
         pointerEvents: 'none',
         overflow: 'visible',
       }}
     >
       <defs>
-        <linearGradient id={ringId} x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#fff5dc" stopOpacity="1" />
-          <stop offset="18%" stopColor="#e2c899" stopOpacity="0.95" />
-          <stop offset="38%" stopColor="#d4b882" stopOpacity="0.8" />
-          <stop offset="55%" stopColor="#bfa067" stopOpacity="0.6" />
-          <stop offset="72%" stopColor="#d4b882" stopOpacity="0.85" />
-          <stop offset="90%" stopColor="#fff5dc" stopOpacity="1" />
-          <stop offset="100%" stopColor="#e2c899" stopOpacity="0.9" />
-        </linearGradient>
-        <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#e2c899" stopOpacity="0.42" />
-          <stop offset="50%" stopColor="#d4b882" stopOpacity="0.2" />
-          <stop offset="100%" stopColor="#bfa067" stopOpacity="0" />
-        </radialGradient>
+        <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2.5" />
+        </filter>
       </defs>
-      <g transform="translate(100 72) rotate(-17)">
-        <ellipse cx="0" cy="0" rx="92" ry="48" fill={`url(#${glowId})`} />
-        <path
-          d="M -84 0 A 84 44 0 0 0 84 0"
+      <g transform="rotate(-8 50 30)">
+        <ellipse
+          cx="50"
+          cy="30"
+          rx="42"
+          ry="20"
           fill="none"
-          stroke={`url(#${ringId})`}
-          strokeWidth="3.2"
-          strokeLinecap="round"
+          stroke="#d4b882"
+          strokeWidth="6"
+          opacity="0.4"
+          filter={`url(#${glowId})`}
         />
-        <path
-          d="M -84 0 A 84 44 0 0 0 84 0"
+        <ellipse
+          cx="50"
+          cy="30"
+          rx="42"
+          ry="20"
           fill="none"
-          stroke="#fff5dc"
-          strokeWidth="1"
-          strokeLinecap="round"
-          opacity="0.95"
-        />
-        <path
-          d="M -84 0 A 84 44 0 0 1 84 0"
-          fill="none"
-          stroke="#bfa067"
-          strokeWidth="0.9"
-          opacity="0.55"
+          stroke="#d4b882"
+          strokeWidth="3"
         />
       </g>
     </svg>
