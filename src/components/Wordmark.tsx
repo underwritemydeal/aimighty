@@ -1,4 +1,4 @@
-import { useId, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { colors, fonts, fontWeights } from '../styles/designSystem';
 
 export type WordmarkSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -20,8 +20,6 @@ const sizeMap: Record<WordmarkSize, { fontSize: string; letterSpacing: string }>
 
 export function Wordmark({ size = 'md', haloGlow = false, style, className }: WordmarkProps) {
   const { fontSize, letterSpacing } = sizeMap[size];
-  const rawId = useId().replace(/:/g, '');
-  const glowId = `wm-glow-${rawId}`;
 
   return (
     <span
@@ -41,66 +39,15 @@ export function Wordmark({ size = 'md', haloGlow = false, style, className }: Wo
     >
       <span
         style={{
-          position: 'relative',
-          display: 'inline-block',
           color: colors.gold,
           textShadow: haloGlow
             ? '0 0 30px rgba(212,184,130,0.5), 0 0 60px rgba(212,184,130,0.25), 0 0 100px rgba(212,184,130,0.1)'
             : undefined,
         }}
       >
-        <Halo glowId={glowId} />
         AI
       </span>
       <span style={{ color: colors.textPrimary }}>mighty</span>
     </span>
-  );
-}
-
-function Halo({ glowId }: { glowId: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 50"
-      aria-hidden="true"
-      focusable="false"
-      style={{
-        position: 'absolute',
-        left: '72%',
-        top: '-0.65em',
-        transform: 'translateX(-50%)',
-        width: '1.2em',
-        height: 'auto',
-        pointerEvents: 'none',
-        overflow: 'visible',
-      }}
-    >
-      <defs>
-        <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2.5" />
-        </filter>
-      </defs>
-      <g transform="rotate(-8 50 30)">
-        <ellipse
-          cx="50"
-          cy="30"
-          rx="42"
-          ry="20"
-          fill="none"
-          stroke="#d4b882"
-          strokeWidth="6"
-          opacity="0.4"
-          filter={`url(#${glowId})`}
-        />
-        <ellipse
-          cx="50"
-          cy="30"
-          rx="42"
-          ry="20"
-          fill="none"
-          stroke="#d4b882"
-          strokeWidth="3"
-        />
-      </g>
-    </svg>
   );
 }
