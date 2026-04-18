@@ -15,7 +15,7 @@
  *   mode, the current belief is highlighted and tapping it cancels.
  */
 import { useState, useEffect, useMemo, memo } from 'react';
-import { beliefSystems } from '../../data/beliefSystems';
+import { beliefSystems, type CategorizedBeliefSystem } from '../../data/beliefSystems';
 import { type LanguageCode } from '../../data/translations';
 import { getThemeForBelief } from '../../config/beliefThemes';
 import { getDescriptorForBelief } from '../../config/beliefDescriptors';
@@ -35,9 +35,11 @@ interface BeliefSelectorProps {
   onCancel?: () => void;
 }
 
-// Color-block + descriptor card. No image — just the belief's palette,
-// typography, and a single evocative line. The color block is the quiet
-// visual cue the spec calls for.
+// Card is the belief's 16:9 conversation background image with a dark
+// overlay for legibility. Selection is signaled by a coloured 1px border
+// and glow drawn from the belief's theme color — same palette the user
+// will see when they enter the conversation, so the picker previews the
+// emotional register of each tradition.
 const BeliefCard = memo(function BeliefCard({
   belief,
   isVisible,
@@ -62,6 +64,19 @@ const BeliefCard = memo(function BeliefCard({
   );
   const isActive = isHovered || isFocused || isStaged;
 
+  // Reuse the 16:9 horizontal image already shipped for the conversation
+  // screen background. Swapping the `.jpg` suffix keeps us correct for
+  // the two beliefs whose file stem differs from their id
+  // (mormonism → mormon-desktop.jpg, atheism-stoicism → stoicism-desktop.jpg).
+  const bgImage = useMemo(() => {
+    const cat = belief as CategorizedBeliefSystem;
+    const base = cat.imagePath || `/images/avatars/${belief.id}.jpg`;
+    return base.replace(/\.jpg$/, '-desktop.jpg');
+  }, [belief]);
+
+  const glowStrong = theme.glow.replace(/[\d.]+\)$/, '0.85)');
+  const glowSoft = theme.glow.replace(/[\d.]+\)$/, '0.35)');
+
   return (
     <button
       onClick={onSelect}
@@ -72,109 +87,115 @@ const BeliefCard = memo(function BeliefCard({
       aria-label={`${belief.name} — ${descriptor}${isCurrent ? ' (your current tradition)' : ''}`}
       aria-pressed={isStaged}
       style={{
+        position: 'relative',
         width: '100%',
         minHeight: '88px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        padding: '16px 18px',
+        padding: 0,
         textAlign: 'left',
-        background: isStaged
-          ? `linear-gradient(90deg, ${theme.glow.replace(/[\d.]+\)$/, '0.18)')} 0%, rgba(255,255,255,0.04) 100%)`
-          : isActive
-          ? 'rgba(255, 255, 255, 0.035)'
-          : 'rgba(255, 255, 255, 0.015)',
+        overflow: 'hidden',
+        backgroundColor: theme.bg,
+        backgroundImage: `url(${bgImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
         border: `1px solid ${
           isStaged
-            ? theme.glow.replace(/[\d.]+\)$/, '0.65)')
+            ? glowStrong
             : isCurrent
-            ? 'rgba(212, 184, 130, 0.35)'
+            ? 'rgba(212, 184, 130, 0.55)'
             : isActive
-            ? 'rgba(255, 255, 255, 0.14)'
-            : 'rgba(255, 255, 255, 0.06)'
+            ? 'rgba(255, 255, 255, 0.20)'
+            : 'rgba(255, 255, 255, 0.08)'
         }`,
         borderRadius: '14px',
         cursor: 'pointer',
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateY(0)' : 'translateY(12px)',
-        // Transition everything except the stage-triggered glow, which
-        // we want to animate faster so the Continue button feels reactive.
         transition:
           `opacity 0.4s ease ${150 + index * 30}ms,` +
           `transform 0.4s ease ${150 + index * 30}ms,` +
-          'background 180ms ease, border-color 180ms ease, box-shadow 220ms ease',
+          'border-color 180ms ease, box-shadow 220ms ease',
         boxShadow: isStaged
-          ? `0 0 0 1px ${theme.glow.replace(/[\d.]+\)$/, '0.35)')} inset, 0 8px 32px ${theme.glow.replace(/[\d.]+\)$/, '0.2)')}`
-          : 'none',
+          ? `0 0 0 1px ${glowStrong} inset, 0 0 24px ${glowSoft}, 0 6px 24px rgba(0,0,0,0.45)`
+          : '0 2px 14px rgba(0,0,0,0.35)',
       }}
     >
-      {/* Color block — the belief's glow color, muted. Tells the eye this
-          tradition has a palette before the words even register. */}
+      {/* Dark overlay — kept in the 0.55–0.70 range so the belief imagery
+          still reads through, but text stays legible on every avatar. */}
       <div
         aria-hidden="true"
         style={{
-          flexShrink: 0,
-          width: '10px',
-          alignSelf: 'stretch',
-          borderRadius: '3px',
-          background: isStaged
-            ? theme.glow.replace(/[\d.]+\)$/, '0.85)')
-            : theme.glow.replace(/[\d.]+\)$/, '0.55)'),
-          boxShadow: isStaged
-            ? `0 0 16px ${theme.glow.replace(/[\d.]+\)$/, '0.6)')}`
-            : 'none',
-          transition: 'background 180ms ease, box-shadow 220ms ease',
+          position: 'absolute',
+          inset: 0,
+          background: isActive
+            ? 'linear-gradient(180deg, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.62) 100%)'
+            : 'linear-gradient(180deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.70) 100%)',
+          transition: 'background 180ms ease',
         }}
       />
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: '10px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          minHeight: '88px',
+          padding: '16px 18px',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
             style={{
-              fontFamily: 'var(--font-body, Outfit)',
-              fontWeight: 500,
-              fontSize: '1.05rem',
-              color: 'rgba(255, 248, 240, 0.96)',
-              letterSpacing: '-0.005em',
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '10px',
+              flexWrap: 'wrap',
             }}
           >
-            {belief.name}
-          </span>
-          {isCurrent && (
             <span
               style={{
                 fontFamily: 'var(--font-body, Outfit)',
-                fontWeight: 400,
-                fontSize: '0.7rem',
-                color: 'rgba(212, 184, 130, 0.85)',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
+                fontWeight: 500,
+                fontSize: '1.05rem',
+                color: 'rgba(255, 248, 240, 0.98)',
+                letterSpacing: '-0.005em',
+                textShadow: '0 1px 3px rgba(0,0,0,0.6)',
               }}
             >
-              Current
+              {belief.name}
             </span>
-          )}
+            {isCurrent && (
+              <span
+                style={{
+                  fontFamily: 'var(--font-body, Outfit)',
+                  fontWeight: 400,
+                  fontSize: '0.7rem',
+                  color: 'rgba(212, 184, 130, 0.95)',
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                }}
+              >
+                Current
+              </span>
+            )}
+          </div>
+          <p
+            style={{
+              marginTop: '4px',
+              fontFamily: 'var(--font-display, Cormorant Garamond)',
+              fontStyle: 'italic',
+              fontWeight: 300,
+              fontSize: '0.95rem',
+              color: 'rgba(255, 248, 240, 0.82)',
+              lineHeight: 1.35,
+              textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+            }}
+          >
+            {descriptor}
+          </p>
         </div>
-        <p
-          style={{
-            marginTop: '4px',
-            fontFamily: 'var(--font-display, Cormorant Garamond)',
-            fontStyle: 'italic',
-            fontWeight: 300,
-            fontSize: '0.95rem',
-            color: 'rgba(255, 248, 240, 0.68)',
-            lineHeight: 1.35,
-          }}
-        >
-          {descriptor}
-        </p>
       </div>
     </button>
   );
