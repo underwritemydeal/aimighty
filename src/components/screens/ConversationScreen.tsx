@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { useState, useEffect, useRef, memo, useCallback, type FocusEvent } from 'react';
 import { sendMessage, summarizeConversation, type Message } from '../../services/claudeApi';
 import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue, prewarmTts, resumeAudio, isAudioPaused } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
@@ -1475,10 +1475,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // input bar floats directly behind that accessory bar and the text the user
   // just typed is half-clipped. We add an IOS_ACCESSORY_BAR_HEIGHT buffer for
   // iOS devices so the bar clears both the keyboard and the accessory overlay.
+  //
+  // We ALSO publish `--vvh` = visualViewport.height on every event. 100dvh
+  // on iOS Safari does NOT shrink when the keyboard opens, so a container
+  // sized to 100dvh still extends behind the keyboard and any input placed
+  // inside its lower half gets occluded. Sizing the conversation container
+  // to `var(--vvh)` makes it track the real visible area, which is what
+  // `scrollIntoView` needs to reason against when we yank the input up on
+  // focus.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const vv = window.visualViewport;
-    if (!vv) return;
+    if (!vv) {
+      // Non-iOS / older browsers — fall back to innerHeight once so the
+      // var(--vvh) consumer still resolves to something sensible.
+      document.documentElement.style.setProperty('--vvh', `${window.innerHeight}px`);
+      return;
+    }
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1488,7 +1501,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     // shifting, pinch-zoom, or rubber-band scroll — NOT a keyboard —
     // and must not move the input bar.
     const KEYBOARD_THRESHOLD_PX = 150;
-    const syncKeyboardOffset = () => {
+    const syncViewport = () => {
+      // Always publish the true visible height. Consumers use this in
+      // place of 100dvh so they shrink when the keyboard opens.
+      document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
+
       // Gate on focus first: if the user isn't typing, keep the bar flush
       // to the bottom regardless of what visualViewport reports. This
       // single check eliminates the most common "floating bar" bug on iOS.
@@ -1505,13 +1522,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       const kb = isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
       document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
     };
-    syncKeyboardOffset();
-    vv.addEventListener('resize', syncKeyboardOffset);
-    vv.addEventListener('scroll', syncKeyboardOffset);
+    syncViewport();
+    vv.addEventListener('resize', syncViewport);
+    vv.addEventListener('scroll', syncViewport);
     return () => {
-      vv.removeEventListener('resize', syncKeyboardOffset);
-      vv.removeEventListener('scroll', syncKeyboardOffset);
+      vv.removeEventListener('resize', syncViewport);
+      vv.removeEventListener('scroll', syncViewport);
       document.documentElement.style.removeProperty('--kb-offset');
+      document.documentElement.style.removeProperty('--vvh');
     };
   }, []);
 
@@ -1519,9 +1537,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // AND re-trigger a sync so the offset applies/clears immediately —
   // otherwise there's a frame of lag between the keyboard animating in
   // and the input bar rising, and the user sees their tap vanish.
-  const handleInputFocus = useCallback(() => {
+  //
+  // The scrollIntoView call at the end is the actual keyboard-occlusion
+  // fix: even with --kb-offset lifting the fixed input bar and --vvh
+  // shrinking the container, iOS Safari can still leave the input
+  // half-hidden behind the keyboard when a user taps mid-scroll. We wait
+  // for the keyboard animation (~300ms) to finish, then ask the browser
+  // to centre the input in the now-shrunken visual viewport.
+  const handleInputFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
     isInputFocusedRef.current = true;
     showControls();
+    const target = e.currentTarget;
     // Fire a sync on the next frame so visualViewport has time to settle.
     if (typeof window !== 'undefined' && window.visualViewport) {
       const vv = window.visualViewport;
@@ -1534,8 +1560,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           const kb = isIOS ? rawKb + 44 : rawKb;
           document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
         }
+        document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
       });
     }
+    // iOS keyboard animation is ~250ms; wait 300ms so visualViewport
+    // has finished shrinking before we ask the browser to scroll.
+    setTimeout(() => {
+      try {
+        target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        target?.scrollIntoView();
+      }
+    }, 300);
   }, []);
 
   const handleInputBlur = useCallback(() => {
@@ -1565,7 +1601,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ background: '#030308', height: '100dvh', minHeight: '100dvh' }}
+      // height tracks the *visual* viewport — `--vvh` is set by the
+      // visualViewport listener and shrinks when the iOS keyboard opens,
+      // so nothing inside the container ends up below the keyboard.
+      // 100dvh is a pre-hydrate fallback for the first paint and for
+      // browsers without visualViewport support.
+      style={{ background: '#030308', height: 'var(--vvh, 100dvh)', minHeight: 'var(--vvh, 100dvh)' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
       onClick={handleScreenTap}
@@ -1613,11 +1654,13 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         aria-hidden="true"
       />
 
-      {/* UI Layer — dvh-sized so it matches the background, not 100vh */}
+      {/* UI Layer — tracks the visual viewport so it matches the real
+          visible area when the iOS keyboard is open. Falls back to 100dvh
+          before the visualViewport listener has fired. */}
       <div
         className="relative z-10 flex flex-col"
         style={{
-          height: '100dvh',
+          height: 'var(--vvh, 100dvh)',
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 110px)',
         }}
