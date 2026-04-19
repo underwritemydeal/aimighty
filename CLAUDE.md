@@ -1,7 +1,7 @@
 # AImighty Project Instructions
 
 **Voice AI for spiritual guidance across 14 belief systems.**
-**Last Updated: April 16, 2026 (response shortening + refund compliance + mobile UX fixes)**
+**Last Updated: April 18, 2026 (belief picker image cards + iOS keyboard fix + champagne brand tokens)**
 
 ## What This Is
 
@@ -332,7 +332,7 @@ import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designS
 ```
 
 ### Colors
-- **Primary Gold:** `colors.gold` = `#d4af37`
+- **Primary Gold:** `colors.gold` = `#d4b882` (muted champagne — migrated from `#d4af37` 2026-04-17)
 - **Void (background):** `colors.void` = `#030308`
 - **Void soft (pricing section):** `colors.voidSoft` = `rgba(10, 10, 18, 1)`
 - **Text Primary:** `colors.textPrimary` = `rgba(255, 248, 240, 0.95)`
@@ -346,13 +346,13 @@ import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designS
 - **Logo wordmark (standardized):** "AI" in `colors.gold` + "mighty" in `colors.textPrimary`, always Cormorant Garamond. Consistent across all screens. Use the `Logo` component pattern from `LandingPage.tsx` when surfacing the wordmark.
 
 ### Viewport Rules — CRITICAL for mobile
-- `viewport-fit=cover` in `index.html`
+- `viewport-fit=cover, interactive-widget=resizes-content` in `index.html` — the `interactive-widget` hint tells iOS 16.4+ Safari to resize content when the virtual keyboard opens rather than overlaying it
 - Global CSS: `html, body, #root { min-height: 100dvh; -webkit-fill-available; }`
 - **Every screen root** uses `minHeight: '100dvh'` or `height: '100dvh'` — NOT `100vh` or `h-screen` (those cause iOS black bars when URL bar collapses)
 - **Never use `backgroundAttachment: 'fixed'`** — iOS Safari disables it and renders the background incorrectly (zoom/clip bug). Always `scroll`.
 - ConversationScreen / belief card background divs use `backgroundSize: 'cover'` + `backgroundPosition: 'top center'`
 - **LandingPage mobile hero** is the exception: `backgroundSize: 'contain'` + `backgroundColor: colors.void` so the full 9:16 cosmic image renders without cropping on narrow iPhones
-- ConversationScreen input bar: `position: fixed; bottom: var(--kb-offset, 0px); padding-bottom: env(safe-area-inset-bottom)` — slides off during TTS via `transform: translateY(100%)`. The `--kb-offset` CSS variable is set by a `visualViewport` listener in ConversationScreen that tracks the iOS software keyboard height. On iOS, an extra 44px buffer accounts for Safari's form accessory bar (domain pill + prev/next/Done row) which overlays the visual viewport without being subtracted from `visualViewport.height`.
+- **ConversationScreen keyboard architecture (locked 2026-04-18):** the input bar is a normal **flex child with `shrink-0`**, NOT `position: fixed`. The root container is sized to `height: var(--vvh, 100dvh)`, where `--vvh` is set by a `visualViewport.resize` listener to `visualViewport.height`. Because the container shrinks to the real visible area when the keyboard opens, a flex-flow input bar naturally anchors to "the space above the keyboard" without any keyboard-height math. On focus, the input calls `scrollIntoView({ block: 'center' })` after 300ms so the keyboard settle animation (~250ms) is complete before the scroll. This replaces the old `--kb-offset` + `transform: translateY(100%)` approach, which repeatedly regressed on iOS. A `--kb-offset` CSS variable is still published for compatibility but the layout no longer depends on it.
 - Safe-area padding on content wrappers, NOT on the background image
 - God's text: **desktop centered**, **mobile left-aligned** (easier to read on narrow screens)
 
@@ -379,6 +379,18 @@ import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designS
 ## Speech Input (STT)
 - Uses `window.SpeechRecognition` / `webkitSpeechRecognition` (free, browser-native)
 - **Cached instance:** `speechInput.ts` caches the `SpeechRecognition` instance at module level (`cachedRecognition`) and reuses it across `startListening()` calls. Only `instance.lang` is updated when the user changes language. This prevents iOS Safari from re-prompting for microphone permission on every mic tap (iOS prompts per-instance, not per-start).
+
+## Belief Picker (`BeliefSelector.tsx`)
+
+The "Who do you talk to?" signup screen. Design rules locked 2026-04-18:
+
+- **Cards are 96px fixed height** (not `minHeight`) so every card is the same size regardless of descriptor length — Islam's 52-char descriptor used to make that card taller than Mormonism's 16-char one.
+- **Card background = the belief's 16:9 conversation-screen image** (`/images/avatars/<id>-desktop.jpg`, with two aliases: `mormonism → mormon-desktop.jpg`, `atheism-stoicism → stoicism-desktop.jpg`). Rendered as a real `<img>` tag, not CSS `background-image`, so image-load failures surface in the Network tab and so the global `button { background: none }` reset can't strip it.
+- **Cards render as `<div role="button">`, NOT `<button>`.** Two reasons: (1) the global `button { background: none }` reset in `index.css` strips the image via shorthand even on inner elements, and (2) some iOS Safari builds refuse to paint absolute-positioned `<img>` descendants of a `<button>`. A `div[role="button"]` with an `onKeyDown` handler for Enter/Space preserves accessibility without either quirk.
+- **Overlay is a horizontal gradient** (`rgba(0,0,0,0.80)` left → `rgba(0,0,0,0.58)` right), not vertical. Text lives on the left, so the darker edge is where it needs contrast.
+- **Text is single-line with `text-overflow: ellipsis`** for both the belief name (Outfit 500, 1.0625rem) and the descriptor (Cormorant Garamond italic 400, 0.95rem). Explicit font stacks (`"Outfit", system-ui, sans-serif` / `"Cormorant Garamond", Georgia, serif`) so a slow Google Fonts load doesn't cause a FOUT-driven layout shift.
+- **Selected state** draws a theme-coloured 1px border + glow, not a coloured left-bar like the previous iteration.
+- Descriptors live in `src/config/beliefDescriptors.ts` (14 canonical IDs) — add here, not in the component.
 
 ## Belief Welcome Screen
 - Shows a cinematic quote overlay before entering the conversation
