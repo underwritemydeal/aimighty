@@ -106,7 +106,7 @@ const BeliefCard = memo(function BeliefCard({
       style={{
         position: 'relative',
         width: '100%',
-        minHeight: '88px',
+        height: '96px',
         padding: 0,
         textAlign: 'left',
         overflow: 'hidden',
@@ -133,10 +133,6 @@ const BeliefCard = memo(function BeliefCard({
           : '0 2px 14px rgba(0,0,0,0.35)',
       }}
     >
-      {/* Background image — rendered as an <img> rather than a CSS
-          background so it bypasses the global `button { background: none }`
-          reset entirely, and so an image-load failure is visible in the
-          Network panel instead of silently rendering as a black card. */}
       <img
         src={bgImage}
         alt=""
@@ -155,16 +151,14 @@ const BeliefCard = memo(function BeliefCard({
         }}
       />
 
-      {/* Dark overlay — kept in the 0.55–0.65 range so the belief imagery
-          still reads through, but text stays legible on every avatar. */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
           inset: 0,
           background: isActive
-            ? 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.58) 100%)'
-            : 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 100%)',
+            ? 'linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.62) 60%, rgba(0,0,0,0.50) 100%)'
+            : 'linear-gradient(90deg, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.68) 60%, rgba(0,0,0,0.58) 100%)',
           transition: 'background 180ms ease',
         }}
       />
@@ -174,72 +168,68 @@ const BeliefCard = memo(function BeliefCard({
           position: 'relative',
           zIndex: 1,
           display: 'flex',
-          alignItems: 'center',
-          minHeight: '88px',
-          padding: '16px 18px',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          height: '100%',
+          padding: '0 18px',
+          gap: '2px',
         }}
       >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: '10px',
+            minWidth: 0,
+          }}
+        >
+          <span
             style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: '10px',
-              flexWrap: 'wrap',
+              fontFamily: '"Outfit", system-ui, sans-serif',
+              fontWeight: 500,
+              fontSize: '1.0625rem',
+              lineHeight: 1.2,
+              color: 'rgba(255, 248, 240, 0.98)',
+              letterSpacing: '-0.005em',
+              textShadow: '0 1px 3px rgba(0,0,0,0.75)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: '0 1 auto',
             }}
           >
+            {belief.name}
+          </span>
+          {isCurrent && (
             <span
               style={{
-                fontFamily: 'var(--font-body, Outfit)',
-                fontWeight: 500,
-                fontSize: '1.05rem',
-                color: 'rgba(255, 248, 240, 0.98)',
-                letterSpacing: '-0.005em',
-                textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                fontFamily: '"Outfit", system-ui, sans-serif',
+                fontWeight: 400,
+                fontSize: '0.65rem',
+                color: 'rgba(212, 184, 130, 0.95)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                textShadow: '0 1px 3px rgba(0,0,0,0.75)',
+                flex: '0 0 auto',
               }}
             >
-              {belief.name}
+              Current
             </span>
-            {isCurrent && (
-              <span
-                style={{
-                  fontFamily: 'var(--font-body, Outfit)',
-                  fontWeight: 400,
-                  fontSize: '0.7rem',
-                  color: 'rgba(212, 184, 130, 0.95)',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  textShadow: '0 1px 3px rgba(0,0,0,0.6)',
-                }}
-              >
-                Current
-              </span>
-            )}
-          </div>
-          <p
-            style={{
-              marginTop: '4px',
-              fontFamily: 'var(--font-display, Cormorant Garamond)',
-              fontStyle: 'italic',
-              fontWeight: 300,
-              fontSize: '0.95rem',
-              color: 'rgba(255, 248, 240, 0.82)',
-              lineHeight: 1.35,
-              textShadow: '0 1px 3px rgba(0,0,0,0.6)',
-            }}
-          >
-            {descriptor}
-          </p>
+          )}
         </div>
         <p
           style={{
-            marginTop: '4px',
-            fontFamily: 'var(--font-display, Cormorant Garamond)',
+            margin: 0,
+            fontFamily: '"Cormorant Garamond", Georgia, serif',
             fontStyle: 'italic',
-            fontWeight: 300,
+            fontWeight: 400,
             fontSize: '0.95rem',
-            color: 'rgba(255, 248, 240, 0.68)',
-            lineHeight: 1.35,
+            color: 'rgba(255, 248, 240, 0.88)',
+            lineHeight: 1.3,
+            textShadow: '0 1px 3px rgba(0,0,0,0.75)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
           {descriptor}
