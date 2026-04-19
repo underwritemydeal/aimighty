@@ -14,7 +14,7 @@
  * - Same component serves signup AND "Other Beliefs" switch. In switch
  *   mode, the current belief is highlighted and tapping it cancels.
  */
-import { useState, useEffect, useMemo, memo } from 'react';
+import { useState, useEffect, useMemo, memo, type KeyboardEvent } from 'react';
 import { beliefSystems, type CategorizedBeliefSystem } from '../../data/beliefSystems';
 import { type LanguageCode } from '../../data/translations';
 import { getThemeForBelief } from '../../config/beliefThemes';
@@ -77,9 +77,26 @@ const BeliefCard = memo(function BeliefCard({
   const glowStrong = theme.glow.replace(/[\d.]+\)$/, '0.85)');
   const glowSoft = theme.glow.replace(/[\d.]+\)$/, '0.35)');
 
+  // Rendered as <div role="button"> rather than <button> to sidestep two
+  // separate iOS Safari quirks: (1) the global `button { background: none }`
+  // reset in index.css was stripping backgroundImage even when moved to an
+  // inner element, and (2) some iOS builds will not render
+  // absolute-positioned <img> descendants of a <button> at all. A div
+  // role="button" with keyboard handling for Enter/Space preserves
+  // accessibility without those quirks.
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onSelect();
+    }
+  };
+
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={handleKeyDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onFocus={() => setIsFocused(true)}
@@ -215,7 +232,7 @@ const BeliefCard = memo(function BeliefCard({
           </p>
         </div>
       </div>
-    </button>
+    </div>
   );
 });
 
