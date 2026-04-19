@@ -94,10 +94,6 @@ const BeliefCard = memo(function BeliefCard({
         textAlign: 'left',
         overflow: 'hidden',
         backgroundColor: theme.bg,
-        backgroundImage: `url(${bgImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
         border: `1px solid ${
           isStaged
             ? glowStrong
@@ -120,7 +116,22 @@ const BeliefCard = memo(function BeliefCard({
           : '0 2px 14px rgba(0,0,0,0.35)',
       }}
     >
-      {/* Dark overlay — kept in the 0.55–0.70 range so the belief imagery
+      {/* Background image layer — rendered as its own div because the
+          global `button { background: none }` reset in index.css strips
+          backgroundImage when set on the <button> itself. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url(${bgImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
+      />
+
+      {/* Dark overlay — kept in the 0.55–0.65 range so the belief imagery
           still reads through, but text stays legible on every avatar. */}
       <div
         aria-hidden="true"
@@ -128,8 +139,8 @@ const BeliefCard = memo(function BeliefCard({
           position: 'absolute',
           inset: 0,
           background: isActive
-            ? 'linear-gradient(180deg, rgba(0,0,0,0.50) 0%, rgba(0,0,0,0.62) 100%)'
-            : 'linear-gradient(180deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.70) 100%)',
+            ? 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.58) 100%)'
+            : 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 100%)',
           transition: 'background 180ms ease',
         }}
       />
