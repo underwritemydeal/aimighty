@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { beliefSystems } from '../../data/beliefSystems';
 import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designSystem';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
+import { Wordmark, type WordmarkSize } from '../Wordmark';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -57,21 +58,8 @@ const XIconFaint = () => (
 // ───── Reusable elements ─────
 
 const Logo = ({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) => {
-  const fontSize = size === 'lg' ? 'clamp(4.5rem, 12vw, 6rem)' : size === 'md' ? '1.3rem' : '1rem';
-  return (
-    <div
-      style={{
-        fontFamily: fonts.display,
-        fontWeight: fontWeights.light,
-        fontSize,
-        letterSpacing: size === 'lg' ? '0.05em' : '0.02em',
-        lineHeight: 1,
-      }}
-    >
-      <span style={{ color: colors.gold }}>AI</span>
-      <span style={{ color: colors.textPrimary }}>mighty</span>
-    </div>
-  );
+  const wordmarkSize: WordmarkSize = size === 'lg' ? 'xl' : size === 'md' ? 'md' : 'sm';
+  return <Wordmark size={wordmarkSize} haloGlow={size === 'lg'} />;
 };
 
 const SectionTitle = ({ title, subtitle }: { title: string; subtitle?: string }) => (
@@ -372,7 +360,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              color: 'rgba(212,175,55,0.6)',
+              color: 'rgba(212,184,130,0.6)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -655,6 +643,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
                 { t: 'Premium AI voice — warm, human', ok: true },
                 { t: 'God remembers you', ok: true },
                 { t: 'Personalized Daily Blessing', ok: true },
+                { t: 'Daily Belief Study — three questions for conversation', ok: true },
                 { t: 'Cinematic word-by-word text', ok: true },
               ]}
             />

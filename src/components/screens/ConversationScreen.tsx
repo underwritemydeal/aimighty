@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { useState, useEffect, useRef, memo, useCallback, type FocusEvent } from 'react';
 import { sendMessage, summarizeConversation, type Message } from '../../services/claudeApi';
 import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue, prewarmTts, resumeAudio, isAudioPaused } from '../../services/openaiTTS';
 import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
@@ -116,7 +116,7 @@ const MenuIcon = memo(function MenuIcon() {
 // Gold flame SVG for the streak row — replaces the 🔥 emoji
 const FlameIcon = memo(function FlameIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4b882" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
     </svg>
   );
@@ -629,7 +629,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           background: 'rgba(8, 8, 16, 0.96)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(212, 175, 55, 0.25)',
+          border: '1px solid rgba(212, 184, 130, 0.25)',
           borderRadius: '16px',
           minWidth: '220px',
           padding: '8px 0',
@@ -642,7 +642,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
         {item('Sacred Text', onSacredText)}
         {item('Reflection', onReflection)}
 
-        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <div
           className="flex items-center gap-2"
@@ -675,7 +675,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           </button>
         )}
 
-        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <button
           onClick={() => { onNavigate?.('terms'); onClose(); }}
@@ -706,7 +706,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           Privacy Policy
         </button>
 
-        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 175, 55, 0.2)' }} />
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <button
           onClick={() => { onSignOut(); onClose(); }}
@@ -721,8 +721,8 @@ const SettingsDropdown = memo(function SettingsDropdown({
 
         <style>{`
           .menu-item:hover {
-            background: rgba(212, 175, 55, 0.08) !important;
-            border-left-color: #d4af37 !important;
+            background: rgba(212, 184, 130, 0.08) !important;
+            border-left-color: #d4b882 !important;
           }
         `}</style>
       </div>
@@ -1475,10 +1475,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // input bar floats directly behind that accessory bar and the text the user
   // just typed is half-clipped. We add an IOS_ACCESSORY_BAR_HEIGHT buffer for
   // iOS devices so the bar clears both the keyboard and the accessory overlay.
+  //
+  // We ALSO publish `--vvh` = visualViewport.height on every event. 100dvh
+  // on iOS Safari does NOT shrink when the keyboard opens, so a container
+  // sized to 100dvh still extends behind the keyboard and any input placed
+  // inside its lower half gets occluded. Sizing the conversation container
+  // to `var(--vvh)` makes it track the real visible area, which is what
+  // `scrollIntoView` needs to reason against when we yank the input up on
+  // focus.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const vv = window.visualViewport;
-    if (!vv) return;
+    if (!vv) {
+      // Non-iOS / older browsers — fall back to innerHeight once so the
+      // var(--vvh) consumer still resolves to something sensible.
+      document.documentElement.style.setProperty('--vvh', `${window.innerHeight}px`);
+      return;
+    }
     const isIOS =
       /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1488,7 +1501,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     // shifting, pinch-zoom, or rubber-band scroll — NOT a keyboard —
     // and must not move the input bar.
     const KEYBOARD_THRESHOLD_PX = 150;
-    const syncKeyboardOffset = () => {
+    const syncViewport = () => {
+      // Always publish the true visible height. Consumers use this in
+      // place of 100dvh so they shrink when the keyboard opens.
+      document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
+
       // Gate on focus first: if the user isn't typing, keep the bar flush
       // to the bottom regardless of what visualViewport reports. This
       // single check eliminates the most common "floating bar" bug on iOS.
@@ -1505,13 +1522,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       const kb = isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
       document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
     };
-    syncKeyboardOffset();
-    vv.addEventListener('resize', syncKeyboardOffset);
-    vv.addEventListener('scroll', syncKeyboardOffset);
+    syncViewport();
+    vv.addEventListener('resize', syncViewport);
+    vv.addEventListener('scroll', syncViewport);
     return () => {
-      vv.removeEventListener('resize', syncKeyboardOffset);
-      vv.removeEventListener('scroll', syncKeyboardOffset);
+      vv.removeEventListener('resize', syncViewport);
+      vv.removeEventListener('scroll', syncViewport);
       document.documentElement.style.removeProperty('--kb-offset');
+      document.documentElement.style.removeProperty('--vvh');
     };
   }, []);
 
@@ -1519,9 +1537,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // AND re-trigger a sync so the offset applies/clears immediately —
   // otherwise there's a frame of lag between the keyboard animating in
   // and the input bar rising, and the user sees their tap vanish.
-  const handleInputFocus = useCallback(() => {
+  //
+  // The scrollIntoView call at the end is the actual keyboard-occlusion
+  // fix: even with --kb-offset lifting the fixed input bar and --vvh
+  // shrinking the container, iOS Safari can still leave the input
+  // half-hidden behind the keyboard when a user taps mid-scroll. We wait
+  // for the keyboard animation (~300ms) to finish, then ask the browser
+  // to centre the input in the now-shrunken visual viewport.
+  const handleInputFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
     isInputFocusedRef.current = true;
     showControls();
+    const target = e.currentTarget;
     // Fire a sync on the next frame so visualViewport has time to settle.
     if (typeof window !== 'undefined' && window.visualViewport) {
       const vv = window.visualViewport;
@@ -1534,8 +1560,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           const kb = isIOS ? rawKb + 44 : rawKb;
           document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
         }
+        document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
       });
     }
+    // iOS keyboard animation is ~250ms; wait 300ms so visualViewport
+    // has finished shrinking before we ask the browser to scroll.
+    setTimeout(() => {
+      try {
+        target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        target?.scrollIntoView();
+      }
+    }, 300);
   }, []);
 
   const handleInputBlur = useCallback(() => {
@@ -1565,7 +1601,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ background: '#030308', height: '100dvh', minHeight: '100dvh' }}
+      // height tracks the *visual* viewport — `--vvh` is set by the
+      // visualViewport listener and shrinks when the iOS keyboard opens,
+      // so nothing inside the container ends up below the keyboard.
+      // 100dvh is a pre-hydrate fallback for the first paint and for
+      // browsers without visualViewport support.
+      style={{ background: '#030308', height: 'var(--vvh, 100dvh)', minHeight: 'var(--vvh, 100dvh)' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
       onClick={handleScreenTap}
@@ -1613,13 +1654,19 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         aria-hidden="true"
       />
 
-      {/* UI Layer — dvh-sized so it matches the background, not 100vh */}
+      {/* UI Layer — tracks the visual viewport so it matches the real
+          visible area when the iOS keyboard is open. Falls back to 100dvh
+          before the visualViewport listener has fired.
+          No bottom padding: the input bar is a real flex child now
+          (shrink-0) instead of being position:fixed, so it naturally
+          anchors to whatever height the container is, which in turn is
+          always the space ABOVE the keyboard. That's the property that
+          makes the input impossible to cover. */}
       <div
         className="relative z-10 flex flex-col"
         style={{
-          height: '100dvh',
+          height: 'var(--vvh, 100dvh)',
           paddingTop: 'env(safe-area-inset-top, 0px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 110px)',
         }}
       >
         {/* Top bar */}
@@ -1682,7 +1729,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               style={{
                 width: '44px',
                 height: '44px',
-                color: voiceEnabled ? 'rgba(255,255,255,0.7)' : '#d4af37',
+                color: voiceEnabled ? 'rgba(255,255,255,0.7)' : '#d4b882',
               }}
             >
               <SpeakerIcon muted={!voiceEnabled} />
@@ -1729,7 +1776,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             transition: 'opacity 0.5s ease 0.2s',
             marginTop: '20px',
             padding: '0 24px',
-            paddingBottom: controlsHidden ? '20px' : '180px', // Extra padding when controls visible
+            paddingBottom: '20px',
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
             cursor: controlsHidden ? 'pointer' : 'auto',
@@ -1892,33 +1939,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         </div>
 
-        {/* Scroll to bottom button */}
-        {showScrollButton && (
-          <button
-            onClick={() => scrollToBottom()}
-            className="absolute left-1/2 -translate-x-1/2 p-2 rounded-full transition-all"
-            style={{
-              bottom: 'calc(env(safe-area-inset-bottom, 20px) + 180px)',
-              background: 'rgba(0, 0, 0, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: 'rgba(255, 255, 255, 0.6)',
-            }}
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDownIcon />
-          </button>
-        )}
-
-        {/* AI disclosure — fades out after first user message. Sits above the input bar. */}
+        {/* AI disclosure — lives in flex flow above the input section so it
+            rides the keyboard exactly like the input does. Fades out after
+            the first user message. */}
         {displayMessages.length === 1 && displayMessages[0].role === 'greeting' && !controlsHidden && (
           <div
-            className="text-center"
+            className="shrink-0 text-center"
             style={{
-              position: 'fixed',
-              left: 0,
-              right: 0,
-              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 158px)',
-              zIndex: 19,
+              padding: '2px 20px 6px',
               fontFamily: 'var(--font-body, Outfit)',
               fontSize: '11px',
               fontWeight: 200,
@@ -1932,105 +1960,129 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         )}
 
-        {/* Input controls — fixed at bottom, slides off during TTS for clean
-            cinematic view. The `bottom` offset uses a CSS var set by the
-            visualViewport listener above so the bar floats above the iOS
-            on-screen keyboard instead of being covered by it. */}
+        {/* Input controls — in-flow flex child, NOT position:fixed. Because
+            the UI Layer is sized to var(--vvh) (the real visible area),
+            this section is always pinned just above the keyboard and can
+            never be covered by it. Collapses to 0 height when TTS plays
+            (controlsHidden=true) so God's words have the full screen. */}
         <div
           className="shrink-0"
           style={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 'var(--kb-offset, 0px)',
-            zIndex: 20,
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-            paddingTop: '12px',
-            background: 'linear-gradient(to top, rgba(3,3,8,0.92) 0%, rgba(3,3,8,0.7) 60%, rgba(3,3,8,0) 100%)',
+            maxHeight: controlsHidden ? '0' : '400px',
+            overflow: 'hidden',
             opacity: controlsHidden ? 0 : (isVisible ? 1 : 0),
-            transform: controlsHidden ? 'translateY(100%)' : 'translateY(0)',
-            transition: 'opacity 0.3s ease, transform 0.3s ease, bottom 0.2s ease',
+            transition: 'max-height 0.35s ease, opacity 0.3s ease',
             pointerEvents: controlsHidden ? 'none' : 'auto',
+            background: 'linear-gradient(to top, rgba(3,3,8,0.92) 0%, rgba(3,3,8,0.7) 60%, rgba(3,3,8,0) 100%)',
+            position: 'relative',
           }}
         >
-          {/* Message counter */}
-          {!user.isPremium && remainingMessages <= 3 && (
-            <div
-              className="text-center"
+          {/* Scroll-to-bottom button — sits just above the input section,
+              floats over the gradient background. Only shown when the
+              messages list has been scrolled off the bottom. */}
+          {showScrollButton && (
+            <button
+              onClick={() => scrollToBottom()}
+              className="absolute left-1/2 -translate-x-1/2 p-2 rounded-full transition-all"
               style={{
-                fontSize: '10px',
-                color: 'rgba(255,255,255,0.25)',
-                marginTop: '20px',
-                marginBottom: '16px',
+                top: '-48px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: 'rgba(255, 255, 255, 0.6)',
+              }}
+              aria-label="Scroll to bottom"
+            >
+              <ArrowDownIcon />
+            </button>
+          )}
+
+          <div style={{ paddingTop: '12px' }}>
+            {/* Message counter */}
+            {!user.isPremium && remainingMessages <= 3 && (
+              <div
+                className="text-center"
+                style={{
+                  fontSize: '10px',
+                  color: 'rgba(255,255,255,0.25)',
+                  marginTop: '8px',
+                  marginBottom: '12px',
+                }}
+              >
+                {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
+              </div>
+            )}
+
+            {/* Mic button */}
+            <div
+              className="flex justify-center"
+              style={{
+                marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '12px',
+                marginBottom: '12px',
               }}
             >
-              {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
-            </div>
-          )}
-
-          {/* Mic button */}
-          <div
-            className="flex justify-center"
-            style={{
-              marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '20px',
-              marginBottom: '16px',
-            }}
-          >
-            <MicButton
-              state={state}
-              accentColor={accentColor}
-              onToggle={handleMicToggle}
-              isDisabled={hasReachedFreeLimit() && !user.isPremium}
-            />
-          </div>
-
-          {/* Text input */}
-          <div className="w-full" style={{ padding: '0 20px' }}>
-            <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={handleInputFocus}
-                onBlur={handleInputBlur}
-                placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
-                disabled={!isInputEnabled}
-                maxLength={500}
-                className="conversation-input"
-                style={{
-                  paddingRight: inputText.trim() ? '50px' : '20px',
-                  opacity: isInputEnabled ? 1 : 0.35,
-                  height: '48px',
-                }}
+              <MicButton
+                state={state}
+                accentColor={accentColor}
+                onToggle={handleMicToggle}
+                isDisabled={hasReachedFreeLimit() && !user.isPremium}
               />
-              {inputText.trim() && isInputEnabled && (
-                <button
-                  onClick={handleSend}
-                  aria-label="Send message"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
-                  style={{ color: accentColor }}
-                >
-                  <SendIcon />
-                </button>
-              )}
             </div>
-          </div>
 
-          {/* Error message */}
-          {speechError && (
-            <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-              {speechError}
+            {/* Text input */}
+            <div className="w-full" style={{ padding: '0 20px' }}>
+              <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
+                  placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
+                  disabled={!isInputEnabled}
+                  maxLength={500}
+                  enterKeyHint="send"
+                  className="conversation-input"
+                  style={{
+                    paddingRight: inputText.trim() ? '50px' : '20px',
+                    opacity: isInputEnabled ? 1 : 0.35,
+                    height: '48px',
+                  }}
+                />
+                {inputText.trim() && isInputEnabled && (
+                  <button
+                    onClick={handleSend}
+                    aria-label="Send message"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
+                    style={{ color: accentColor }}
+                  >
+                    <SendIcon />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Error message */}
+            {speechError && (
+              <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                {speechError}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Chevron indicator - always visible, tap to show/hide controls */}
+        {/* Chevron indicator — always visible, pinned below the input
+            section (or at the bottom when the input section collapses).
+            Bottom padding absorbs the home-indicator safe area. */}
         <button
           onClick={toggleControls}
-          className="shrink-0 flex justify-center items-center w-full py-3"
-          style={{ color: 'rgba(255, 255, 255, 0.2)' }}
+          className="shrink-0 flex justify-center items-center w-full"
+          style={{
+            color: 'rgba(255, 255, 255, 0.2)',
+            paddingTop: '8px',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+          }}
           aria-label={controlsHidden ? 'Show input controls' : 'Hide input controls'}
         >
           <ChevronIndicator pointsUp={controlsHidden} />
@@ -2236,7 +2288,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               background: 'rgba(8,8,16,0.96)',
               backdropFilter: 'blur(24px)',
               WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(212,175,55,0.35)',
+              border: '1px solid rgba(212,184,130,0.35)',
               borderRadius: '16px',
               color: 'rgba(255,248,240,0.95)',
               fontSize: '0.9rem',
@@ -2253,7 +2305,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 style={{
                   padding: '10px 22px',
                   borderRadius: '8px',
-                  background: '#d4af37',
+                  background: '#d4b882',
                   color: '#0a0a0f',
                   fontSize: '0.85rem',
                   fontWeight: 500,

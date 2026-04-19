@@ -52,7 +52,7 @@ export const OtherBeliefsConfirm = memo(function OtherBeliefsConfirm({
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(212,175,55,0.05) 0%, rgba(3,3,8,0) 60%)',
+            'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(212,184,130,0.05) 0%, rgba(3,3,8,0) 60%)',
           pointerEvents: 'none',
         }}
       />
@@ -115,11 +115,11 @@ export const OtherBeliefsConfirm = memo(function OtherBeliefsConfirm({
               padding: '15px 28px',
               borderRadius: '999px',
               border: 'none',
-              background: '#d4af37',
+              background: '#d4b882',
               color: '#0a0a0f',
               cursor: 'pointer',
               boxShadow:
-                '0 10px 40px rgba(212,175,55,0.25), 0 0 0 1px rgba(212,175,55,0.5) inset',
+                '0 10px 40px rgba(212,184,130,0.25), 0 0 0 1px rgba(212,184,130,0.5) inset',
               transition: 'transform 120ms ease, box-shadow 220ms ease',
             }}
             onMouseDown={(e) => {

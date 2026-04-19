@@ -1,4 +1,5 @@
 import { useState, useEffect, memo } from 'react';
+import { Wordmark } from '../Wordmark';
 
 interface PrivacyScreenProps {
   onBack: () => void;
@@ -34,16 +35,9 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
       {/* AImighty logo — top center */}
       <div
         className="fixed top-5 left-1/2 z-20"
-        style={{
-          transform: 'translateX(-50%)',
-          fontFamily: 'var(--font-display)',
-          fontSize: '1.1rem',
-          fontWeight: 300,
-          letterSpacing: '0.05em',
-        }}
+        style={{ transform: 'translateX(-50%)' }}
       >
-        <span style={{ color: '#d4af37' }}>AI</span>
-        <span style={{ color: 'rgba(255,248,240,0.95)' }}>mighty</span>
+        <Wordmark size="sm" style={{ fontSize: '1.1rem' }} />
       </div>
       {/* Back button */}
       <nav
@@ -81,7 +75,7 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-3xl)',
               fontWeight: 300,
-              color: '#d4af37',
+              color: '#d4b882',
             }}
           >
             Privacy Policy
@@ -123,11 +117,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               Please read this Privacy Policy carefully. By accessing or using the Service, you acknowledge that you have read, understood, and agree to be bound by this Privacy Policy. If you do not agree with our policies and practices, do not use the Service.
             </p>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 1 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 1. INFORMATION WE COLLECT
               </h2>
 
@@ -158,8 +152,8 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               <div
                 className="p-4 rounded-xl mt-4"
                 style={{
-                  background: 'rgba(212, 175, 55, 0.1)',
-                  border: '1px solid rgba(212, 175, 55, 0.3)',
+                  background: 'rgba(212, 184, 130, 0.1)',
+                  border: '1px solid rgba(212, 184, 130, 0.3)',
                 }}
               >
                 <p style={{ color: 'rgba(255, 255, 255, 0.95)' }}>
@@ -174,11 +168,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </div>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 2 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 2. HOW WE USE YOUR INFORMATION
               </h2>
               <p>We use the information we collect for the following purposes:</p>
@@ -224,11 +218,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </ul>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 3 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 3. HOW WE SHARE YOUR INFORMATION
               </h2>
               <p><strong style={{ color: 'rgba(255, 255, 255, 0.95)' }}>We do not sell your personal information.</strong> We share your information only in the following limited circumstances:</p>
@@ -238,11 +232,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </h3>
               <p>We use trusted third-party services to operate the Service. These providers have access to your information only as necessary to perform their functions and are obligated to protect your data:</p>
               <ul className="list-disc list-inside space-y-2 mt-4 ml-4">
-                <li><strong>Anthropic (Claude API):</strong> Your conversation messages (text only) are sent to Anthropic's Claude API to generate AI responses. Anthropic processes this data according to their API Terms of Service and Privacy Policy. Anthropic does not use API data to train their models. See: <a href="https://www.anthropic.com/privacy" style={{ color: '#d4af37' }}>https://www.anthropic.com/privacy</a></li>
-                <li><strong>OpenAI (Text-to-Speech):</strong> AI-generated response text is sent to OpenAI's TTS API to generate voice audio for Divine tier subscribers. OpenAI processes this data according to their API Terms of Service. See: <a href="https://openai.com/policies/privacy-policy" style={{ color: '#d4af37' }}>https://openai.com/policies/privacy-policy</a></li>
-                <li><strong>Cloudflare:</strong> Our API runs on Cloudflare Workers. Cloudflare processes requests and may log IP addresses for security purposes. See: <a href="https://www.cloudflare.com/privacypolicy/" style={{ color: '#d4af37' }}>https://www.cloudflare.com/privacypolicy/</a></li>
-                <li><strong>Vercel:</strong> Our website is hosted on Vercel. See: <a href="https://vercel.com/legal/privacy-policy" style={{ color: '#d4af37' }}>https://vercel.com/legal/privacy-policy</a></li>
-                <li><strong>Stripe:</strong> Payment processing is handled by Stripe. See: <a href="https://stripe.com/privacy" style={{ color: '#d4af37' }}>https://stripe.com/privacy</a></li>
+                <li><strong>Anthropic (Claude API):</strong> Your conversation messages (text only) are sent to Anthropic's Claude API to generate AI responses. Anthropic processes this data according to their API Terms of Service and Privacy Policy. Anthropic does not use API data to train their models. See: <a href="https://www.anthropic.com/privacy" style={{ color: '#d4b882' }}>https://www.anthropic.com/privacy</a></li>
+                <li><strong>OpenAI (Text-to-Speech):</strong> AI-generated response text is sent to OpenAI's TTS API to generate voice audio for Divine tier subscribers. OpenAI processes this data according to their API Terms of Service. See: <a href="https://openai.com/policies/privacy-policy" style={{ color: '#d4b882' }}>https://openai.com/policies/privacy-policy</a></li>
+                <li><strong>Cloudflare:</strong> Our API runs on Cloudflare Workers. Cloudflare processes requests and may log IP addresses for security purposes. See: <a href="https://www.cloudflare.com/privacypolicy/" style={{ color: '#d4b882' }}>https://www.cloudflare.com/privacypolicy/</a></li>
+                <li><strong>Vercel:</strong> Our website is hosted on Vercel. See: <a href="https://vercel.com/legal/privacy-policy" style={{ color: '#d4b882' }}>https://vercel.com/legal/privacy-policy</a></li>
+                <li><strong>Stripe:</strong> Payment processing is handled by Stripe. See: <a href="https://stripe.com/privacy" style={{ color: '#d4b882' }}>https://stripe.com/privacy</a></li>
               </ul>
 
               <h3 className="mt-6 mb-3" style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)' }}>
@@ -274,11 +268,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 4 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 4. DATA RETENTION
               </h2>
 
@@ -324,11 +318,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </ul>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 5 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 5. DATA SECURITY
               </h2>
 
@@ -360,11 +354,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 6 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 6. YOUR RIGHTS AND CHOICES
               </h2>
 
@@ -404,11 +398,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 7 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 7. JURISDICTION-SPECIFIC RIGHTS
               </h2>
 
@@ -423,7 +417,7 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
                 <li><strong>Right to Non-Discrimination:</strong> We will not discriminate against you for exercising your CCPA/CPRA rights.</li>
               </ul>
               <p className="mt-4">
-                To exercise your California privacy rights, contact us at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4af37' }}>privacy@aimightyme.com</a> or call us at the number listed in our Contact section.
+                To exercise your California privacy rights, contact us at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a> or call us at the number listed in our Contact section.
               </p>
 
               <h3 className="mt-6 mb-3" style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)' }}>
@@ -445,22 +439,22 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
                 <strong>Data Transfers:</strong> Your data may be transferred to and processed in the United States, where our servers and service providers are located. We ensure appropriate safeguards are in place for such transfers, including Standard Contractual Clauses where applicable.
               </p>
               <p className="mt-4">
-                To exercise your GDPR rights, contact us at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4af37' }}>privacy@aimightyme.com</a>.
+                To exercise your GDPR rights, contact us at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a>.
               </p>
 
               <h3 className="mt-6 mb-3" style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)' }}>
                 7.3 Other Jurisdictions
               </h3>
               <p>
-                We are committed to complying with applicable data protection laws in all jurisdictions where we operate. If you have questions about your specific rights under local law, please contact us at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4af37' }}>privacy@aimightyme.com</a>.
+                We are committed to complying with applicable data protection laws in all jurisdictions where we operate. If you have questions about your specific rights under local law, please contact us at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a>.
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 8 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 8. COOKIES AND LOCAL STORAGE
               </h2>
 
@@ -481,11 +475,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 9 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 9. CHILDREN'S PRIVACY
               </h2>
 
@@ -500,15 +494,15 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
                 9.2 Parental Rights
               </h3>
               <p>
-                If you are a parent or guardian and believe that your child under 13 has provided us with personal information, please contact us immediately at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4af37' }}>privacy@aimightyme.com</a> so that we can take appropriate action.
+                If you are a parent or guardian and believe that your child under 13 has provided us with personal information, please contact us immediately at <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a> so that we can take appropriate action.
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 10 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 10. CONVERSATION DATA AND AI PROCESSING
               </h2>
 
@@ -537,8 +531,8 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               <div
                 className="p-4 rounded-xl mt-4"
                 style={{
-                  background: 'rgba(212, 175, 55, 0.1)',
-                  border: '1px solid rgba(212, 175, 55, 0.3)',
+                  background: 'rgba(212, 184, 130, 0.1)',
+                  border: '1px solid rgba(212, 184, 130, 0.3)',
                 }}
               >
                 <p style={{ color: 'rgba(255, 255, 255, 0.95)' }}>
@@ -554,11 +548,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 11 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 11. THIRD-PARTY LINKS AND SERVICES
               </h2>
               <p>
@@ -566,11 +560,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 12 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 12. INTERNATIONAL DATA TRANSFERS
               </h2>
               <p>
@@ -578,11 +572,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 13 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 13. CHANGES TO THIS PRIVACY POLICY
               </h2>
               <p>
@@ -590,27 +584,27 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             {/* Section 14 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4af37' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
                 14. CONTACT US
               </h2>
               <p>If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
               <div className="mt-4">
                 <p><strong>AImighty LLC</strong></p>
-                <p>Email: <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4af37' }}>privacy@aimightyme.com</a></p>
-                <p>General Support: <a href="mailto:support@aimightyme.com" style={{ color: '#d4af37' }}>support@aimightyme.com</a></p>
-                <p>Legal Inquiries: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4af37' }}>legal@aimightyme.com</a></p>
-                <p>Website: <a href="https://aimightyme.com" style={{ color: '#d4af37' }}>https://aimightyme.com</a></p>
+                <p>Email: <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a></p>
+                <p>General Support: <a href="mailto:support@aimightyme.com" style={{ color: '#d4b882' }}>support@aimightyme.com</a></p>
+                <p>Legal Inquiries: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4b882' }}>legal@aimightyme.com</a></p>
+                <p>Website: <a href="https://aimightyme.com" style={{ color: '#d4b882' }}>https://aimightyme.com</a></p>
               </div>
               <p className="mt-4">
-                For GDPR-related inquiries, you may also contact our Data Protection point of contact at: <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4af37' }}>privacy@aimightyme.com</a>
+                For GDPR-related inquiries, you may also contact our Data Protection point of contact at: <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a>
               </p>
             </section>
 
-            <hr style={{ borderColor: 'rgba(212, 175, 55, 0.3)', margin: '32px 0' }} />
+            <hr style={{ borderColor: 'rgba(212, 184, 130, 0.3)', margin: '32px 0' }} />
 
             <p className="text-center italic" style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
               By using AImighty, you acknowledge that you have read, understood, and agree to this Privacy Policy.

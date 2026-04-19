@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { signUp, signIn, isValidEmail, getRememberMe, getLastEmail } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
+import { Wordmark } from '../Wordmark';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -181,27 +182,8 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
         >
           {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="flex items-baseline justify-center select-none">
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  color: '#d4af37',
-                }}
-              >
-                AI
-              </span>
-              <span
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: '1.5rem',
-                  fontWeight: 300,
-                  color: 'rgba(255, 248, 240, 0.95)',
-                }}
-              >
-                mighty
-              </span>
+            <h1 className="select-none" style={{ margin: 0 }}>
+              <Wordmark size="md" style={{ fontSize: '1.5rem' }} />
             </h1>
           </div>
 
@@ -278,9 +260,9 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-white/20 bg-transparent accent-[#d4af37]"
+                  className="w-4 h-4 rounded border-white/20 bg-transparent accent-[#d4b882]"
                   style={{
-                    accentColor: '#d4af37',
+                    accentColor: '#d4b882',
                   }}
                 />
                 <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -314,7 +296,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
               className="w-full mt-6 transition-all duration-200"
               style={{
                 height: '52px',
-                background: '#d4af37',
+                background: '#d4b882',
                 color: '#0a0a0f',
                 borderRadius: '12px',
                 fontFamily: 'var(--font-display)',
@@ -356,7 +338,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
             <button
               type="button"
               onClick={switchMode}
-              style={{ color: '#d4af37', fontWeight: 500 }}
+              style={{ color: '#d4b882', fontWeight: 500 }}
             >
               {mode === 'signup' ? 'Sign In' : 'Create Account'}
             </button>

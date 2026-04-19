@@ -39,9 +39,9 @@ export const BELIEF_THEMES: Record<string, BeliefTheme> = {
   // Christian — warm gold on deep void, reverent
   protestant: {
     bg: '#0a0612',
-    glow: 'rgba(212, 175, 55, 0.55)',
+    glow: 'rgba(212, 184, 130, 0.55)',
     primary: '#f5e8c7',
-    secondary: 'rgba(212, 175, 55, 0.75)',
+    secondary: 'rgba(212, 184, 130, 0.75)',
   },
   // Catholic — deeper, Vatican burgundy/gold
   catholic: {
@@ -167,9 +167,9 @@ export const SHARE_TEXT_BY_BELIEF: Record<string, string> = {
  */
 export const DEFAULT_THEME: BeliefTheme = {
   bg: '#030308',
-  glow: 'rgba(212, 175, 55, 0.5)',
+  glow: 'rgba(212, 184, 130, 0.5)',
   primary: '#f5e8c7',
-  secondary: 'rgba(212, 175, 55, 0.75)',
+  secondary: 'rgba(212, 184, 130, 0.75)',
 };
 
 export const DEFAULT_SHARE_TEXT = 'Something worth sitting with.';

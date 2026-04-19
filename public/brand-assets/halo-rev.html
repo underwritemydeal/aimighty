@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>AImighty · Halo Rev 3 (Variant B)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #030308;
+    --void-soft: #0a0a12;
+    --gold: #d4b882;
+    --gold-hi: #e2c899;
+    --gold-lo: #bfa067;
+    --text: rgba(245, 240, 232, 0.95);
+    --text-dim: rgba(245, 240, 232, 0.55);
+    --hairline: rgba(212, 184, 130, 0.22);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--void); color: var(--text); }
+  body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 300;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+    padding: 0 0 env(safe-area-inset-bottom);
+  }
+  header {
+    padding: 48px 20px 24px;
+    text-align: center;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+    font-size: 38px;
+    letter-spacing: 1px;
+  }
+  .logo .ai { color: var(--gold); }
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+    font-size: 26px;
+    margin: 18px 0 6px;
+    letter-spacing: 0.5px;
+  }
+  header p { margin: 4px 0; color: var(--text-dim); font-size: 15px; }
+  main { max-width: 620px; margin: 0 auto; padding: 32px 20px 80px; }
+  section { margin-bottom: 40px; }
+  h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+    font-size: 22px;
+    color: var(--gold);
+    border-bottom: 1px solid var(--hairline);
+    padding-bottom: 10px;
+    margin: 0 0 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .intro {
+    background: var(--void-soft);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 18px 20px;
+    color: var(--text-dim);
+    font-size: 15px;
+  }
+  .intro strong { color: var(--gold-hi); font-weight: 500; }
+  figure { margin: 0 0 24px; }
+  figure img {
+    display: block; width: 100%; height: auto;
+    border: 1px solid rgba(245,240,232,0.06);
+    border-radius: 8px;
+    background: #000;
+  }
+  figcaption {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 14px;
+    margin-top: 10px;
+    letter-spacing: 1px;
+  }
+  ul.checklist { list-style: none; padding: 0; margin: 0; font-size: 15px; }
+  ul.checklist li {
+    padding: 10px 0; border-bottom: 1px solid rgba(245,240,232,0.06);
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  ul.checklist li::before {
+    content: "·"; color: var(--gold); font-size: 22px; line-height: 1; font-weight: 600;
+  }
+  ul.checklist li b { color: var(--gold-hi); font-weight: 500; }
+  .cta-note {
+    text-align: center; font-family: 'Cormorant Garamond', serif;
+    font-style: italic; color: var(--gold-hi);
+    font-size: 20px; margin: 24px 0 8px;
+  }
+  .cta-sub { text-align: center; color: var(--text-dim); font-size: 14px; }
+  .prev-link {
+    display: block; text-align: center; margin-top: 16px;
+    color: var(--text-dim); font-size: 13px; letter-spacing: 1px;
+    text-decoration: none; border: 1px solid var(--hairline);
+    padding: 10px 16px; border-radius: 6px;
+  }
+  footer {
+    border-top: 1px solid var(--hairline);
+    margin-top: 40px; padding: 28px 20px;
+    text-align: center; color: var(--text-dim); font-size: 12px;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span class="ai">AI</span><span>mighty</span></div>
+  <h1>Halo · Rev 3</h1>
+  <p>Variant B (Champagne gold · #D4B882) · pre-final-asset review</p>
+</header>
+
+<main>
+
+  <section>
+    <div class="intro">
+      <strong>What changed.</strong> The halo is now a tilted disc rather than a flat saucer.
+      It sits <em>behind and above</em> the letters — the bottom rim is occluded by the AI
+      glyphs, the top rim glows above them. Stronger z-rotation (17°), rounder disc (ry/rx ≈ 0.52),
+      and asymmetric bloom so the visible back rim reads as the luminous edge.
+    </div>
+  </section>
+
+  <section>
+    <h2>Preview · Variant B</h2>
+    <figure>
+      <img src="/brand-assets/preview/profile-variant-B-champagne.png?v=3" alt="Variant B champagne gold with Byzantine halo rev 3" />
+      <figcaption>1080 × 1080 · black bg · champagne gold #D4B882</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Design checklist</h2>
+    <ul class="checklist">
+      <li><span><b>Tilted perspective.</b> 17° z-rotation, ry/rx ≈ 0.52 — reads as a disc in 3D, not a saucer.</span></li>
+      <li><span><b>Behind the letters.</b> Halo center overlaps upper glyphs; front rim hidden behind AI.</span></li>
+      <li><span><b>Bloom on the visible rim.</b> Layered Gaussian blur + warm-white core line — catches light like gold leaf.</span></li>
+      <li><span><b>Muted champagne palette.</b> #D4B882 with #BFA067 shadow and #E2C899 highlight — soft, not flashy.</span></li>
+      <li><span><b>Cormorant Garamond 600.</b> AI wordmark with vertical gold sheen, crisp edges.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="cta-note">"Every belief. One voice."</p>
+    <p class="cta-sub">Approve the halo and I'll build all 5 assets + the master SVG.</p>
+    <a class="prev-link" href="/brand-assets/preview.html">← back to full 3-gold comparison</a>
+  </section>
+
+</main>
+
+<footer>
+  AIMIGHTY &nbsp;·&nbsp; HALO&nbsp;REV&nbsp;3 &nbsp;·&nbsp; APR&nbsp;2026
+</footer>
+
+</body>
+</html>

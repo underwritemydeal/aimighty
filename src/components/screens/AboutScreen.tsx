@@ -75,7 +75,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
               fontFamily: 'var(--font-body, Outfit)',
               fontSize: '1.05rem',
               fontWeight: 300,
-              color: '#d4af37',
+              color: '#d4b882',
               lineHeight: 1.5,
             }}
           >
@@ -114,7 +114,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 
             <h2
               className="mt-12 mb-5"
-              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4af37' }}
+              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4b882' }}
             >
               What we promise
             </h2>
@@ -127,7 +127,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 
             <h2
               className="mt-12 mb-5"
-              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4af37' }}
+              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4b882' }}
             >
               If you're struggling
             </h2>
@@ -135,13 +135,13 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
               className="p-5 rounded-xl"
               style={{
                 background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(212, 175, 55, 0.2)',
+                border: '1px solid rgba(212, 184, 130, 0.2)',
               }}
             >
               <ul className="space-y-2 list-none pl-0" style={{ color: 'rgba(255,255,255,0.85)' }}>
-                <li>Mental health crisis → <strong style={{ color: '#d4af37' }}>988</strong> Suicide &amp; Crisis Lifeline</li>
-                <li>Emergency → <strong style={{ color: '#d4af37' }}>911</strong></li>
-                <li>Domestic abuse → <strong style={{ color: '#d4af37' }}>1-800-799-7233</strong></li>
+                <li>Mental health crisis → <strong style={{ color: '#d4b882' }}>988</strong> Suicide &amp; Crisis Lifeline</li>
+                <li>Emergency → <strong style={{ color: '#d4b882' }}>911</strong></li>
+                <li>Domestic abuse → <strong style={{ color: '#d4b882' }}>1-800-799-7233</strong></li>
               </ul>
               <p className="mt-4" style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.6)' }}>
                 AImighty is a spiritual companion, not a mental health service. If you're in
@@ -151,7 +151,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 
             <h2
               className="mt-12 mb-4"
-              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4af37' }}
+              style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 400, color: '#d4b882' }}
             >
               The team
             </h2>
@@ -176,7 +176,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
                 onClick={onBack}
                 className="px-8 py-4 rounded-full"
                 style={{
-                  background: '#d4af37',
+                  background: '#d4b882',
                   color: '#0a0a0f',
                   fontFamily: 'var(--font-body, Outfit)',
                   fontSize: '0.95rem',

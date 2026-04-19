@@ -6,12 +6,18 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#030308",
-  "theme_color": "#d4af37",
+  "theme_color": "#d4b882",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "/brand-assets/mark.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand-assets/profile-1080.png",
+      "sizes": "1080x1080",
+      "type": "image/png",
       "purpose": "any"
     }
   ],
