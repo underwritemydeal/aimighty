@@ -1656,13 +1656,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
       {/* UI Layer — tracks the visual viewport so it matches the real
           visible area when the iOS keyboard is open. Falls back to 100dvh
-          before the visualViewport listener has fired. */}
+          before the visualViewport listener has fired.
+          No bottom padding: the input bar is a real flex child now
+          (shrink-0) instead of being position:fixed, so it naturally
+          anchors to whatever height the container is, which in turn is
+          always the space ABOVE the keyboard. That's the property that
+          makes the input impossible to cover. */}
       <div
         className="relative z-10 flex flex-col"
         style={{
           height: 'var(--vvh, 100dvh)',
           paddingTop: 'env(safe-area-inset-top, 0px)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 110px)',
         }}
       >
         {/* Top bar */}
@@ -1772,7 +1776,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             transition: 'opacity 0.5s ease 0.2s',
             marginTop: '20px',
             padding: '0 24px',
-            paddingBottom: controlsHidden ? '20px' : '180px', // Extra padding when controls visible
+            paddingBottom: '20px',
             maskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 3%, black 97%, transparent 100%)',
             cursor: controlsHidden ? 'pointer' : 'auto',
@@ -1935,33 +1939,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         </div>
 
-        {/* Scroll to bottom button */}
-        {showScrollButton && (
-          <button
-            onClick={() => scrollToBottom()}
-            className="absolute left-1/2 -translate-x-1/2 p-2 rounded-full transition-all"
-            style={{
-              bottom: 'calc(env(safe-area-inset-bottom, 20px) + 180px)',
-              background: 'rgba(0, 0, 0, 0.7)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: 'rgba(255, 255, 255, 0.6)',
-            }}
-            aria-label="Scroll to bottom"
-          >
-            <ArrowDownIcon />
-          </button>
-        )}
-
-        {/* AI disclosure — fades out after first user message. Sits above the input bar. */}
+        {/* AI disclosure — lives in flex flow above the input section so it
+            rides the keyboard exactly like the input does. Fades out after
+            the first user message. */}
         {displayMessages.length === 1 && displayMessages[0].role === 'greeting' && !controlsHidden && (
           <div
-            className="text-center"
+            className="shrink-0 text-center"
             style={{
-              position: 'fixed',
-              left: 0,
-              right: 0,
-              bottom: 'calc(env(safe-area-inset-bottom, 0px) + 158px)',
-              zIndex: 19,
+              padding: '2px 20px 6px',
               fontFamily: 'var(--font-body, Outfit)',
               fontSize: '11px',
               fontWeight: 200,
@@ -1975,105 +1960,129 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         )}
 
-        {/* Input controls — fixed at bottom, slides off during TTS for clean
-            cinematic view. The `bottom` offset uses a CSS var set by the
-            visualViewport listener above so the bar floats above the iOS
-            on-screen keyboard instead of being covered by it. */}
+        {/* Input controls — in-flow flex child, NOT position:fixed. Because
+            the UI Layer is sized to var(--vvh) (the real visible area),
+            this section is always pinned just above the keyboard and can
+            never be covered by it. Collapses to 0 height when TTS plays
+            (controlsHidden=true) so God's words have the full screen. */}
         <div
           className="shrink-0"
           style={{
-            position: 'fixed',
-            left: 0,
-            right: 0,
-            bottom: 'var(--kb-offset, 0px)',
-            zIndex: 20,
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-            paddingTop: '12px',
-            background: 'linear-gradient(to top, rgba(3,3,8,0.92) 0%, rgba(3,3,8,0.7) 60%, rgba(3,3,8,0) 100%)',
+            maxHeight: controlsHidden ? '0' : '400px',
+            overflow: 'hidden',
             opacity: controlsHidden ? 0 : (isVisible ? 1 : 0),
-            transform: controlsHidden ? 'translateY(100%)' : 'translateY(0)',
-            transition: 'opacity 0.3s ease, transform 0.3s ease, bottom 0.2s ease',
+            transition: 'max-height 0.35s ease, opacity 0.3s ease',
             pointerEvents: controlsHidden ? 'none' : 'auto',
+            background: 'linear-gradient(to top, rgba(3,3,8,0.92) 0%, rgba(3,3,8,0.7) 60%, rgba(3,3,8,0) 100%)',
+            position: 'relative',
           }}
         >
-          {/* Message counter */}
-          {!user.isPremium && remainingMessages <= 3 && (
-            <div
-              className="text-center"
+          {/* Scroll-to-bottom button — sits just above the input section,
+              floats over the gradient background. Only shown when the
+              messages list has been scrolled off the bottom. */}
+          {showScrollButton && (
+            <button
+              onClick={() => scrollToBottom()}
+              className="absolute left-1/2 -translate-x-1/2 p-2 rounded-full transition-all"
               style={{
-                fontSize: '10px',
-                color: 'rgba(255,255,255,0.25)',
-                marginTop: '20px',
-                marginBottom: '16px',
+                top: '-48px',
+                background: 'rgba(0, 0, 0, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                color: 'rgba(255, 255, 255, 0.6)',
+              }}
+              aria-label="Scroll to bottom"
+            >
+              <ArrowDownIcon />
+            </button>
+          )}
+
+          <div style={{ paddingTop: '12px' }}>
+            {/* Message counter */}
+            {!user.isPremium && remainingMessages <= 3 && (
+              <div
+                className="text-center"
+                style={{
+                  fontSize: '10px',
+                  color: 'rgba(255,255,255,0.25)',
+                  marginTop: '8px',
+                  marginBottom: '12px',
+                }}
+              >
+                {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
+              </div>
+            )}
+
+            {/* Mic button */}
+            <div
+              className="flex justify-center"
+              style={{
+                marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '12px',
+                marginBottom: '12px',
               }}
             >
-              {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
-            </div>
-          )}
-
-          {/* Mic button */}
-          <div
-            className="flex justify-center"
-            style={{
-              marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '20px',
-              marginBottom: '16px',
-            }}
-          >
-            <MicButton
-              state={state}
-              accentColor={accentColor}
-              onToggle={handleMicToggle}
-              isDisabled={hasReachedFreeLimit() && !user.isPremium}
-            />
-          </div>
-
-          {/* Text input */}
-          <div className="w-full" style={{ padding: '0 20px' }}>
-            <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={handleInputFocus}
-                onBlur={handleInputBlur}
-                placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
-                disabled={!isInputEnabled}
-                maxLength={500}
-                className="conversation-input"
-                style={{
-                  paddingRight: inputText.trim() ? '50px' : '20px',
-                  opacity: isInputEnabled ? 1 : 0.35,
-                  height: '48px',
-                }}
+              <MicButton
+                state={state}
+                accentColor={accentColor}
+                onToggle={handleMicToggle}
+                isDisabled={hasReachedFreeLimit() && !user.isPremium}
               />
-              {inputText.trim() && isInputEnabled && (
-                <button
-                  onClick={handleSend}
-                  aria-label="Send message"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
-                  style={{ color: accentColor }}
-                >
-                  <SendIcon />
-                </button>
-              )}
             </div>
-          </div>
 
-          {/* Error message */}
-          {speechError && (
-            <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-              {speechError}
+            {/* Text input */}
+            <div className="w-full" style={{ padding: '0 20px' }}>
+              <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
+                  placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
+                  disabled={!isInputEnabled}
+                  maxLength={500}
+                  enterKeyHint="send"
+                  className="conversation-input"
+                  style={{
+                    paddingRight: inputText.trim() ? '50px' : '20px',
+                    opacity: isInputEnabled ? 1 : 0.35,
+                    height: '48px',
+                  }}
+                />
+                {inputText.trim() && isInputEnabled && (
+                  <button
+                    onClick={handleSend}
+                    aria-label="Send message"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
+                    style={{ color: accentColor }}
+                  >
+                    <SendIcon />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Error message */}
+            {speechError && (
+              <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                {speechError}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Chevron indicator - always visible, tap to show/hide controls */}
+        {/* Chevron indicator — always visible, pinned below the input
+            section (or at the bottom when the input section collapses).
+            Bottom padding absorbs the home-indicator safe area. */}
         <button
           onClick={toggleControls}
-          className="shrink-0 flex justify-center items-center w-full py-3"
-          style={{ color: 'rgba(255, 255, 255, 0.2)' }}
+          className="shrink-0 flex justify-center items-center w-full"
+          style={{
+            color: 'rgba(255, 255, 255, 0.2)',
+            paddingTop: '8px',
+            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+          }}
           aria-label={controlsHidden ? 'Show input controls' : 'Hide input controls'}
         >
           <ChevronIndicator pointsUp={controlsHidden} />
