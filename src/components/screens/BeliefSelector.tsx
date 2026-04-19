@@ -116,18 +116,25 @@ const BeliefCard = memo(function BeliefCard({
           : '0 2px 14px rgba(0,0,0,0.35)',
       }}
     >
-      {/* Background image layer — rendered as its own div because the
-          global `button { background: none }` reset in index.css strips
-          backgroundImage when set on the <button> itself. */}
-      <div
+      {/* Background image — rendered as an <img> rather than a CSS
+          background so it bypasses the global `button { background: none }`
+          reset entirely, and so an image-load failure is visible in the
+          Network panel instead of silently rendering as a black card. */}
+      <img
+        src={bgImage}
+        alt=""
         aria-hidden="true"
+        loading="lazy"
+        decoding="async"
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `url(${bgImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          objectPosition: 'center',
+          display: 'block',
+          pointerEvents: 'none',
         }}
       />
 
