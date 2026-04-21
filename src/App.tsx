@@ -63,6 +63,14 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  // Tracks where the user navigated FROM before entering a legal page
+  // (Terms / Privacy / About). Without this, the back button on legal
+  // screens always dropped users onto the auth screen — which for an
+  // already-signed-in user looked identical to being signed out, even
+  // though the session was still valid. Updated only when navigating
+  // INTO a legal page from somewhere else; consecutive legal-to-legal
+  // navigation preserves the original source.
+  const [legalReturnScreen, setLegalReturnScreen] = useState<Screen>('auth');
   // True while we poll `/user-tier` after a Stripe checkout redirect.
   // Blocks the UI so a just-paid user cannot enter a conversation while
   // the webhook is still in flight and the server still reports 'free'.
@@ -330,10 +338,31 @@ function App() {
     transitionTo('auth');
   }, []);
 
-  // Handle navigation to static pages
-  const handleNavigate = (screen: Screen) => {
+  // Navigate INTO a legal page (Terms / Privacy / About) while remembering
+  // where the user came from. Tapping Back on the legal page will return
+  // to this source screen instead of hard-dropping to 'auth'. Called in
+  // place of `transitionTo` whenever a component passes a legal screen
+  // through its onNavigate callback. The explicit `currentScreen` capture
+  // happens before we kick off the transition, so the returnScreen
+  // snapshot is the user-visible source at click time.
+  const handleNavigateToLegal = useCallback((screen: Screen) => {
+    const legalPages: Screen[] = ['terms', 'privacy', 'about'];
+    if (!legalPages.includes(currentScreen)) {
+      setLegalReturnScreen(currentScreen);
+    }
     transitionTo(screen);
-  };
+  }, [currentScreen]);
+
+  // Back from a legal page — returns to whichever screen the user was on
+  // before they opened Terms/Privacy/About. Preserves the authenticated
+  // session: ConversationScreen stays mounted with its belief + user state
+  // intact because we only mutate currentScreen, never signOut(). If the
+  // user arrived via a direct URL visit to /terms or /privacy, the default
+  // 'auth' lands them on the auth screen (matches the previous behavior
+  // for that narrow case).
+  const handleBackFromLegal = useCallback(() => {
+    transitionTo(legalReturnScreen);
+  }, [legalReturnScreen]);
 
   // Show nothing until initialized to prevent flash
   if (!isInitialized) {
@@ -468,7 +497,7 @@ function App() {
               if (typeof window !== 'undefined') {
                 window.history.pushState({}, '', `/${screen}`);
               }
-              transitionTo(screen as Screen);
+              handleNavigateToLegal(screen as Screen);
             }}
           />
         )}
@@ -482,7 +511,7 @@ function App() {
           <AuthScreen
             onAuthSuccess={handleAuthSuccess}
             onBack={() => transitionTo('landing')}
-            onNavigate={(screen) => transitionTo(screen)}
+            onNavigate={(screen) => handleNavigateToLegal(screen as Screen)}
             language={language}
           />
         )}
@@ -515,7 +544,7 @@ function App() {
             onChangeBelief={handleChangeBelief}
             onSwitchBelief={handleSwitchBelief}
             onSignOut={handleSignOut}
-            onNavigate={(screen) => transitionTo(screen)}
+            onNavigate={(screen) => handleNavigateToLegal(screen as Screen)}
             language={language}
           />
         )}
@@ -551,15 +580,15 @@ function App() {
         )}
 
         {currentScreen === 'about' && (
-          <AboutScreen onBack={() => handleNavigate('auth')} />
+          <AboutScreen onBack={handleBackFromLegal} />
         )}
 
         {currentScreen === 'privacy' && (
-          <PrivacyScreen onBack={() => handleNavigate('auth')} />
+          <PrivacyScreen onBack={handleBackFromLegal} />
         )}
 
         {currentScreen === 'terms' && (
-          <TermsScreen onBack={() => handleNavigate('auth')} />
+          <TermsScreen onBack={handleBackFromLegal} />
         )}
         </Suspense>
       </div>
