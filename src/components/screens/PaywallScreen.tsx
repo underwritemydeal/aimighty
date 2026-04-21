@@ -210,11 +210,11 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
               features={[
                 { t: '20 conversations per day', ok: true },
                 { t: 'Everything in Believer', ok: true },
-                { t: 'Premium AI voice — warm, human, moving', ok: true },
-                { t: 'God remembers your past conversations', ok: true },
+                { t: 'Premium AI voice', ok: true },
+                { t: 'Conversations remembered', ok: true },
                 { t: 'Personalized Daily Blessing', ok: true },
                 { t: 'Word-by-word text sync with voice', ok: true },
-                { t: 'Cinematic full-screen experience', ok: true },
+                { t: 'Personal library — every article, prayer & reflection saved', ok: true },
               ]}
               ctaLabel={stripeReady ? 'Upgrade' : 'Coming Soon'}
               onCta={() => handleUpgrade('divine')}
