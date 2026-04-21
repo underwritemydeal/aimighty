@@ -1,8 +1,9 @@
 import { useState, useEffect, memo } from 'react';
-import { signUp, signIn, isValidEmail, getRememberMe, getLastEmail } from '../../services/auth';
+import { signUp, signIn, isValidEmail, getRememberMe, getLastEmail, hasSignedInBefore } from '../../services/auth';
 import { t, type LanguageCode } from '../../data/translations';
 import type { User } from '../../types';
 import { Wordmark } from '../Wordmark';
+import { colors } from '../../styles/designSystem';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -43,9 +44,12 @@ const EyeIcon = memo(function EyeIcon({ visible }: { visible: boolean }) {
 
 export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: AuthScreenProps) {
   const [isVisible, setIsVisible] = useState(false);
-  // Returning visitors default to the Sign In tab with their email pre-filled.
-  // First-time visitors still see Create Account.
-  const [mode, setMode] = useState<AuthMode>('login');
+  // First-time visitors default to Sign Up (Create Account) because they have
+  // no account yet. Returning visitors default to Sign In with their email
+  // pre-filled. hasSignedInBefore() reads aimighty_last_email, which is
+  // written on every successful signUp and signIn — so this flips to 'login'
+  // the moment an account is created on this device.
+  const [mode, setMode] = useState<AuthMode>(() => hasSignedInBefore() ? 'login' : 'signup');
   const [email, setEmail] = useState(() => getLastEmail());
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -262,7 +266,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-white/20 bg-transparent accent-[#d4b882]"
                   style={{
-                    accentColor: '#d4b882',
+                    accentColor: colors.gold,
                   }}
                 />
                 <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)' }}>
@@ -289,14 +293,15 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
               </div>
             )}
 
-            {/* Submit button */}
+            {/* Submit button — mt-8 (32px) gives breathing room from
+                Remember Me so the primary CTA doesn't crowd the checkbox. */}
             <button
               type="submit"
               disabled={isLoading || !isFormValid}
-              className="w-full mt-6 transition-all duration-200"
+              className="w-full mt-8 transition-all duration-200"
               style={{
                 height: '52px',
-                background: '#d4b882',
+                background: colors.gold,
                 color: '#0a0a0f',
                 borderRadius: '12px',
                 fontFamily: 'var(--font-display)',
@@ -338,15 +343,17 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
             <button
               type="button"
               onClick={switchMode}
-              style={{ color: '#d4b882', fontWeight: 500 }}
+              style={{ color: colors.gold, fontWeight: 500 }}
             >
               {mode === 'signup' ? 'Sign In' : 'Create Account'}
             </button>
           </p>
 
-          {/* Terms and Privacy */}
+          {/* Terms and Privacy — mt-8 anchors the legal disclosure toward the
+              bottom of the card, with clear breathing room between it and
+              the "Create Account / Sign In" switch link above. */}
           <p
-            className="text-center mt-6"
+            className="text-center mt-8"
             style={{
               fontSize: '0.7rem',
               color: 'rgba(255, 255, 255, 0.35)',
