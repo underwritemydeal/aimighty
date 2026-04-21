@@ -32,9 +32,11 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
       role="main"
       aria-labelledby="privacy-heading"
     >
-      {/* AImighty logo — top center */}
+      {/* AImighty logo — fixed top-center. top-6 (24px) gives a touch
+          more breathing room above the wordmark on notched devices than
+          the old top-5. */}
       <div
-        className="fixed top-5 left-1/2 z-20"
+        className="fixed top-6 left-1/2 z-20"
         style={{ transform: 'translateX(-50%)' }}
       >
         <Wordmark size="sm" style={{ fontSize: '1.1rem' }} />
@@ -61,7 +63,7 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
       {/* Content */}
       <div className="relative z-10 overflow-y-auto" style={{ minHeight: '100dvh' }}>
         <div
-          className="max-w-[800px] mx-auto px-6 py-20"
+          className="max-w-[800px] mx-auto px-6 pt-28 pb-20"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
@@ -111,7 +113,7 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
             }}
           >
             <p>
-              AImighty LLC ("AImighty," "we," "us," or "our") is committed to protecting the privacy of our users. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use the AImighty website at aimightyme.com and the AImighty progressive web application (collectively, the "Service").
+              Robby Hess, doing business as AImighty ("AImighty," "we," "us," or "our") is committed to protecting the privacy of our users. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use the AImighty website at aimightyme.com and the AImighty progressive web application (collectively, the "Service").
             </p>
             <p>
               Please read this Privacy Policy carefully. By accessing or using the Service, you acknowledge that you have read, understood, and agree to be bound by this Privacy Policy. If you do not agree with our policies and practices, do not use the Service.
@@ -593,7 +595,7 @@ export function PrivacyScreen({ onBack }: PrivacyScreenProps) {
               </h2>
               <p>If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact us:</p>
               <div className="mt-4">
-                <p><strong>AImighty LLC</strong></p>
+                <p><strong>Robby Hess, doing business as AImighty</strong></p>
                 <p>Email: <a href="mailto:privacy@aimightyme.com" style={{ color: '#d4b882' }}>privacy@aimightyme.com</a></p>
                 <p>General Support: <a href="mailto:support@aimightyme.com" style={{ color: '#d4b882' }}>support@aimightyme.com</a></p>
                 <p>Legal Inquiries: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4b882' }}>legal@aimightyme.com</a></p>

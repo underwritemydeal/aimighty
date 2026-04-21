@@ -32,8 +32,11 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
       role="main"
       aria-labelledby="terms-heading"
     >
+      {/* AImighty logo — fixed top-center. top-6 (24px) gives a touch
+          more breathing room above the wordmark on notched devices than
+          the old top-5. */}
       <div
-        className="fixed top-5 left-1/2 z-20"
+        className="fixed top-6 left-1/2 z-20"
         style={{ transform: 'translateX(-50%)' }}
       >
         <Wordmark size="sm" style={{ fontSize: '1.1rem' }} />
@@ -60,7 +63,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
       {/* Content */}
       <div className="relative z-10 overflow-y-auto" style={{ minHeight: '100dvh' }}>
         <div
-          className="max-w-[800px] mx-auto px-6 py-20"
+          className="max-w-[800px] mx-auto px-6 pt-28 pb-20"
           style={{
             opacity: isVisible ? 1 : 0,
             transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
@@ -110,7 +113,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
             }}
           >
             <p>
-              Welcome to AImighty ("we," "us," "our," or the "Company"), operated by AImighty LLC. These Terms of Service ("Terms") govern your access to and use of the AImighty website at aimightyme.com, the AImighty progressive web application, and all related services (collectively, the "Service").
+              Welcome to AImighty ("we," "us," "our," or the "Company"), operated by Robby Hess, doing business as AImighty. These Terms of Service ("Terms") govern your access to and use of the AImighty website at aimightyme.com, the AImighty progressive web application, and all related services (collectively, the "Service").
             </p>
             <p>
               By creating an account, accessing, or using the Service, you agree to be bound by these Terms. If you do not agree to these Terms, do not use the Service.
@@ -346,7 +349,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
                 6.1 Our Intellectual Property
               </h3>
               <p>
-                The Service, including but not limited to the software, design, text, graphics, images, logos, icons, audio, and the AImighty brand, is owned by AImighty LLC and is protected by copyright, trademark, and other intellectual property laws. "AImighty" and the AImighty logo are trademarks of AImighty LLC.
+                The Service, including but not limited to the software, design, text, graphics, images, logos, icons, audio, and the AImighty brand, is owned by Robby Hess, doing business as AImighty and is protected by copyright, trademark, and other intellectual property laws. "AImighty" and the AImighty logo are trademarks of Robby Hess, doing business as AImighty.
               </p>
 
               <h3 className="mt-6 mb-3" style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)' }}>
@@ -416,7 +419,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
                 8.3 Limitation of Liability
               </h3>
               <p style={{ textTransform: 'uppercase', fontSize: '0.9rem' }}>
-                TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL AIMIGHTY LLC, ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, AFFILIATES, OR LICENSORS BE LIABLE FOR:
+                TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ROBBY HESS (DOING BUSINESS AS AIMIGHTY), ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, AFFILIATES, OR LICENSORS BE LIABLE FOR:
               </p>
               <ul className="list-disc list-inside space-y-2 mt-4 ml-4" style={{ textTransform: 'uppercase', fontSize: '0.9rem' }}>
                 <li>ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, PUNITIVE, OR EXEMPLARY DAMAGES</li>
@@ -445,7 +448,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
                 9. INDEMNIFICATION
               </h2>
               <p>
-                You agree to indemnify, defend, and hold harmless AImighty LLC, its officers, directors, employees, agents, affiliates, and licensors from and against any and all claims, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising from:
+                You agree to indemnify, defend, and hold harmless Robby Hess, doing business as AImighty, its officers, directors, employees, agents, affiliates, and licensors from and against any and all claims, damages, losses, costs, and expenses (including reasonable attorneys' fees) arising from:
               </p>
               <ul className="list-disc list-inside space-y-2 mt-4 ml-4">
                 <li>Your use of the Service</li>
@@ -678,7 +681,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </h2>
               <p>If you have questions about these Terms, please contact us:</p>
               <div className="mt-4">
-                <p><strong>AImighty LLC</strong></p>
+                <p><strong>Robby Hess, doing business as AImighty</strong></p>
                 <p>Email: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4b882' }}>legal@aimightyme.com</a></p>
                 <p>Website: <a href="https://aimightyme.com" style={{ color: '#d4b882' }}>https://aimightyme.com</a></p>
               </div>
