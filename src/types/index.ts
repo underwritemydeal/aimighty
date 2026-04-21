@@ -8,7 +8,6 @@ export interface BeliefSystem {
   particleColor: string;
   backgroundGradient: [string, string];
   category?: 'religious' | 'spiritual' | 'philosophical';
-  selfDescription?: string;
 }
 
 export type Tier = 'free' | 'believer' | 'divine';

@@ -20,6 +20,7 @@ import { type LanguageCode } from '../../data/translations';
 import { getThemeForBelief } from '../../config/beliefThemes';
 import { getDescriptorForBelief } from '../../config/beliefDescriptors';
 import { normalizeBeliefId } from '../../config/beliefSystems';
+import { colors } from '../../styles/designSystem';
 import type { BeliefSystem } from '../../types';
 
 interface BeliefSelectorProps {
@@ -415,7 +416,7 @@ export function BeliefSelector({
                 fontWeight: 300,
                 fontStyle: 'italic',
                 fontSize: 'clamp(1.9rem, 6vw, 2.75rem)',
-                color: 'rgba(255, 248, 240, 0.95)',
+                color: colors.gold,
                 letterSpacing: '-0.01em',
                 lineHeight: 1.15,
                 margin: 0,

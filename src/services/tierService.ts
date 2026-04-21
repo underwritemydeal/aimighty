@@ -11,6 +11,7 @@ const DAILY_KEY = 'aimighty_daily';
 const STREAK_KEY = 'aimighty_streak';
 const MEMORY_PREFIX = 'aimighty_memory_';
 const LAST_BELIEF_KEY = 'aimighty_last_belief';
+const BELIEF_SELECTED_KEY = 'aimighty_belief_selected';
 const CHARACTER_PREFIX = 'aimighty_character_';
 
 // ───── Last belief memory ─────
@@ -21,9 +22,19 @@ export function getLastBelief(): string | null {
 }
 export function setLastBelief(beliefId: string): void {
   safeSetItem(LAST_BELIEF_KEY, beliefId);
+  // Belt-and-suspenders boolean flag: once a user has ever picked a belief,
+  // the onboarding picker is skipped on future sign-ins. getLastBelief()
+  // already drives that routing, but keeping this flag lets future code
+  // ask the simple "has onboarding happened" question without caring which
+  // belief was picked.
+  safeSetItem(BELIEF_SELECTED_KEY, 'true');
 }
 export function clearLastBelief(): void {
   safeRemoveItem(LAST_BELIEF_KEY);
+}
+
+export function hasSelectedBelief(): boolean {
+  return safeGetItem(BELIEF_SELECTED_KEY) === 'true';
 }
 
 // ───── Character memory (per belief) ─────

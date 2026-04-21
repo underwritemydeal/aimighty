@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { beliefSystems } from '../../data/beliefSystems';
+import { getDescriptorForBelief } from '../../config/beliefDescriptors';
+import { normalizeBeliefId } from '../../config/beliefSystems';
 import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designSystem';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import { Wordmark, type WordmarkSize } from '../Wordmark';
@@ -552,20 +554,18 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
                 >
                   {b.name}
                 </div>
-                {b.selfDescription && (
-                  <div
-                    style={{
-                      fontFamily: fonts.body,
-                      fontWeight: fontWeights.light,
-                      fontStyle: 'italic',
-                      fontSize: '0.8rem',
-                      color: 'rgba(255,248,240,0.7)',
-                      lineHeight: 1.3,
-                    }}
-                  >
-                    {b.selfDescription}
-                  </div>
-                )}
+                <div
+                  style={{
+                    fontFamily: fonts.display,
+                    fontWeight: fontWeights.regular,
+                    fontStyle: 'italic',
+                    fontSize: '0.88rem',
+                    color: 'rgba(255,248,240,0.82)',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {getDescriptorForBelief(normalizeBeliefId(b.id))}
+                </div>
               </div>
             </button>
           ))}
