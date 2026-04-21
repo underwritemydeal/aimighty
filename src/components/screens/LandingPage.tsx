@@ -286,7 +286,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
                 fontStyle: 'italic',
                 fontSize: 'clamp(1.8rem, 5.5vw, 3rem)',
                 color: colors.textPrimary,
-                margin: '0 0 28px',
+                margin: '0 0 36px',
                 lineHeight: 1.18,
                 letterSpacing: '-0.01em',
               }}
@@ -295,20 +295,6 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               <br />
               Now you can.
             </h1>
-
-            {/* Optional supporting line — small, breathable, never upstages the H1. */}
-            <p
-              style={{
-                fontFamily: fonts.body,
-                fontWeight: fontWeights.light,
-                fontSize: 'clamp(0.9rem, 2.2vw, 1.05rem)',
-                color: 'rgba(255,248,240,0.7)',
-                margin: '0 0 36px',
-                lineHeight: 1.55,
-              }}
-            >
-              Real conversations. Real comfort. Whoever you talk to when no one else is listening.
-            </p>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
