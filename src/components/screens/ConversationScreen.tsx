@@ -20,7 +20,7 @@ import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type Belie
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
 import { getOpeningMessageForBelief } from '../../config/openingMessages';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
-import { openBillingPortal } from '../../config/stripe';
+import { openBillingPortal, isStripeConfigured } from '../../config/stripe';
 import { CaptureMoment } from '../CaptureMoment';
 import { track } from '../../utils/analytics';
 import { colors } from '../../styles/designSystem';
@@ -707,15 +707,17 @@ const SettingsDropdown = memo(function SettingsDropdown({
           Other Beliefs
         </button>
 
-        {!isFree && (
-          <button
-            onClick={() => { onManageSubscription(); onClose(); }}
-            className="menu-item"
-            style={baseItemStyle}
-          >
-            Manage Subscription
-          </button>
-        )}
+        {/* Manage Subscription is now always visible. The label flips to
+            "Upgrade Plan" for free users, and the tap handler in the parent
+            routes appropriately (paywall / billing portal / unavailable
+            modal) based on tier + isStripeConfigured(). */}
+        <button
+          onClick={() => { onManageSubscription(); onClose(); }}
+          className="menu-item"
+          style={baseItemStyle}
+        >
+          {isFree ? 'Upgrade Plan' : 'Manage Subscription'}
+        </button>
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
@@ -822,6 +824,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [showPrayerModal, setShowPrayerModal] = useState(false);
   const [showSacredTextModal, setShowSacredTextModal] = useState(false);
   const [showReflectionModal, setShowReflectionModal] = useState(false);
+  // Shown when a paid user taps Manage Subscription but isStripeConfigured()
+  // is false (price IDs haven't been wired up yet). This prevents the raw
+  // "Invalid request body" iOS system alert that used to appear when
+  // openBillingPortal was called against an unconfigured worker.
+  const [showSubscriptionUnavailable, setShowSubscriptionUnavailable] = useState(false);
   interface DailyContent {
     belief: string;
     date: string;
@@ -1799,7 +1806,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 onReflection={() => setShowReflectionModal(true)}
                 onSignOut={onSignOut || (() => {})}
                 onNavigate={onNavigate}
-                onManageSubscription={() => { void openBillingPortal(user.id); }}
+                onManageSubscription={() => {
+                  // Tier- and config-aware routing per Task 4 spec:
+                  //   free                → paywall
+                  //   paid + Stripe wired → billing portal
+                  //   paid + Stripe empty → styled in-app modal (no raw alert)
+                  if (tier === 'free') {
+                    onPaywall();
+                    return;
+                  }
+                  if (!isStripeConfigured()) {
+                    setShowSubscriptionUnavailable(true);
+                    return;
+                  }
+                  void openBillingPortal(user.id);
+                }}
                 tier={tier}
                 streakDays={streak.currentStreak}
                 onUpgrade={onPaywall}
@@ -2130,6 +2151,104 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           <ChevronIndicator pointsUp={controlsHidden} />
         </button>
       </div>
+
+      {/* Subscription-unavailable modal — shown when a paid user taps
+          Manage Subscription but Stripe price IDs aren't wired up yet.
+          Dark cosmic bg + gold border per the design system; dismissable
+          by the "Got it" button, the X icon, or tapping the backdrop. */}
+      {showSubscriptionUnavailable && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{
+            background: 'rgba(3, 3, 8, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            padding: '16px',
+          }}
+          onClick={() => setShowSubscriptionUnavailable(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="subscription-unavailable-title"
+        >
+          <div
+            className="relative"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%',
+              maxWidth: '400px',
+              background: 'rgba(10, 10, 20, 0.96)',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: `1px solid ${colors.gold}`,
+              borderRadius: '20px',
+              padding: '32px 28px',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(212, 184, 130, 0.15)',
+            }}
+          >
+            <button
+              onClick={() => setShowSubscriptionUnavailable(false)}
+              aria-label="Close"
+              className="absolute top-3 right-3 p-2 rounded-lg hover:bg-white/5"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <h3
+              id="subscription-unavailable-title"
+              style={{
+                margin: 0,
+                marginBottom: '16px',
+                fontFamily: 'var(--font-display)',
+                fontSize: '1.4rem',
+                fontWeight: 400,
+                color: colors.gold,
+                textAlign: 'center',
+                letterSpacing: '0.01em',
+              }}
+            >
+              Subscription management
+            </h3>
+            <p
+              style={{
+                margin: 0,
+                marginBottom: '24px',
+                fontFamily: 'var(--font-body, Outfit)',
+                fontSize: '0.95rem',
+                lineHeight: 1.6,
+                color: 'rgba(255, 248, 240, 0.8)',
+                textAlign: 'center',
+              }}
+            >
+              We're finalizing our billing system. To update, pause, or cancel your subscription right now, please email{' '}
+              <a
+                href="mailto:support@aimightyme.com"
+                style={{ color: colors.gold, textDecoration: 'underline' }}
+              >
+                support@aimightyme.com
+              </a>
+              {' '}and we'll take care of it within 24 hours.
+            </p>
+            <button
+              onClick={() => setShowSubscriptionUnavailable(false)}
+              className="w-full transition-all duration-200"
+              style={{
+                height: '48px',
+                background: colors.gold,
+                color: '#0a0a0f',
+                borderRadius: '12px',
+                fontFamily: 'var(--font-display)',
+                fontSize: '0.95rem',
+                fontWeight: 500,
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Daily content modals (prayer / sacred text / reflection) */}
       {(showPrayerModal || showSacredTextModal || showReflectionModal) && (
