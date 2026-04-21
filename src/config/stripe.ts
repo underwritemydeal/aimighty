@@ -27,10 +27,11 @@ export function isStripeConfigured(): boolean {
 const WORKER_URL = 'https://aimighty-api.robby-hess.workers.dev';
 
 import { fetchWithTimeout } from '../services/fetchWithTimeout';
+import { showToast } from '../services/toast';
 
 export async function startCheckout(priceId: string, userId: string, email: string): Promise<void> {
   if (!priceId) {
-    alert('Payment coming soon.');
+    showToast('Payment options are coming soon. Sign up for the newsletter in the meantime.', { type: 'info' });
     return;
   }
   try {
@@ -41,18 +42,18 @@ export async function startCheckout(priceId: string, userId: string, email: stri
       body: JSON.stringify({ priceId, userId, email }),
     }, 10000);
     if (!resp.ok) {
-      alert('Unable to start checkout. Please try again later.');
+      showToast('We could not start checkout. Please try again in a moment.', { type: 'error' });
       return;
     }
     const data = await resp.json();
     if (data.checkoutUrl) {
       window.location.href = data.checkoutUrl;
     } else {
-      alert('Unable to start checkout.');
+      showToast('We could not start checkout. Please try again in a moment.', { type: 'error' });
     }
   } catch (e) {
     console.error('[Stripe] checkout failed:', e);
-    alert('Unable to start checkout.');
+    showToast('The connection is briefly strained. One more breath, then try again.', { type: 'error' });
   }
 }
 
@@ -102,7 +103,7 @@ export async function pollUserTierUntilPaid(
  */
 export async function openBillingPortal(userId: string): Promise<void> {
   if (!userId) {
-    alert('Please sign in to manage your subscription.');
+    showToast('Please sign in to manage your subscription.', { type: 'error' });
     return;
   }
   try {
@@ -113,24 +114,28 @@ export async function openBillingPortal(userId: string): Promise<void> {
       body: JSON.stringify({ userId }),
     }, 10000);
     if (!resp.ok) {
-      const data = await resp.json().catch(() => ({}));
       if (resp.status === 404) {
-        alert(
-          'We could not find an active subscription on file. If you believe this is an error, email support@aimightyme.com.'
+        showToast(
+          'We could not find an active subscription on file. If you believe this is an error, email support@aimightyme.com.',
+          { type: 'error', duration: 8000 },
         );
         return;
       }
-      alert(data.error || 'Unable to open subscription management. Please try again.');
+      const data = await resp.json().catch(() => ({} as { error?: string }));
+      showToast(
+        data.error || 'Something went sideways on our end. Please try again.',
+        { type: 'error' },
+      );
       return;
     }
     const data = await resp.json();
     if (data.portalUrl) {
       window.location.href = data.portalUrl;
     } else {
-      alert('Unable to open subscription management.');
+      showToast('Something went sideways on our end. Please try again.', { type: 'error' });
     }
   } catch (e) {
     console.error('[Stripe] portal failed:', e);
-    alert('Unable to open subscription management.');
+    showToast('The connection is briefly strained. One more breath, then try again.', { type: 'error' });
   }
 }

@@ -3,6 +3,7 @@ import { t, type LanguageCode } from '../../data/translations';
 import { STRIPE_PRICE_IDS, startCheckout, isStripeConfigured } from '../../config/stripe';
 import { getCurrentUser } from '../../services/auth';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
+import { showToast } from '../../services/toast';
 import { colors } from '../../styles/designSystem';
 
 interface PaywallScreenProps {
@@ -32,7 +33,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
 
   const handleUpgrade = (tier: 'believer' | 'divine') => {
     if (!stripeReady) {
-      alert('Payment coming soon. Sign up for the free newsletter in the meantime.');
+      showToast('Payment options are coming soon. Sign up for the free newsletter in the meantime.', { type: 'info' });
       return;
     }
     const user = getCurrentUser();

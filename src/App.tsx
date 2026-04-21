@@ -20,6 +20,7 @@ import { preloadCaptureFonts } from './utils/captureImage';
 import { clearBeliefConversation } from './utils/resetConversation';
 import { track } from './utils/analytics';
 import { OtherBeliefsConfirm } from './components/OtherBeliefsConfirm';
+import { ToastContainer } from './components/ToastContainer';
 import { defaultLanguage, type LanguageCode, isRTL } from './data/translations';
 import { beliefSystems } from './data/beliefSystems';
 import type { Screen, BeliefSystem, User } from './types';
@@ -592,6 +593,11 @@ function App() {
         )}
         </Suspense>
       </div>
+
+      {/* Global toast stack — replaces every window.alert() in the app
+          with a dark-cosmic-themed in-app notice. Mounted once at the
+          root so it survives route transitions. */}
+      <ToastContainer />
     </div>
   );
 }
