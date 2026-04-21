@@ -498,7 +498,7 @@ export function BeliefSelector({
             borderRadius: '999px',
             border: 'none',
             minWidth: '240px',
-            background: continueEnabled ? '#d4b882' : 'rgba(212, 184, 130, 0.18)',
+            background: continueEnabled ? colors.gold : 'rgba(212, 184, 130, 0.18)',
             color: continueEnabled ? '#0a0a0f' : 'rgba(255,248,240,0.4)',
             cursor: continueEnabled ? 'pointer' : 'not-allowed',
             boxShadow: continueEnabled

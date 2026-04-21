@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { Wordmark } from '../Wordmark';
+import { colors } from '../../styles/designSystem';
 
 interface TermsScreenProps {
   onBack: () => void;
@@ -77,7 +78,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-3xl)',
               fontWeight: 300,
-              color: '#d4b882',
+              color: colors.gold,
             }}
           >
             Terms of Service
@@ -123,7 +124,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 1 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 1. NATURE OF THE SERVICE — IMPORTANT DISCLAIMER
               </h2>
 
@@ -186,7 +187,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 2 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 2. ELIGIBILITY
               </h2>
 
@@ -216,7 +217,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 3 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 3. ACCOUNTS AND REGISTRATION
               </h2>
 
@@ -246,7 +247,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 4 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 4. SUBSCRIPTION PLANS AND BILLING
               </h2>
 
@@ -299,7 +300,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 5 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 5. ACCEPTABLE USE
               </h2>
 
@@ -341,7 +342,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 6 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 6. INTELLECTUAL PROPERTY
               </h2>
 
@@ -378,7 +379,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 7 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 7. PRIVACY
               </h2>
               <p>
@@ -390,7 +391,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 8 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 8. DISCLAIMERS AND LIMITATION OF LIABILITY
               </h2>
 
@@ -444,7 +445,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 9 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 9. INDEMNIFICATION
               </h2>
               <p>
@@ -464,7 +465,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 10 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 10. DISPUTE RESOLUTION
               </h2>
 
@@ -508,7 +509,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 11 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 11. SAFETY AND CRISIS RESOURCES
               </h2>
 
@@ -549,7 +550,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 12 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 12. AI DISCLOSURE AND TRANSPARENCY
               </h2>
 
@@ -590,7 +591,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 13 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 13. TERMINATION
               </h2>
 
@@ -620,7 +621,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 14 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 14. MODIFICATIONS TO TERMS
               </h2>
               <p>
@@ -632,7 +633,7 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 15 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 15. GENERAL PROVISIONS
               </h2>
 
@@ -676,14 +677,14 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
 
             {/* Section 16 */}
             <section>
-              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: '#d4b882' }}>
+              <h2 className="mt-8 mb-4" style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 400, color: colors.gold }}>
                 16. CONTACT INFORMATION
               </h2>
               <p>If you have questions about these Terms, please contact us:</p>
               <div className="mt-4">
                 <p><strong>Robby Hess, doing business as AImighty</strong></p>
-                <p>Email: <a href="mailto:legal@aimightyme.com" style={{ color: '#d4b882' }}>legal@aimightyme.com</a></p>
-                <p>Website: <a href="https://aimightyme.com" style={{ color: '#d4b882' }}>https://aimightyme.com</a></p>
+                <p>Email: <a href="mailto:legal@aimightyme.com" style={{ color: colors.gold }}>legal@aimightyme.com</a></p>
+                <p>Website: <a href="https://aimightyme.com" style={{ color: colors.gold }}>https://aimightyme.com</a></p>
               </div>
             </section>
 

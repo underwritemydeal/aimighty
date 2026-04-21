@@ -3,6 +3,7 @@ import { t, type LanguageCode } from '../../data/translations';
 import { STRIPE_PRICE_IDS, startCheckout, isStripeConfigured } from '../../config/stripe';
 import { getCurrentUser } from '../../services/auth';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
+import { colors } from '../../styles/designSystem';
 
 interface PaywallScreenProps {
   onBack: () => void;
@@ -153,7 +154,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                   style={{
                     padding: '8px 20px',
                     borderRadius: '999px',
-                    background: billingCycle === cycle ? '#d4b882' : 'transparent',
+                    background: billingCycle === cycle ? colors.gold : 'transparent',
                     color: billingCycle === cycle ? '#0a0a0f' : 'rgba(255,255,255,0.7)',
                     fontFamily: 'var(--font-body, Outfit)',
                     fontSize: '0.85rem',
@@ -328,7 +329,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                 style={{
                   padding: '12px 24px',
                   borderRadius: '999px',
-                  background: '#d4b882',
+                  background: colors.gold,
                   color: '#0a0a0f',
                   fontSize: '0.85rem',
                   fontWeight: 500,
@@ -383,7 +384,7 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
       style={{
         padding: '28px 24px',
         opacity: grayed ? 0.6 : 1,
-        border: highlight ? '1px solid #d4b882' : '1px solid rgba(255,255,255,0.08)',
+        border: highlight ? `1px solid ${colors.gold}` : '1px solid rgba(255,255,255,0.08)',
         background: highlight
           ? 'linear-gradient(160deg, rgba(212,184,130,0.12), rgba(3,3,8,0.85))'
           : 'rgba(3,3,8,0.7)',
@@ -396,7 +397,7 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
             top: '-10px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: '#d4b882',
+            background: colors.gold,
             color: '#0a0a0f',
             fontFamily: 'var(--font-body, Outfit)',
             fontSize: '0.65rem',
@@ -422,13 +423,13 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
         {name}
       </h3>
       <div className="mb-4">
-        <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 600, color: '#d4b882' }}>{price}</span>
+        <span style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 600, color: colors.gold }}>{price}</span>
         <span style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '0.85rem', color: 'rgba(255,255,255,0.5)', marginLeft: '6px' }}>{priceNote}</span>
       </div>
       <ul className="mb-6" style={{ listStyle: 'none', padding: 0 }}>
         {features.map((f, i) => (
           <li key={i} className="flex items-start gap-2" style={{ marginBottom: '10px' }}>
-            <span style={{ color: f.ok ? '#d4b882' : 'rgba(255,255,255,0.35)', fontSize: '0.9rem', lineHeight: 1.3 }}>
+            <span style={{ color: f.ok ? colors.gold : 'rgba(255,255,255,0.35)', fontSize: '0.9rem', lineHeight: 1.3 }}>
               {f.ok ? '✓' : '✕'}
             </span>
             <span style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '0.82rem', color: f.ok ? 'rgba(255,255,255,0.78)' : 'rgba(255,255,255,0.38)', lineHeight: 1.4 }}>
@@ -442,7 +443,7 @@ function TierCard({ name, price, priceNote, features, ctaLabel, onCta, highlight
         className="w-full rounded-xl transition-opacity"
         style={{
           height: '44px',
-          background: highlight ? '#d4b882' : 'rgba(255,255,255,0.06)',
+          background: highlight ? colors.gold : 'rgba(255,255,255,0.06)',
           color: highlight ? '#0a0a0f' : 'rgba(255,255,255,0.85)',
           border: highlight ? 'none' : '1px solid rgba(255,255,255,0.12)',
           fontFamily: 'var(--font-body, Outfit)',
