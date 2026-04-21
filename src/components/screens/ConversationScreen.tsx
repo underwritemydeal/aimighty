@@ -9,7 +9,6 @@ import {
   incrementDailyCount,
   bumpStreak,
   getStreak,
-  formatStreak,
   streakMilestone,
   saveMemory,
   formatMemoryContext,
@@ -24,6 +23,7 @@ import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import { openBillingPortal } from '../../config/stripe';
 import { CaptureMoment } from '../CaptureMoment';
 import { track } from '../../utils/analytics';
+import { colors } from '../../styles/designSystem';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -113,11 +113,14 @@ const MenuIcon = memo(function MenuIcon() {
     </svg>
   );
 });
-// Gold flame SVG for the streak row — replaces the 🔥 emoji
-const FlameIcon = memo(function FlameIcon() {
+// Padlock icon rendered next to menu items that are locked for the
+// current tier. Keeps the dropdown's affordance explicit rather than
+// relying on opacity alone.
+const LockIcon = memo(function LockIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d4b882" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 });
@@ -566,7 +569,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   isOpen,
   onClose,
   onSwitchBelief,
-  onDailyWisdom,
+  onDailyBeliefStudy,
   onDailyPrayer,
   onSacredText,
   onReflection,
@@ -574,13 +577,13 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onNavigate,
   onManageSubscription,
   tier,
-  streakText,
+  streakDays,
   onUpgrade,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSwitchBelief: () => void;
-  onDailyWisdom: () => void;
+  onDailyBeliefStudy: () => void;
   onDailyPrayer: () => void;
   onSacredText: () => void;
   onReflection: () => void;
@@ -588,7 +591,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onNavigate?: (screen: 'terms' | 'privacy') => void;
   onManageSubscription: () => void;
   tier: 'free' | 'believer' | 'divine';
-  streakText: string;
+  streakDays: number;
   onUpgrade: () => void;
 }) {
   if (!isOpen) return null;
@@ -610,15 +613,34 @@ const SettingsDropdown = memo(function SettingsDropdown({
     transition: 'background 0.15s ease, border-color 0.15s ease',
   };
 
-  const item = (label: string, action: () => void, locked = false) => (
-    <button
-      onClick={() => { if (locked || isFree) { onUpgrade(); onClose(); return; } action(); onClose(); }}
-      className="menu-item"
-      style={{ ...baseItemStyle, opacity: locked || isFree ? 0.45 : 1 }}
-    >
-      {label}
-    </button>
-  );
+  // Locked items show at 60% opacity with a padlock SVG on the right.
+  // Tap routes to the paywall (onUpgrade) instead of the item's action.
+  // `locked` is derived from the tier gate: anything requiring a paid tier
+  // is locked for free users.
+  const item = (label: string, action: () => void, locked = false) => {
+    const isLocked = locked || isFree;
+    return (
+      <button
+        onClick={() => { if (isLocked) { onUpgrade(); onClose(); return; } action(); onClose(); }}
+        className="menu-item"
+        style={{
+          ...baseItemStyle,
+          opacity: isLocked ? 0.6 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+        }}
+      >
+        <span>{label}</span>
+        {isLocked && (
+          <span style={{ color: 'rgba(255,255,255,0.65)', display: 'inline-flex', alignItems: 'center' }}>
+            <LockIcon />
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <>
@@ -637,25 +659,45 @@ const SettingsDropdown = memo(function SettingsDropdown({
           boxShadow: '0 8px 40px rgba(0, 0, 0, 0.6)',
         }}
       >
-        {item('Daily Wisdom', onDailyWisdom)}
+        {/* Daily content — order per Task 3 spec:
+            Daily Prayer → Sacred Text → Reflection → Daily Belief Study */}
         {item('Daily Prayer', onDailyPrayer)}
         {item('Sacred Text', onSacredText)}
         {item('Reflection', onReflection)}
+        {item('Daily Belief Study', onDailyBeliefStudy)}
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
+        {/* Streak row — gold-bordered "Day N" pill, replaces the 🔥 emoji
+            that used to come through from formatStreak(). Read-only row,
+            not tappable. */}
         <div
-          className="flex items-center gap-2"
+          className="flex items-center justify-between"
           style={{
             ...baseItemStyle,
             padding: '12px 20px',
-            opacity: 0.9,
             cursor: 'default',
           }}
         >
-          <FlameIcon />
-          <span>{streakText}</span>
+          <span>Streak</span>
+          <span
+            style={{
+              display: 'inline-block',
+              border: `1px solid ${colors.gold}`,
+              borderRadius: '999px',
+              padding: '3px 10px',
+              fontSize: '12px',
+              fontWeight: 500,
+              color: colors.gold,
+              lineHeight: 1,
+              letterSpacing: '0.02em',
+            }}
+          >
+            Day {streakDays}
+          </span>
         </div>
+
+        <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
         <button
           onClick={() => { onSwitchBelief(); onClose(); }}
@@ -1751,7 +1793,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 isOpen={showSettings}
                 onClose={() => setShowSettings(false)}
                 onSwitchBelief={() => { onSwitchBelief?.(); }}
-                onDailyWisdom={() => setShowDailyWisdom(true)}
+                onDailyBeliefStudy={() => setShowDailyWisdom(true)}
                 onDailyPrayer={() => setShowPrayerModal(true)}
                 onSacredText={() => setShowSacredTextModal(true)}
                 onReflection={() => setShowReflectionModal(true)}
@@ -1759,7 +1801,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 onNavigate={onNavigate}
                 onManageSubscription={() => { void openBillingPortal(user.id); }}
                 tier={tier}
-                streakText={formatStreak(streak)}
+                streakDays={streak.currentStreak}
                 onUpgrade={onPaywall}
               />
             </div>
