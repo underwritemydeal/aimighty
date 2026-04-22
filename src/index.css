@@ -513,13 +513,21 @@ button:disabled {
   -webkit-backdrop-filter: blur(10px);
   border: none;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  height: 48px;
-  padding: 0 20px;
+  border-radius: 20px;
+  /* Auto-grow textarea: 1 line at 48px, grows to ~4 lines (~120px),
+     then internal scroll. font-size 16px is REQUIRED on iOS to prevent
+     the browser from auto-zooming into the field on focus. */
+  min-height: 48px;
+  max-height: 120px;
+  padding: 12px 20px;
   color: rgba(255, 255, 255, 0.9);
   font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.4;
   font-style: italic;
   width: 100%;
+  resize: none;
+  overflow-y: auto;
 }
 
 .conversation-input::placeholder {

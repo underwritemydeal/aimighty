@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef, memo, useCallback, type FocusEvent } from 'react';
+
+// localStorage flag: once the user has granted mic permission on this
+// device, we skip the pre-flight getUserMedia() probe on subsequent mic
+// taps. The cached SpeechRecognition instance in speechInput.ts already
+// avoids per-instance re-prompts; this flag additionally avoids the
+// permission-probe round-trip entirely after first grant.
+const MIC_GRANTED_KEY = 'aimighty_mic_granted';
 import { sendMessage, summarizeConversation, type Message } from '../../services/claudeApi';
 import { speakWithOpenAI, stop as stopSpeaking, initAudio, setVoiceEnabled, isVoiceEnabled, unlockMobileAudio, replayAudio, enqueueSentence, clearSentenceQueue, prewarmTts, resumeAudio, isAudioPaused } from '../../services/openaiTTS';
-import { startListening, stopListening, isSupported as isSpeechSupported } from '../../services/speechInput';
+import { startListening, stopListening, isSupported as isSpeechSupported, requestMicrophonePermission } from '../../services/speechInput';
+import { showToast } from '../../services/toast';
 import { incrementMessageCount, hasReachedFreeLimit, getRemainingFreeMessages } from '../../services/auth';
 import {
   getTier,
@@ -811,7 +819,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [inputText, setInputText] = useState('');
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([]);
   const [apiMessages, setApiMessages] = useState<Message[]>([]);
-  const [speechError, setSpeechError] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabledState] = useState(isVoiceEnabled());
   const [showBeliefModal, setShowBeliefModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -875,7 +882,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // pair the user wants to turn into a shareable. Null means no overlay.
   const [capturing, setCapturing] = useState<{ question: string; reply: string } | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   // Tracks whether the text input currently has focus. We only apply
   // the iOS keyboard offset when the input is focused AND the viewport
   // shrinkage is big enough to actually be a keyboard — this kills
@@ -1367,6 +1374,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     unlockMobileAudio();
     const message = inputText.trim();
     setInputText('');
+    // Reset textarea height after the value clears — without this, the
+    // textarea keeps the grown height from the previous long input.
+    if (inputRef.current) inputRef.current.style.height = '';
     sendToAI(message);
   }, [inputText, isInputEnabled, sendToAI]);
 
@@ -1378,30 +1388,70 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
   };
 
-  // Mic toggle
-  const handleMicToggle = useCallback(() => {
+  // Mic toggle — permission-aware.
+  //   1. First tap: pre-flight getUserMedia() so the system permission dialog
+  //      appears ONCE. On grant, localStorage[MIC_GRANTED_KEY] = '1' and we
+  //      skip the probe on every subsequent tap. On denial, we route a
+  //      friendly notice through the global toast bus (no jarring iOS alert,
+  //      no red inline text dangling below the input).
+  //   2. Subsequent taps: skip the probe entirely — the cached
+  //      SpeechRecognition instance in speechInput.ts avoids per-instance
+  //      re-prompts, and the granted flag avoids even the getUserMedia probe.
+  //   3. Runtime errors from recognition.onerror (network, not-allowed mid-
+  //      session, audio-capture device missing) also route through showToast.
+  const startRecognizer = useCallback(() => {
+    initAudio();
+    startListening({
+      language,
+      onStart: () => { setState('listening'); setInputText(''); },
+      onResult: (transcript) => setInputText(transcript),
+      onEnd: () => setState('idle'),
+      onError: (error) => {
+        setState('idle');
+        // Route permission/device errors through the global toast.
+        // speechInput.ts already normalizes codes to friendly strings;
+        // we suppress the empty 'aborted' case it emits on user cancel.
+        if (error) showToast(error, { type: 'error' });
+      },
+    });
+  }, [language]);
+
+  const handleMicToggle = useCallback(async () => {
     // Unlock mobile audio on user gesture
     unlockMobileAudio();
-    setSpeechError(null);
     if (state === 'listening') {
       stopListening();
       setState('idle');
-    } else if (state === 'idle') {
-      if (!isSpeechSupported()) {
-        setSpeechError('Speech not supported');
-        setTimeout(() => setSpeechError(null), 3000);
-        return;
-      }
-      initAudio();
-      startListening({
-        language,
-        onStart: () => { setState('listening'); setInputText(''); },
-        onResult: (transcript) => setInputText(transcript),
-        onEnd: () => setState('idle'),
-        onError: (error) => { setState('idle'); setSpeechError(error); setTimeout(() => setSpeechError(null), 6000); },
-      });
+      return;
     }
-  }, [state, language]);
+    if (state !== 'idle') return;
+
+    if (!isSpeechSupported()) {
+      showToast('Voice input isn’t supported in this browser. You can still type below.', { type: 'error' });
+      return;
+    }
+
+    // Skip probe if we've already been granted on this device.
+    const alreadyGranted = (() => {
+      try { return localStorage.getItem(MIC_GRANTED_KEY) === '1'; } catch { return false; }
+    })();
+
+    if (alreadyGranted) {
+      startRecognizer();
+      return;
+    }
+
+    // First-time probe — single getUserMedia() so the system dialog fires
+    // once, here, inside a user gesture. On grant we persist the flag and
+    // start the recognizer.
+    const granted = await requestMicrophonePermission();
+    if (!granted) {
+      showToast('Voice input needs microphone access. You can still type below.', { type: 'error' });
+      return;
+    }
+    try { localStorage.setItem(MIC_GRANTED_KEY, '1'); } catch { /* quota / private mode — proceed anyway */ }
+    startRecognizer();
+  }, [state, startRecognizer]);
 
   // Handle belief change
   const handleBeliefChange = useCallback((newBelief: CategorizedBeliefSystem) => {
@@ -1593,7 +1643,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // half-hidden behind the keyboard when a user taps mid-scroll. We wait
   // for the keyboard animation (~300ms) to finish, then ask the browser
   // to centre the input in the now-shrunken visual viewport.
-  const handleInputFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
+  const handleInputFocus = useCallback((e: FocusEvent<HTMLTextAreaElement>) => {
     isInputFocusedRef.current = true;
     showControls();
     const target = e.currentTarget;
@@ -1915,9 +1965,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                     {message.content}
                   </div>
                 ) : (
-                  // God's message - divine text, centered
-                  // Mobile: max 85%, smaller font
-                  // Desktop: max 65%, larger font, more line-height, centered
+                  // God's message - divine text, centered on both mobile and
+                  // desktop. The cinematic spoken-word feel only works because
+                  // responses are hard-capped at 1-2 sentences / 60 words in
+                  // the Worker (max_tokens: 120) and system prompt. Long
+                  // centered prose wraps awkwardly — do not relax the cap.
                   <div
                     className="text-divine relative group"
                     style={{
@@ -1926,8 +1978,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                       color: 'rgba(255, 248, 240, 0.95)',
                       textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
                       lineHeight: isMobile ? 1.8 : 1.9,
-                      // Desktop: center text. Mobile: left-align for easier reading.
-                      textAlign: isMobile ? 'left' : 'center',
+                      textAlign: 'center',
                       marginLeft: 'auto',
                       marginRight: 'auto',
                       width: isMobile ? '100%' : 'auto',
@@ -2091,14 +2142,26 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               />
             </div>
 
-            {/* Text input */}
+            {/* Text input — auto-growing textarea. Grows from 1 to ~4 lines
+                (48px → 120px) with internal scroll after. 16px font-size is
+                REQUIRED on iOS to prevent auto-zoom on focus.
+                Enter = send, Shift+Enter = newline (see handleKeyDown). */}
             <div className="w-full" style={{ padding: '0 20px' }}>
               <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
-                <input
+                <textarea
                   ref={inputRef}
-                  type="text"
+                  rows={1}
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    // Auto-grow: reset to min, then size to scrollHeight up
+                    // to the CSS max-height (120px). The CSS max-height +
+                    // overflow-y:auto makes the textarea scroll internally
+                    // once content exceeds 4 lines.
+                    const el = e.currentTarget;
+                    el.style.height = 'auto';
+                    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+                  }}
                   onKeyDown={handleKeyDown}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
@@ -2110,15 +2173,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   style={{
                     paddingRight: inputText.trim() ? '50px' : '20px',
                     opacity: isInputEnabled ? 1 : 0.35,
-                    height: '48px',
                   }}
                 />
                 {inputText.trim() && isInputEnabled && (
                   <button
                     onClick={handleSend}
                     aria-label="Send message"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors"
-                    style={{ color: accentColor }}
+                    className="absolute right-3 p-2 rounded-full transition-colors"
+                    style={{ color: accentColor, bottom: '6px' }}
                   >
                     <SendIcon />
                   </button>
@@ -2126,12 +2188,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               </div>
             </div>
 
-            {/* Error message */}
-            {speechError && (
-              <div className="text-center mt-2" style={{ fontSize: '0.75rem', color: '#ef4444' }}>
-                {speechError}
-              </div>
-            )}
+            {/* Mic/speech errors route through the global toast bus
+                (see handleMicToggle). No inline error rendering here. */}
           </div>
         </div>
 
