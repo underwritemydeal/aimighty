@@ -34,6 +34,10 @@ export interface CaptureMomentProps {
   question: string;
   reply: string;
   beliefId: string;
+  /** Full divine-background image path from ConversationScreen. Renders
+   *  in-place behind the capture composition so the cinematic image is
+   *  preserved — no jarring jump to a flat black screen. */
+  imagePath: string;
   onClose: () => void;
 }
 
@@ -41,7 +45,7 @@ type Phase = 'chrome-fade' | 'glow-bloom' | 'reposition' | 'hold' | 'actions' | 
 
 const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'; // sunrise-style easing
 
-export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMomentProps) {
+export function CaptureMoment({ question, reply, beliefId, imagePath, onClose }: CaptureMomentProps) {
   const theme: BeliefTheme = useMemo(() => getThemeForBelief(beliefId), [beliefId]);
   const shareText = useMemo(() => getShareTextForBelief(beliefId), [beliefId]);
 
@@ -198,7 +202,15 @@ export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMom
         position: 'fixed',
         inset: 0,
         zIndex: 100,
-        background: theme.bg,
+        // In-place capture: the divine background image from the
+        // conversation screen is preserved behind a dark gradient for
+        // readability. This replaces the old flat theme.bg solid color
+        // that made the capture feel like a separate black-screen
+        // destination instead of a moment captured in place.
+        background: `linear-gradient(rgba(3,3,8,0.70), rgba(3,3,8,0.88)), url(${imagePath})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'top center',
+        backgroundRepeat: 'no-repeat',
         opacity: bgOpacity,
         transition: `opacity 400ms ${EASE}`,
         overflow: 'hidden',
@@ -250,7 +262,10 @@ export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMom
           margin: '0 auto',
           display: 'flex',
           flexDirection: 'column',
-          padding: 'max(env(safe-area-inset-top), 48px) 28px max(env(safe-area-inset-bottom), 36px)',
+          /* Bottom padding generous enough that the wordmark at the end
+             of this composition never visually overlaps the absolute-
+             positioned action bar (~50px button + 24px safe-area). */
+          padding: 'max(env(safe-area-inset-top), 48px) 28px calc(max(env(safe-area-inset-bottom), 24px) + 96px)',
           boxSizing: 'border-box',
           cursor: 'default',
           opacity: textOpacity,
@@ -368,7 +383,7 @@ export function CaptureMoment({ question, reply, beliefId, onClose }: CaptureMom
           variant="primary"
         />
         <ActionButton
-          label="Keep talking"
+          label="Done"
           onClick={handleClose}
           disabled={Boolean(busy)}
           theme={theme}

@@ -177,6 +177,19 @@ const SendIcon = memo(function SendIcon() {
   );
 });
 
+// Header share glyph — triggers Capture This Moment for the latest
+// {user question, God reply} pair. Arrow-up-from-square style, lives
+// next to the speaker/menu icons.
+const HeaderShareIcon = memo(function HeaderShareIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v12" />
+      <path d="M7 8l5-5 5 5" />
+      <path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+    </svg>
+  );
+});
+
 // Subtle chevron for showing/hiding controls
 const ChevronIndicator = memo(function ChevronIndicator({ pointsUp }: { pointsUp: boolean }) {
   return (
@@ -206,64 +219,6 @@ const ReplaySpeakerIcon = memo(function ReplaySpeakerIcon() {
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
     </svg>
-  );
-});
-
-// Capture This Moment affordance — rendered under every settled God reply.
-// Fires a single `capture_button_shown` impression per mount so we can
-// measure the funnel (shown → tapped → completed → shared) per belief.
-// Intentionally quiet styling: thin outline, uppercase micro-label,
-// accent-tinted. Reverence over conversion.
-const CaptureButton = memo(function CaptureButton({
-  messageId,
-  beliefId,
-  accentColor,
-  onTap,
-}: {
-  messageId: string;
-  beliefId: string;
-  accentColor: string;
-  onTap: () => void;
-}) {
-  useEffect(() => {
-    track('capture_button_shown', { belief: beliefId, message_id: messageId });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messageId]);
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onTap();
-      }}
-      aria-label="Capture this moment"
-      style={{
-        display: 'block',
-        margin: '20px auto 0',
-        background: 'transparent',
-        border: `1px solid ${accentColor}33`,
-        color: `${accentColor}cc`,
-        fontFamily: "'Outfit', system-ui, sans-serif",
-        fontSize: '11px',
-        fontWeight: 500,
-        letterSpacing: '0.12em',
-        textTransform: 'uppercase',
-        padding: '8px 14px',
-        borderRadius: '999px',
-        cursor: 'pointer',
-        opacity: 0.75,
-        transition: 'opacity 200ms ease, border-color 200ms ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.opacity = '1';
-        e.currentTarget.style.borderColor = `${accentColor}66`;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.opacity = '0.75';
-        e.currentTarget.style.borderColor = `${accentColor}33`;
-      }}
-    >
-      Capture this moment
-    </button>
   );
 });
 
@@ -1697,6 +1652,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
   }, []);
 
+  // Header share handler — walks backwards from the end of the thread to
+  // find the latest {user question, God reply} pair and opens the Capture
+  // This Moment overlay for it. If there isn't a completed pair yet
+  // (fresh conversation, only greeting), the icon no-ops silently.
+  const handleHeaderShare = useCallback(() => {
+    if (streamingMessageId.current) return; // don't capture mid-stream
+    for (let i = displayMessages.length - 1; i >= 1; i--) {
+      const msg = displayMessages[i];
+      const prev = displayMessages[i - 1];
+      if (msg.role === 'assistant' && prev.role === 'user' && msg.content.trim().length > 0) {
+        track('capture_button_tapped', { belief: belief.id, message_id: msg.id, source: 'header' });
+        setCapturing({ question: prev.content, reply: msg.content });
+        return;
+      }
+    }
+  }, [displayMessages, belief.id]);
+
   return (
     <div
       className="relative w-full overflow-hidden"
@@ -1819,8 +1791,25 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             />
           </div>
 
-          {/* Right controls — mute + menu icons, generous gap */}
+          {/* Right controls — share + mute + menu icons, generous gap */}
           <div className="flex items-center" style={{ gap: '16px' }}>
+            {/* Capture This Moment — captures the latest {user, reply}
+                pair. Greyed out when no pair exists yet (only greeting)
+                or during streaming. Styled to match the other header
+                glyphs so it reads as part of the icon row, not a CTA. */}
+            <button
+              onClick={handleHeaderShare}
+              aria-label="Capture this moment"
+              className="flex items-center justify-center rounded-lg transition-colors hover:bg-white/5 active:bg-white/10"
+              style={{
+                width: '44px',
+                height: '44px',
+                color: colors.gold,
+                opacity: displayMessages.some((m, i) => i > 0 && m.role === 'assistant' && displayMessages[i - 1].role === 'user' && m.content.trim().length > 0) ? 0.9 : 0.35,
+              }}
+            >
+              <HeaderShareIcon />
+            </button>
             <button
               onClick={handleVoiceToggle}
               aria-label={voiceEnabled ? 'Mute voice' : 'Enable voice'}
@@ -1917,19 +1906,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             }}
           >
             {displayMessages.map((message, index) => {
-              // The capture affordance shows on every God reply that has a
-              // preceding user question AND isn't currently streaming. The
-              // very first message (God's greeting) has no preceding
-              // question, so we skip it — nothing to "capture" yet.
-              const priorUser = index > 0 && displayMessages[index - 1].role === 'user'
-                ? displayMessages[index - 1]
-                : null;
-              const isStreamingThis = streamingMessageId.current === message.id;
-              const canCapture =
-                message.role === 'assistant' &&
-                priorUser != null &&
-                !isStreamingThis &&
-                message.content.trim().length > 0;
+              // Capture-this-moment is now triggered from the header share
+              // icon (captures the latest {user, reply} pair). The old
+              // per-reply inline affordance was moved out of the message
+              // body because it broke conversation flow.
               return (
               <div
                 key={message.id}
@@ -1985,27 +1965,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                     }}
                   >
                     {renderDivineContent(message, accentColor)}
-                    {/* Capture This Moment affordance — appears under every
-                        God reply that has a preceding user question. A subtle
-                        text button, not a big gradient CTA; reverence over
-                        conversion. */}
-                    {canCapture && priorUser && (
-                      <CaptureButton
-                        messageId={message.id}
-                        beliefId={belief.id}
-                        accentColor={accentColor}
-                        onTap={() => {
-                          track('capture_button_tapped', {
-                            belief: belief.id,
-                            message_id: message.id,
-                          });
-                          setCapturing({
-                            question: priorUser.content,
-                            reply: message.content,
-                          });
-                        }}
-                      />
-                    )}
+                    {/* Capture This Moment trigger moved to the header
+                        share icon (see top bar). The inline button under
+                        each reply broke conversation flow. */}
                     {/* Replay speaker icon - only show if message has audioUrl */}
                     {message.audioUrl && (
                       <button
@@ -2726,6 +2688,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           question={capturing.question}
           reply={capturing.reply}
           beliefId={belief.id}
+          imagePath={actualImagePath}
           onClose={() => setCapturing(null)}
         />
       )}
