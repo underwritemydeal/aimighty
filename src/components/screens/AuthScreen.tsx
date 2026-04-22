@@ -144,7 +144,7 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
 
   return (
     <div
-      className="relative overflow-hidden flex flex-col items-center"
+      className="relative flex flex-col items-center"
       style={{ background: 'var(--color-void)', minHeight: '100dvh' }}
       role="main"
       aria-labelledby="auth-heading"
@@ -207,10 +207,14 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
         </h1>
       </div>
 
-      {/* Card container — flex-1 so the legal line inside can anchor to the
-          card bottom via margin-top: auto regardless of viewport height. */}
+      {/* Card container — content-height (no flex-1) so the card sizes to
+          its content on every viewport. Previous flex-1 + margin-top:auto on
+          the legal line caused the disclosure to fall off the card bottom
+          on iPhone SE / iPhone 14 when the card stretched beyond viewport.
+          Legal line now uses a fixed padding-top spacer instead of
+          bottom-anchoring. */}
       <div
-        className="relative z-10 w-full max-w-[400px] flex-1 flex flex-col"
+        className="relative z-10 w-full max-w-[400px]"
         style={{
           padding: '0 16px 40px 16px',
           opacity: isVisible ? 1 : 0,
@@ -219,7 +223,6 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
         }}
       >
         <div
-          className="flex flex-col flex-1"
           style={{
             background: 'rgba(255, 255, 255, 0.05)',
             backdropFilter: 'blur(20px)',
@@ -399,18 +402,16 @@ export function AuthScreen({ onAuthSuccess, onBack, onNavigate, language }: Auth
             </button>
           </p>
 
-          {/* Legal — anchored to the bottom of the card via margin-top: auto.
-              padding-top: 24px guarantees the 24px minimum gap above legal
-              when the card is content-sized (spec: Switch-mode → Legal). */}
+          {/* Legal — fixed 24px padding above, wraps naturally on narrow
+              viewports. Previous margin-top:auto on a flex-column card was
+              causing the disclosure to fall off the card on iPhone SE. */}
           <p
             className="text-center"
             style={{
-              marginTop: 'auto',
               paddingTop: '24px',
               fontSize: '0.7rem',
               color: 'rgba(255, 255, 255, 0.35)',
               lineHeight: 1.6,
-              whiteSpace: 'nowrap',
             }}
           >
             By continuing, you agree to our{' '}
