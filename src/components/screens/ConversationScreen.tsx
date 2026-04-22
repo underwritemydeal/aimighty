@@ -30,6 +30,7 @@ import { getOpeningMessageForBelief } from '../../config/openingMessages';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import { openBillingPortal, isStripeConfigured } from '../../config/stripe';
 import { CaptureMoment } from '../CaptureMoment';
+import { DailyBeliefStudy } from '../DailyBeliefStudy';
 import { track } from '../../utils/analytics';
 import { colors } from '../../styles/designSystem';
 import type { BeliefSystem, User } from '../../types';
@@ -535,7 +536,6 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onDailyBeliefStudy,
   onDailyPrayer,
   onSacredText,
-  onReflection,
   onSignOut,
   onNavigate,
   onManageSubscription,
@@ -549,7 +549,6 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onDailyBeliefStudy: () => void;
   onDailyPrayer: () => void;
   onSacredText: () => void;
-  onReflection: () => void;
   onSignOut: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
   onManageSubscription: () => void;
@@ -622,12 +621,15 @@ const SettingsDropdown = memo(function SettingsDropdown({
           boxShadow: '0 8px 40px rgba(0, 0, 0, 0.6)',
         }}
       >
-        {/* Daily content — order per Task 3 spec:
-            Daily Prayer → Sacred Text → Reflection → Daily Belief Study */}
+        {/* Daily content. "Reflection" was removed and its role is now
+            filled by Daily Belief Study (a live 3-question conversational
+            flow); the old single-prompt reflection screen dead-ended in
+            a button that just primed the input and kicked back to chat.
+            DBS is Divine-only — believer and free see the padlock + pay-
+            wall route. */}
         {item('Daily Prayer', onDailyPrayer)}
         {item('Sacred Text', onSacredText)}
-        {item('Reflection', onReflection)}
-        {item('Daily Belief Study', onDailyBeliefStudy)}
+        {item('Daily Belief Study', onDailyBeliefStudy, tier !== 'divine')}
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 
@@ -785,7 +787,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [streak] = useState(() => getStreak());
   const [showPrayerModal, setShowPrayerModal] = useState(false);
   const [showSacredTextModal, setShowSacredTextModal] = useState(false);
-  const [showReflectionModal, setShowReflectionModal] = useState(false);
   // Shown when a paid user taps Manage Subscription but isStripeConfigured()
   // is false (price IDs haven't been wired up yet). This prevents the raw
   // "Invalid request body" iOS system alert that used to appear when
@@ -799,24 +800,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     reflectionPrompt: string;
   }
   const [dailyContent, setDailyContent] = useState<DailyContent | null>(null);
-  interface DailyArticle {
-    title: string;
-    metaDescription: string;
-    slug: string;
-    belief: string;
-    topic: string;
-    topicDisplay: string;
-    date: string;
-    body: {
-      intro: string;
-      sections: Array<{ heading: string; body: string }>;
-      closing: string;
-      cta: string;
-    };
-    url: string;
-  }
-  const [dailyArticle, setDailyArticle] = useState<DailyArticle | null>(null);
-  const [articleLoading, setArticleLoading] = useState(false);
+  // (Old /daily-article fetching was tied to the in-app article reader
+  // that the Daily Belief Study 3-question flow replaces. The public
+  // /[belief]/[slug] SEO route still consumes /daily-article via
+  // ArticlePage.tsx.)
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [imageError, setImageError] = useState(false);
   // Default character per belief: sbnr/taoism/pantheism speak with the Divine Feminine (mary/coral).
@@ -1428,9 +1415,9 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     }
   }, [replayingMessageId, state]);
 
-  // Fetch daily content (prayer / sacred text / reflection) on demand
+  // Fetch daily content (prayer / sacred text) on demand
   useEffect(() => {
-    if (!showPrayerModal && !showSacredTextModal && !showReflectionModal) return;
+    if (!showPrayerModal && !showSacredTextModal) return;
     if (dailyContent && dailyContent.belief === belief.id) return;
     const key = `daily-content-${belief.id}-${new Date().toISOString().split('T')[0]}`;
     const cached = sessionStorage.getItem(key);
@@ -1446,7 +1433,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         sessionStorage.setItem(key, JSON.stringify(data));
       })
       .catch((e) => console.error('[Conversation] daily-content fetch failed:', e));
-  }, [showPrayerModal, showSacredTextModal, showReflectionModal, belief.id, dailyContent]);
+  }, [showPrayerModal, showSacredTextModal, belief.id, dailyContent]);
 
   // Clear any in-flight TTS drain watcher on unmount so setInterval
   // doesn't keep firing setState on an unmounted component.
@@ -1492,23 +1479,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     };
   }, [belief.id]);
 
-  // Fetch full daily wisdom article for current belief
-  useEffect(() => {
-    if (!showDailyWisdom) return;
-    if (dailyArticle && dailyArticle.belief === belief.id) return;
-    setArticleLoading(true);
-    setDailyArticle(null);
-    const workerUrl = 'https://aimighty-api.robby-hess.workers.dev';
-    // 15s budget for article JSON — larger payload, but bounded.
-    fetchWithTimeout(`${workerUrl}/daily-article?belief=${encodeURIComponent(belief.id)}`, {}, 15000)
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`)))
-      .then((data: DailyArticle) => setDailyArticle(data))
-      .catch((e) => {
-        console.error('[Conversation] daily-article fetch failed:', e);
-        setDailyArticle(null);
-      })
-      .finally(() => setArticleLoading(false));
-  }, [showDailyWisdom, belief.id, dailyArticle]);
+  // (Old daily-article fetch + in-app reader were replaced by the new
+  // 3-question Daily Belief Study flow — see <DailyBeliefStudy/>. The
+  // worker's /daily-article endpoint is still used by ArticlePage.tsx
+  // for SEO routes and by the public /[belief]/[slug] pages.)
 
   // Cleanup on unmount
   useEffect(() => {
@@ -1842,7 +1816,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 onDailyBeliefStudy={() => setShowDailyWisdom(true)}
                 onDailyPrayer={() => setShowPrayerModal(true)}
                 onSacredText={() => setShowSacredTextModal(true)}
-                onReflection={() => setShowReflectionModal(true)}
                 onSignOut={onSignOut || (() => {})}
                 onNavigate={onNavigate}
                 onManageSubscription={() => {
@@ -2270,8 +2243,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         </div>
       )}
 
-      {/* Daily content modals (prayer / sacred text / reflection) */}
-      {(showPrayerModal || showSacredTextModal || showReflectionModal) && (
+      {/* Daily content modals (prayer / sacred text) — the old
+          Reflection modal was removed; its role is now filled by the
+          Daily Belief Study 3-question flow rendered below. */}
+      {(showPrayerModal || showSacredTextModal) && (
         <div
           className="fixed inset-0 z-50 flex flex-col"
           style={{
@@ -2285,7 +2260,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               onClick={() => {
                 setShowPrayerModal(false);
                 setShowSacredTextModal(false);
-                setShowReflectionModal(false);
               }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5"
               style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}
@@ -2296,9 +2270,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               onClick={() => {
                 const text = showPrayerModal
                   ? dailyContent?.prayer || ''
-                  : showSacredTextModal
-                  ? `${dailyContent?.sacredText?.reference}\n${dailyContent?.sacredText?.text}`
-                  : dailyContent?.reflectionPrompt || '';
+                  : `${dailyContent?.sacredText?.reference}\n${dailyContent?.sacredText?.text}`;
                 navigator.clipboard?.writeText(text);
               }}
               className="px-3 py-2 rounded-lg hover:bg-white/5"
@@ -2388,42 +2360,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   >
                     {dailyContent.sacredText.reflection}
                   </p>
-                </>
-              )}
-              {dailyContent && showReflectionModal && (
-                <>
-                  <div style={{ fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: accentColor, marginBottom: '20px' }}>
-                    Reflection · {belief.name}
-                  </div>
-                  <p
-                    style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 'clamp(1.5rem, 4vw, 2.1rem)',
-                      fontWeight: 300,
-                      lineHeight: 1.5,
-                      color: 'rgba(255,248,240,0.95)',
-                      marginBottom: '40px',
-                    }}
-                  >
-                    {dailyContent.reflectionPrompt}
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowReflectionModal(false);
-                      setInputText(dailyContent.reflectionPrompt);
-                      setTimeout(() => inputRef.current?.focus(), 100);
-                    }}
-                    className="px-6 py-3 rounded-full"
-                    style={{
-                      background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
-                      border: `1px solid ${accentColor}60`,
-                      color: accentColor,
-                      fontSize: '0.9rem',
-                      fontWeight: 500,
-                    }}
-                  >
-                    Reflect with God
-                  </button>
                 </>
               )}
             </div>
@@ -2549,120 +2485,17 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         </div>
       )}
 
-      {/* Daily Wisdom reader */}
+      {/* Daily Belief Study — Divine-tier 3-question conversational flow.
+          Replaced the old in-app /daily-article reader; the SEO-facing
+          /[belief]/[slug] route still renders articles via ArticlePage.tsx. */}
       {showDailyWisdom && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col"
-          style={{
-            background: `linear-gradient(rgba(3,3,8,0.75), rgba(3,3,8,0.92)), url(${actualImagePath})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'top center',
-          }}
-        >
-          <div className="flex items-center justify-between px-5 py-4 shrink-0">
-            <button
-              onClick={() => setShowDailyWisdom(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/5"
-              style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem' }}
-            >
-              <BackIcon /> Back to Conversation
-            </button>
-            <button
-              onClick={() => {
-                const url = `https://aimightyme.com/wisdom/${belief.id}/${dailyArticle?.topic || 'today'}`;
-                if (navigator.share) {
-                  navigator.share({ title: dailyArticle?.topicDisplay || 'Daily Wisdom', url }).catch(() => {});
-                } else {
-                  navigator.clipboard?.writeText(url);
-                }
-              }}
-              className="px-3 py-2 rounded-lg hover:bg-white/5"
-              style={{ color: accentColor, fontSize: '0.85rem' }}
-            >
-              Share
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto px-6 pb-12">
-            <div className="mx-auto" style={{ maxWidth: '720px' }}>
-              <div
-                style={{
-                  fontSize: '0.7rem',
-                  letterSpacing: '0.15em',
-                  textTransform: 'uppercase',
-                  color: accentColor,
-                  marginBottom: '12px',
-                }}
-              >
-                {dailyArticle?.date || new Date().toISOString().split('T')[0]} · {belief.name}
-              </div>
-              <h1
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 'clamp(1.8rem, 5vw, 2.6rem)',
-                  fontWeight: 300,
-                  color: 'rgba(255,248,240,0.98)',
-                  lineHeight: 1.2,
-                  marginBottom: '24px',
-                }}
-              >
-                {articleLoading ? 'Gathering wisdom…' : (dailyArticle?.title || 'Daily Wisdom')}
-              </h1>
-              {articleLoading && (
-                <p style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '1rem', color: 'rgba(255,248,240,0.6)' }}>
-                  Generating today's reflection for {belief.name}…
-                </p>
-              )}
-              {dailyArticle && !articleLoading && (
-                <div style={{ fontFamily: 'var(--font-body, Outfit)', color: 'rgba(255,248,240,0.85)' }}>
-                  <p style={{ fontSize: '1.1rem', lineHeight: 1.8, marginBottom: '28px', fontStyle: 'italic' }}>
-                    {dailyArticle.body.intro}
-                  </p>
-                  {dailyArticle.body.sections?.map((s, i) => (
-                    <div key={i} style={{ marginBottom: '28px' }}>
-                      <h2
-                        style={{
-                          fontFamily: 'var(--font-display)',
-                          fontSize: '1.4rem',
-                          fontWeight: 400,
-                          color: accentColor,
-                          marginBottom: '10px',
-                        }}
-                      >
-                        {s.heading}
-                      </h2>
-                      <p style={{ fontSize: '1rem', lineHeight: 1.8 }}>{s.body}</p>
-                    </div>
-                  ))}
-                  {dailyArticle.body.closing && (
-                    <p style={{ fontSize: '1rem', lineHeight: 1.8, marginBottom: '24px' }}>
-                      {dailyArticle.body.closing}
-                    </p>
-                  )}
-                  {dailyArticle.body.cta && (
-                    <button
-                      onClick={() => setShowDailyWisdom(false)}
-                      className="w-full text-center py-4 px-6 rounded-xl mt-4"
-                      style={{
-                        background: `linear-gradient(135deg, ${accentColor}30, ${accentColor}10)`,
-                        border: `1px solid ${accentColor}60`,
-                        color: accentColor,
-                        fontSize: '0.95rem',
-                        fontWeight: 500,
-                      }}
-                    >
-                      {dailyArticle.body.cta}
-                    </button>
-                  )}
-                </div>
-              )}
-              {!dailyArticle && !articleLoading && (
-                <p style={{ fontFamily: 'var(--font-body, Outfit)', fontSize: '1rem', color: 'rgba(255,248,240,0.6)' }}>
-                  Unable to load today's reflection. Please try again later.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
+        <DailyBeliefStudy
+          belief={belief}
+          user={user}
+          imagePath={actualImagePath}
+          language={language}
+          onClose={() => setShowDailyWisdom(false)}
+        />
       )}
 
       {/* Belief selector modal */}
