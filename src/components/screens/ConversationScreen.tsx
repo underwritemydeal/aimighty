@@ -26,6 +26,7 @@ import {
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
+import { getDescriptorForBelief } from '../../config/beliefDescriptors';
 import { getOpeningMessageForBelief } from '../../config/openingMessages';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
 import { openBillingPortal, isStripeConfigured } from '../../config/stripe';
@@ -460,7 +461,12 @@ function renderDivineContent(
   );
 }
 
-// Belief selector modal
+// Belief selector modal — redesigned per Task 5. Fills 80% of the
+// viewport height, single-column list with 56px minimum touch targets
+// (Apple HIG 44px floor with headroom), gold section headers, white
+// belief names, descriptors from src/config/beliefDescriptors.ts, gold
+// ✓ checkmark on the active belief, subtle gold dividers between
+// categories, X close in the top-right corner.
 const BeliefSelectorModal = memo(function BeliefSelectorModal({
   isOpen,
   onClose,
@@ -475,53 +481,163 @@ const BeliefSelectorModal = memo(function BeliefSelectorModal({
   if (!isOpen) return null;
 
   const categories: BeliefCategory[] = ['religious', 'spiritual', 'philosophical'];
+  const canonicalId = normalizeBeliefId(currentBeliefId);
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
-      style={{ background: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(8px)' }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      style={{ background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Switch belief system"
     >
       <div
-        className="w-full max-w-md max-h-[80vh] overflow-hidden"
+        className="w-full"
         style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          borderRadius: '20px',
+          maxWidth: '520px',
+          height: '80vh',
+          background: 'rgba(12, 12, 22, 0.98)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: `1px solid ${colors.gold}30`,
+          borderRadius: '24px 24px 0 0',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 -20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(212, 184, 130, 0.1)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-5 border-b border-white/5">
-          <h2 className="text-center" style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 500, color: 'var(--color-text-primary)' }}>
-            Switch Belief System
+        <div
+          className="flex items-center justify-between shrink-0"
+          style={{
+            padding: '20px 24px 16px 24px',
+            borderBottom: `1px solid ${colors.gold}1a`,
+          }}
+        >
+          <h2
+            style={{
+              margin: 0,
+              fontFamily: 'var(--font-display)',
+              fontSize: '1.1rem',
+              fontWeight: 400,
+              color: 'rgba(255, 248, 240, 0.95)',
+              letterSpacing: '0.03em',
+            }}
+          >
+            Switch belief system
           </h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="flex items-center justify-center rounded-lg hover:bg-white/5"
+            style={{ width: '40px', height: '40px', color: 'rgba(255,255,255,0.55)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
-        <div className="p-4 overflow-y-auto" style={{ maxHeight: 'calc(80vh - 80px)' }}>
-          {categories.map((category) => (
-            <div key={category} className="mb-4">
-              <h3 className="mb-2 px-2" style={{ fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>
-                {categoryLabels[category]}
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {beliefSystems.filter((b) => b.category === category).map((belief) => (
-                  <button
-                    key={belief.id}
-                    onClick={() => { onSelect(belief); onClose(); }}
-                    className="px-3 py-2.5 rounded-xl text-left transition-all"
+
+        <div className="flex-1 overflow-y-auto" style={{ padding: '8px 12px 24px 12px' }}>
+          {categories.map((category, catIdx) => {
+            const items = beliefSystems.filter((b) => b.category === category);
+            if (items.length === 0) return null;
+            return (
+              <div key={category}>
+                {catIdx > 0 && (
+                  <div
+                    aria-hidden
                     style={{
-                      background: belief.id === currentBeliefId ? `linear-gradient(135deg, ${belief.accentColor}30 0%, ${belief.accentColor}10 100%)` : 'rgba(255, 255, 255, 0.03)',
-                      border: belief.id === currentBeliefId ? `1px solid ${belief.accentColor}60` : '1px solid rgba(255, 255, 255, 0.06)',
+                      height: '1px',
+                      margin: '12px 12px',
+                      background: `${colors.gold}33`,
                     }}
-                  >
-                    <span className="block" style={{ fontSize: '0.9rem', fontWeight: belief.id === currentBeliefId ? 500 : 400, color: belief.id === currentBeliefId ? belief.accentColor : 'var(--color-text-primary)' }}>
-                      {belief.name}
-                    </span>
-                  </button>
-                ))}
+                  />
+                )}
+                <h3
+                  style={{
+                    margin: 0,
+                    padding: '14px 12px 10px 12px',
+                    fontSize: '0.72rem',
+                    letterSpacing: '0.22em',
+                    textTransform: 'uppercase',
+                    color: colors.gold,
+                    fontFamily: 'var(--font-body, Outfit)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {categoryLabels[category]}
+                </h3>
+                <div className="flex flex-col" style={{ gap: '6px' }}>
+                  {items.map((b) => {
+                    const isActive = normalizeBeliefId(b.id) === canonicalId;
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={() => { onSelect(b); onClose(); }}
+                        className="flex items-center justify-between transition-all text-left"
+                        style={{
+                          minHeight: '56px',
+                          padding: '10px 14px',
+                          borderRadius: '14px',
+                          background: isActive ? `${b.accentColor}1a` : 'transparent',
+                          border: isActive ? `1px solid ${b.accentColor}99` : '1px solid transparent',
+                          boxShadow: isActive ? `0 0 24px ${b.accentColor}20` : 'none',
+                          cursor: 'pointer',
+                          width: '100%',
+                        }}
+                      >
+                        <div className="flex flex-col" style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
+                          <span
+                            style={{
+                              fontFamily: 'var(--font-body, Outfit)',
+                              fontSize: '1rem',
+                              fontWeight: isActive ? 500 : 400,
+                              color: 'rgba(255, 248, 240, 0.95)',
+                              lineHeight: 1.25,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {b.name}
+                          </span>
+                          <span
+                            style={{
+                              marginTop: '3px',
+                              fontFamily: "'Cormorant Garamond', Georgia, serif",
+                              fontStyle: 'italic',
+                              fontSize: '0.88rem',
+                              color: 'rgba(255, 248, 240, 0.55)',
+                              lineHeight: 1.3,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {getDescriptorForBelief(normalizeBeliefId(b.id))}
+                          </span>
+                        </div>
+                        {isActive && (
+                          <span
+                            aria-label="Currently selected"
+                            style={{ color: colors.gold, flexShrink: 0 }}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
