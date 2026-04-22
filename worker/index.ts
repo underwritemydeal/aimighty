@@ -430,7 +430,7 @@ const SMALLEST_AI_VOICES: Record<string, SmallestVoiceConfig> = {
     voice_id: 'voice_Hv9szTBA4K', // cloned AImighty voice
     speed: 0.8,
     endpoint: SMALLEST_V3_1,
-    description: 'AImighty cloned voice — protestant/catholic/mormonism/judaism/science',
+    description: 'AImighty cloned voice — Christian God the Father: protestant, catholic, mormonism',
   },
   universe: {
     voice_id: 'sophia',           // V3.1 stock
@@ -442,29 +442,38 @@ const SMALLEST_AI_VOICES: Record<string, SmallestVoiceConfig> = {
     voice_id: 'walter',           // V2 stock — Walter exists only in V2
     speed: 0.9,
     endpoint: SMALLEST_V2,
-    description: 'Walter (American male, calm) — buddhism/agnosticism/atheism-stoicism',
+    description: 'Walter (American male, calm) — buddhism/agnosticism/atheism-stoicism/science/judaism',
   },
   islam: {
     voice_id: 'blofeld',          // V2 stock — Blofeld exists only in V2
-    speed: 0.8,
+    // Speed corrected 0.8 → 1.0 — 0.8 was audibly distorted on Blofeld
+    // (the V2 stock voice's cadence breaks down below 0.9). Sprint 6.3.
+    speed: 1.0,
     endpoint: SMALLEST_V2,
     description: 'Blofeld (American male, dignified authority) — islam',
   },
   hinduism: {
     voice_id: 'ethan',            // V3.1 stock
-    speed: 0.8,
+    // Speed corrected 0.8 → 1.0 — matches the Blofeld fix; Ethan was
+    // also distorting below 0.9 on the stock voice. Sprint 6.3.
+    speed: 1.0,
     endpoint: SMALLEST_V3_1,
     description: 'Ethan (American male, gentle wisdom) — hinduism/sikhism',
   },
 };
 
-// Belief system → character key
+// Belief system → character key.
+// Sprint 6.3 corrections: judaism + science moved off the AImighty
+// cloned voice (god) and onto Walter. The cloned voice is pinned to
+// Christian God the Father (protestant / catholic / mormonism) to
+// preserve the voice's identity; non-Christian beliefs route to stock
+// voices that match the tradition's tone better.
 const BELIEF_CHARACTER_MAP: Record<string, keyof typeof SMALLEST_AI_VOICES> = {
   protestant: 'god',
   catholic: 'god',
   mormonism: 'god',
-  judaism: 'god',
-  science: 'god',
+  judaism: 'buddha',
+  science: 'buddha',
   islam: 'islam',
   hinduism: 'hinduism',
   sikhism: 'hinduism',
