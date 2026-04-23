@@ -241,7 +241,7 @@ export function DailyBeliefStudy({ belief, user, imagePath, language, onClose }:
         background: `linear-gradient(rgba(3,3,8,0.78), rgba(3,3,8,0.92)), url(${imagePath})`,
         backgroundSize: 'cover',
         backgroundPosition: 'top center',
-        height: 'var(--vvh, 100dvh)',
+        height: '100dvh',
       }}
     >
       {/* Header */}

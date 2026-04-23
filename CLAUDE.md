@@ -352,9 +352,18 @@ import { colors, fonts, fontWeights, radii, shadows } from '../../styles/designS
 - **Never use `backgroundAttachment: 'fixed'`** — iOS Safari disables it and renders the background incorrectly (zoom/clip bug). Always `scroll`.
 - ConversationScreen / belief card background divs use `backgroundSize: 'cover'` + `backgroundPosition: 'top center'`
 - **LandingPage mobile hero** is the exception: `backgroundSize: 'contain'` + `backgroundColor: colors.void` so the full 9:16 cosmic image renders without cropping on narrow iPhones
-- **ConversationScreen keyboard architecture (locked 2026-04-18):** the input bar is a normal **flex child with `shrink-0`**, NOT `position: fixed`. The root container is sized to `height: var(--vvh, 100dvh)`, where `--vvh` is set by a `visualViewport.resize` listener to `visualViewport.height`. Because the container shrinks to the real visible area when the keyboard opens, a flex-flow input bar naturally anchors to "the space above the keyboard" without any keyboard-height math. On focus, the input calls `scrollIntoView({ block: 'center' })` after 300ms so the keyboard settle animation (~250ms) is complete before the scroll. This replaces the old `--kb-offset` + `transform: translateY(100%)` approach, which repeatedly regressed on iOS. A `--kb-offset` CSS variable is still published for compatibility but the layout no longer depends on it.
+- **ConversationScreen layout architecture (rebuilt 2026-04-22 — supersedes the 2026-04-18 lock):** declarative, CSS-only, no JavaScript keyboard math.
+  - Root `.conversation-screen` is `height: 100dvh`, `display: flex`, `flex-direction: column`, `overflow: hidden`.
+  - Background `.conversation-bg` is `position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0` — full-bleed behind iOS chrome, never scrolls.
+  - Gradient overlay at `z-index: 1` darkens the top ~20% so God's face has ≥80px tonal separation from the header icons.
+  - Header `.conversation-header` is `flex-shrink: 0`, `padding-top: calc(env(safe-area-inset-top) + 12px)`, `z-index: 30`.
+  - Messages `.conversation-messages` is `flex: 1; overflow-y: auto; z-index: 10` — the ONLY part that scrolls.
+  - Input `.conversation-input` is `position: sticky; bottom: 0; flex-shrink: 0; z-index: 30` — contains the scroll-button, mic, textarea, and chevron in a single unit so they ride the keyboard together.
+  - The textarea itself uses class `.conversation-textarea` (renamed from `.conversation-input` so the outer container could take that name).
+  - iOS keyboard: `interactive-widget=resizes-content` in the index.html viewport meta makes iOS Safari 16.4+ resize the layout viewport when the keyboard opens. `100dvh` shrinks with it, `flex:1` messages collapse to fit, and the sticky input rides the new bottom edge — no `--vvh`, no `visualViewport` listener, no `--kb-offset`.
+  - **Do NOT** use `position: fixed` on the input bar. **Do NOT** add `visualViewport` resize/scroll listeners. **Do NOT** reintroduce a `--vvh` or `--kb-offset` CSS variable. Those were the repeatedly-regressing patches this architecture replaces — the native CSS path is simpler and stable.
 - Safe-area padding on content wrappers, NOT on the background image
-- God's text: **desktop centered**, **mobile left-aligned** (easier to read on narrow screens)
+- God's text: **centered on both mobile and desktop** (cinematic spoken-word feel; safeguarded by the Worker's max_tokens=120 / 60-word cap — long centered prose wraps awkwardly, so do not relax the cap)
 
 ### LandingPage sections (top to bottom)
 1. **Hero** — 100dvh, cosmic bg (mobile contain / desktop cover), floating logo, tagline, Begin + Learn More CTAs, animated scroll chevron

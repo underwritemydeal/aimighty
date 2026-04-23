@@ -505,9 +505,82 @@ button:disabled {
 }
 
 /* ============================================
-   CONVERSATION INPUT
-   ============================================ */
+   CONVERSATION — APP SHELL (rebuilt 2026-04-22)
+   ============================================
+   New architecture (replaces the --vvh + visualViewport listener approach):
+     - .conversation-screen  = 100dvh flex column with overflow hidden.
+       iOS Safari 16.4+ shrinks 100dvh when the keyboard opens because
+       index.html sets `interactive-widget=resizes-content` in the
+       viewport meta.
+     - .conversation-bg      = position:fixed, 100vh, z:0 — full-bleed
+       behind system chrome (status bar + home indicator), never scrolls.
+     - .conversation-header  = flex-shrink:0 at the top. God's face has
+       at least ~80px clear space below the header.
+     - .conversation-messages = flex:1 overflow-y:auto — only part that
+       scrolls.
+     - .conversation-input   = position:sticky; bottom:0 — rides the
+       bottom of the shrinking flex container, stays above the keyboard.
+       NOTE: sticky is belt-and-suspenders; the primary mechanism is
+       the flex layout shrinking under 100dvh.
+
+   Do NOT add visualViewport listeners, --vvh, --kb-offset, or
+   position:fixed on the input. Those were the previous attempts and
+   caused the stale-keyboard-offset / ghost-area / input-hovering bugs. */
+
+.conversation-screen {
+  height: 100dvh;
+  min-height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.conversation-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-size: cover;
+  background-position: top center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.conversation-header {
+  flex-shrink: 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
+  padding-bottom: 12px;
+  z-index: 30;
+  position: relative;
+}
+
+.conversation-messages {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  z-index: 10;
+  position: relative;
+}
+
 .conversation-input {
+  position: sticky;
+  bottom: 0;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  padding-top: 16px;
+  z-index: 30;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   CONVERSATION TEXTAREA (the actual <textarea>)
+   ============================================
+   Renamed from .conversation-input → .conversation-textarea on
+   2026-04-22 when the sticky input-bar container took over the
+   .conversation-input class name. */
+.conversation-textarea {
   background: rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -530,12 +603,12 @@ button:disabled {
   overflow-y: auto;
 }
 
-.conversation-input::placeholder {
+.conversation-textarea::placeholder {
   color: rgba(255, 255, 255, 0.3);
   font-style: italic;
 }
 
-.conversation-input:focus {
+.conversation-textarea:focus {
   outline: none;
   border-bottom-color: rgba(255, 255, 255, 0.2);
 }

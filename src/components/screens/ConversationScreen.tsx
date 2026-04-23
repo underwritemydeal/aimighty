@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback, type FocusEvent } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 
 // localStorage flag: once the user has granted mic permission on this
 // device, we skip the pre-flight getUserMedia() probe on subsequent mic
@@ -941,12 +941,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   const [capturing, setCapturing] = useState<{ question: string; reply: string } | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  // Tracks whether the text input currently has focus. We only apply
-  // the iOS keyboard offset when the input is focused AND the viewport
-  // shrinkage is big enough to actually be a keyboard — this kills
-  // phantom offsets from URL-bar collapse/expand and pinch-zoom that
-  // otherwise float the input bar 40-100px above the screen bottom.
-  const isInputFocusedRef = useRef(false);
   const hideControlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1607,115 +1601,30 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     };
   }, []);
 
-  // Track the iOS on-screen keyboard height via visualViewport. When the
-  // keyboard opens, window.innerHeight stays the same but visualViewport.height
-  // shrinks. We push the fixed input bar up by the difference so it's never
-  // hidden under the keyboard.
+  // iOS keyboard architecture (rebuilt 2026-04-22):
   //
-  // On iOS Safari there is an additional ~44px "form accessory bar" (domain
-  // pill + prev/next/done) that overlays the top of the keyboard and is NOT
-  // subtracted from visualViewport.height. Without compensating for it, the
-  // input bar floats directly behind that accessory bar and the text the user
-  // just typed is half-clipped. We add an IOS_ACCESSORY_BAR_HEIGHT buffer for
-  // iOS devices so the bar clears both the keyboard and the accessory overlay.
+  // The previous --vvh + visualViewport-listener + --kb-offset approach
+  // was REMOVED. It was overcomplicated and caused the bugs it was meant
+  // to prevent (input hovering above the keyboard, ghost region below
+  // the input, layout instability during URL-bar chrome animations).
   //
-  // We ALSO publish `--vvh` = visualViewport.height on every event. 100dvh
-  // on iOS Safari does NOT shrink when the keyboard opens, so a container
-  // sized to 100dvh still extends behind the keyboard and any input placed
-  // inside its lower half gets occluded. Sizing the conversation container
-  // to `var(--vvh)` makes it track the real visible area, which is what
-  // `scrollIntoView` needs to reason against when we yank the input up on
-  // focus.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const vv = window.visualViewport;
-    if (!vv) {
-      // Non-iOS / older browsers — fall back to innerHeight once so the
-      // var(--vvh) consumer still resolves to something sensible.
-      document.documentElement.style.setProperty('--vvh', `${window.innerHeight}px`);
-      return;
-    }
-    const isIOS =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const IOS_ACCESSORY_BAR_HEIGHT = 44;
-    // A real on-screen keyboard shrinks the visual viewport by >150px on
-    // every modern mobile device. Anything below that is URL-bar chrome
-    // shifting, pinch-zoom, or rubber-band scroll — NOT a keyboard —
-    // and must not move the input bar.
-    const KEYBOARD_THRESHOLD_PX = 150;
-    const syncViewport = () => {
-      // Always publish the true visible height. Consumers use this in
-      // place of 100dvh so they shrink when the keyboard opens.
-      document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
-
-      // Gate on focus first: if the user isn't typing, keep the bar flush
-      // to the bottom regardless of what visualViewport reports. This
-      // single check eliminates the most common "floating bar" bug on iOS.
-      if (!isInputFocusedRef.current) {
-        document.documentElement.style.setProperty('--kb-offset', '0px');
-        return;
-      }
-      const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      if (rawKb < KEYBOARD_THRESHOLD_PX) {
-        document.documentElement.style.setProperty('--kb-offset', '0px');
-        return;
-      }
-      // Only add the accessory-bar buffer when the keyboard is actually open.
-      const kb = isIOS ? rawKb + IOS_ACCESSORY_BAR_HEIGHT : rawKb;
-      document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
-    };
-    syncViewport();
-    vv.addEventListener('resize', syncViewport);
-    vv.addEventListener('scroll', syncViewport);
-    return () => {
-      vv.removeEventListener('resize', syncViewport);
-      vv.removeEventListener('scroll', syncViewport);
-      document.documentElement.style.removeProperty('--kb-offset');
-      document.documentElement.style.removeProperty('--vvh');
-    };
-  }, []);
-
-  // Focus/blur handlers for the text input. These update the focus ref
-  // AND re-trigger a sync so the offset applies/clears immediately —
-  // otherwise there's a frame of lag between the keyboard animating in
-  // and the input bar rising, and the user sees their tap vanish.
+  // The new architecture is declarative, CSS-only:
+  //   1. index.html sets `interactive-widget=resizes-content` so iOS
+  //      Safari 16.4+ resizes the layout viewport when the keyboard
+  //      opens (instead of overlaying the keyboard on top of the page).
+  //   2. .conversation-screen is `height: 100dvh` (dynamic viewport)
+  //      which shrinks with that viewport change.
+  //   3. .conversation-messages is `flex: 1` so it shrinks to fit,
+  //      and .conversation-input is `position: sticky; bottom: 0;
+  //      flex-shrink: 0` — it rides the bottom of the now-shorter
+  //      flex container, naturally sitting just above the keyboard.
   //
-  // The scrollIntoView call at the end is the actual keyboard-occlusion
-  // fix: even with --kb-offset lifting the fixed input bar and --vvh
-  // shrinking the container, iOS Safari can still leave the input
-  // half-hidden behind the keyboard when a user taps mid-scroll. We wait
-  // for the keyboard animation (~300ms) to finish, then ask the browser
-  // to centre the input in the now-shrunken visual viewport.
-  const handleInputFocus = useCallback((e: FocusEvent<HTMLTextAreaElement>) => {
-    isInputFocusedRef.current = true;
+  // No JavaScript keyboard math. No focus/blur CSS-variable writes.
+  // The focus handler just calls showControls() so the input section
+  // reveals itself if it was auto-hidden mid-TTS.
+  const handleInputFocus = useCallback(() => {
     showControls();
-    const target = e.currentTarget;
-    // Fire a sync on the next frame so visualViewport has time to settle.
-    if (typeof window !== 'undefined' && window.visualViewport) {
-      const vv = window.visualViewport;
-      requestAnimationFrame(() => {
-        const isIOS =
-          /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const rawKb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-        if (rawKb >= 150) {
-          const kb = isIOS ? rawKb + 44 : rawKb;
-          document.documentElement.style.setProperty('--kb-offset', `${kb}px`);
-        }
-        document.documentElement.style.setProperty('--vvh', `${vv.height}px`);
-      });
-    }
-    // iOS keyboard animation is ~250ms; wait 300ms so visualViewport
-    // has finished shrinking before we ask the browser to scroll.
-    setTimeout(() => {
-      try {
-        target?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      } catch {
-        target?.scrollIntoView();
-      }
-    }, 300);
-  }, []);
+  }, [showControls]);
 
   // Auto-grow the textarea on any value change — covers typing AND
   // external sources (mic onResult, Stripe handoff, daily-prompt primer
@@ -1729,14 +1638,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     el.style.height = 'auto';
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [inputText]);
-
-  const handleInputBlur = useCallback(() => {
-    isInputFocusedRef.current = false;
-    // Reset offset immediately on blur — don't wait for the visualViewport
-    // resize event to catch up, which on iOS can take 300-500ms and leaves
-    // the input bar floating during the keyboard dismiss animation.
-    document.documentElement.style.setProperty('--kb-offset', '0px');
-  }, []);
 
   const remainingMessages = getRemainingFreeMessages();
   const actualImagePath = imageError ? fallbackImagePath : imagePath;
@@ -1773,41 +1674,26 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
 
   return (
     <div
-      className="relative w-full overflow-hidden"
-      // height tracks the *visual* viewport — `--vvh` is set by the
-      // visualViewport listener and shrinks when the iOS keyboard opens,
-      // so nothing inside the container ends up below the keyboard.
-      // 100dvh is a pre-hydrate fallback for the first paint and for
-      // browsers without visualViewport support.
-      style={{ background: '#030308', height: 'var(--vvh, 100dvh)', minHeight: 'var(--vvh, 100dvh)' }}
+      className="conversation-screen"
+      style={{ background: '#030308' }}
       role="main"
       aria-label={`Conversation with ${belief.name}`}
       onClick={handleScreenTap}
       onTouchStart={handleScreenTap}
     >
-      {/* Background image — uses 100vh (large viewport) so the image bleeds
-          behind iOS status bar AND Safari browser chrome — no black bars.
-          The overlaying content uses 100dvh so it tracks the visible area. */}
+      {/* Layer 0 — background image, full-bleed behind iOS chrome.
+          position:fixed with 100vh (not 100dvh) so the image extends
+          behind the status bar and home indicator = no black bars. */}
       <div
+        className="conversation-bg"
         style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          zIndex: 0,
           backgroundImage: `url(${actualImagePath})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'top center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: 'scroll',
           transform: 'scale(1.02)',
           transformOrigin: 'center top',
           filter: 'saturate(0.7) brightness(0.85)',
         }}
         aria-hidden="true"
       />
-      {/* Preload desktop image and handle fallback */}
       {!isMobile && (
         <img
           src={imagePath}
@@ -1817,23 +1703,23 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         />
       )}
 
-      {/* Gradient overlay.
-          Top: darkened so the header icons read cleanly and God's face
-          visually recedes behind them. Measurement on iPhone 16:
-          safe-area-inset-top ≈ 59px, then 12px padding, then 44px icon
-          row ⇒ header bottom ≈ 115px ≈ 13% of 852px viewport. A 0.65
-          darkening stop at 0% that fades through 0.25 at 12% gives the
-          header tonal separation without making the photo feel murky.
-          Bottom: unchanged — same ramp the input/text readability
-          relied on before. */}
+      {/* Layer 1 — gradient overlay.
+          Deepened top stops give God's face ≥80px of tonal separation
+          from the header bar (spec: "figure's face not touching the
+          title bar"). On iPhone 16 (393×852) the header bottom edge is
+          at ~13% of viewport height; the gradient holds 0.55+ opacity
+          through the first 20% of viewport, which recedes the face
+          behind a visible-but-tonal veil until the messages region
+          starts. Bottom ramp unchanged — readability for the textarea. */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
           background:
             'linear-gradient(to bottom, ' +
-            'rgba(3,3,8,0.65) 0%, ' +
-            'rgba(3,3,8,0.25) 12%, ' +
-            'rgba(0,0,0,0) 25%, ' +
+            'rgba(3,3,8,0.78) 0%, ' +
+            'rgba(3,3,8,0.55) 10%, ' +
+            'rgba(3,3,8,0.25) 20%, ' +
+            'rgba(0,0,0,0) 32%, ' +
             'rgba(0,0,0,0.15) 55%, ' +
             'rgba(3,3,8,0.55) 75%, ' +
             'rgba(3,3,8,0.85) 100%)',
@@ -1842,26 +1728,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         aria-hidden="true"
       />
 
-      {/* UI Layer — tracks the visual viewport so it matches the real
-          visible area when the iOS keyboard is open. Falls back to 100dvh
-          before the visualViewport listener has fired.
-          No bottom padding: the input bar is a real flex child now
-          (shrink-0) instead of being position:fixed, so it naturally
-          anchors to whatever height the container is, which in turn is
-          always the space ABOVE the keyboard. That's the property that
-          makes the input impossible to cover. */}
-      <div
-        className="relative z-10 flex flex-col"
-        style={{
-          height: 'var(--vvh, 100dvh)',
-          paddingTop: 'env(safe-area-inset-top, 0px)',
-        }}
+      {/* The rest of the flex children — header, messages, input — sit
+          directly under .conversation-screen. No intermediate flex
+          wrapper. The conversation-screen itself is the flex column;
+          100dvh shrinks when the iOS keyboard opens (thanks to
+          interactive-widget=resizes-content in index.html) and the
+          sticky input rides the bottom of that shrinking container. */}
+
+      {/* Top bar */}
+      <header
+        className="conversation-header flex items-center justify-between"
+        style={{ paddingLeft: '20px', paddingRight: '20px', opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}
       >
-        {/* Top bar */}
-        <header
-          className="flex items-center justify-between shrink-0"
-          style={{ padding: '12px 20px 0 20px', opacity: isVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}
-        >
           <button
             onClick={onBack}
             aria-label="Go back"
@@ -1984,10 +1862,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         </header>
 
-        {/* Conversation thread - tap to show controls when hidden */}
+        {/* Conversation thread — flex:1, the only part that scrolls.
+            Class .conversation-messages handles flex/overflow/z-index. */}
         <div
           ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto"
+          className="conversation-messages"
           onClick={controlsHidden ? showControls : undefined}
           style={{
             opacity: isVisible ? 1 : 0,
@@ -2152,13 +2031,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         )}
 
-        {/* Input controls — in-flow flex child, NOT position:fixed. Because
-            the UI Layer is sized to var(--vvh) (the real visible area),
-            this section is always pinned just above the keyboard and can
-            never be covered by it. Collapses to 0 height when TTS plays
-            (controlsHidden=true) so God's words have the full screen. */}
+      {/* Input bar — sticky bottom of the flex column.
+          Class .conversation-input handles position:sticky, z-index,
+          safe-area bottom padding. When the iOS keyboard opens and
+          100dvh shrinks, .conversation-messages (flex:1) absorbs the
+          reduction and this sticky input rides up with the container's
+          new bottom edge — no JS math required. */}
+      <div className="conversation-input">
         <div
-          className="shrink-0"
           style={{
             maxHeight: controlsHidden ? '0' : '400px',
             overflow: 'hidden',
@@ -2223,7 +2103,10 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             {/* Text input — auto-growing textarea. Grows from 1 to ~4 lines
                 (48px → 120px) with internal scroll after. 16px font-size is
                 REQUIRED on iOS to prevent auto-zoom on focus.
-                Enter = send, Shift+Enter = newline (see handleKeyDown). */}
+                Enter = send, Shift+Enter = newline (see handleKeyDown).
+                Class renamed from .conversation-input → .conversation-textarea
+                on 2026-04-22 when the sticky input-bar container took over
+                the .conversation-input name. */}
             <div className="w-full" style={{ padding: '0 20px' }}>
               <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
                 <textarea
@@ -2233,12 +2116,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onFocus={handleInputFocus}
-                  onBlur={handleInputBlur}
                   placeholder={state === 'listening' ? `${t('conversation.listening', language)}...` : t('conversation.speakYourTruth', language)}
                   disabled={!isInputEnabled}
                   maxLength={500}
                   enterKeyHint="send"
-                  className="conversation-input"
+                  className="conversation-textarea"
                   style={{
                     paddingRight: inputText.trim() ? '50px' : '20px',
                     opacity: isInputEnabled ? 1 : 0.35,
@@ -2274,16 +2156,16 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         </div>
 
-        {/* Chevron indicator — always visible, pinned below the input
-            section (or at the bottom when the input section collapses).
-            Bottom padding absorbs the home-indicator safe area. */}
+        {/* Chevron indicator — always visible, inside the sticky input
+            container so it rides up with the keyboard together with the
+            textarea above it. Home-indicator safe-area inset is on the
+            .conversation-input class's padding-bottom. */}
         <button
           onClick={toggleControls}
-          className="shrink-0 flex justify-center items-center w-full"
+          className="flex justify-center items-center w-full"
           style={{
             color: 'rgba(255, 255, 255, 0.2)',
             paddingTop: '8px',
-            paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
           }}
           aria-label={controlsHidden ? 'Show input controls' : 'Hide input controls'}
         >

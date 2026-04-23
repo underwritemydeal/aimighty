@@ -34,7 +34,12 @@ export interface CaptureRenderOptions {
 }
 
 const CANVAS_W = 1080;
-const CANVAS_H = 1920;
+// Base 9:16 height. For most replies this is the exported canvas height.
+// For unusually long replies that wouldn't fit even at REPLY_FONT_MIN, the
+// canvas is extended below this so the FULL God response is captured —
+// the saved PNG is no longer guaranteed 9:16, but the text is never
+// clipped. See renderCaptureBlob for the overflow math.
+const CANVAS_H_BASE = 1920;
 
 // Target font sizes. The layout engine below scales these up/down to fit.
 const QUESTION_FONT_BASE = 34;
@@ -140,24 +145,31 @@ function fitReplyToHeight(
   return { fontPx: bestFont, lines: bestLines };
 }
 
-function drawBackground(ctx: CanvasRenderingContext2D, theme: BeliefTheme): void {
+function drawBackground(ctx: CanvasRenderingContext2D, theme: BeliefTheme, h: number): void {
   // Radial glow from upper-center outward, dissolving into the bg.
+  // Glow center is anchored to CANVAS_H_BASE * 0.25 so the glow always
+  // sits near the top of the image regardless of whether the canvas was
+  // extended to fit a long reply — extending pushes the wordmark down,
+  // not the glow.
+  const glowY = CANVAS_H_BASE * 0.25;
   const gradient = ctx.createRadialGradient(
-    CANVAS_W / 2, CANVAS_H * 0.25, 0,
-    CANVAS_W / 2, CANVAS_H * 0.25, CANVAS_W * 0.9
+    CANVAS_W / 2, glowY, 0,
+    CANVAS_W / 2, glowY, CANVAS_W * 0.9
   );
   gradient.addColorStop(0, theme.glow);
   gradient.addColorStop(0.55, theme.bg);
   gradient.addColorStop(1, theme.bg);
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillRect(0, 0, CANVAS_W, h);
 
-  // Vignette at the bottom for wordmark legibility.
-  const vignette = ctx.createLinearGradient(0, CANVAS_H * 0.7, 0, CANVAS_H);
+  // Vignette at the bottom for wordmark legibility. Anchored to the
+  // actual canvas bottom so extended captures get the vignette around
+  // the wordmark too, not stranded up in the middle.
+  const vignette = ctx.createLinearGradient(0, h * 0.7, 0, h);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');
   vignette.addColorStop(1, 'rgba(0,0,0,0.4)');
   ctx.fillStyle = vignette;
-  ctx.fillRect(0, CANVAS_H * 0.7, CANVAS_W, CANVAS_H * 0.3);
+  ctx.fillRect(0, h * 0.7, CANVAS_W, h * 0.3);
 }
 
 /**
@@ -165,22 +177,22 @@ function drawBackground(ctx: CanvasRenderingContext2D, theme: BeliefTheme): void
  * less-plastic feel and helps it not look like AI-generated slop on Instagram.
  * Skip on low-power devices where the noise fill is too expensive.
  */
-function drawGrain(ctx: CanvasRenderingContext2D): void {
+function drawGrain(ctx: CanvasRenderingContext2D, h: number): void {
   const density = 0.012; // ~1.2% of pixels get a noise dot
-  const count = Math.floor(CANVAS_W * CANVAS_H * density);
+  const count = Math.floor(CANVAS_W * h * density);
   ctx.save();
   ctx.globalAlpha = 0.06;
   ctx.fillStyle = '#ffffff';
   for (let i = 0; i < count; i++) {
     const x = Math.random() * CANVAS_W;
-    const y = Math.random() * CANVAS_H;
+    const y = Math.random() * h;
     ctx.fillRect(x, y, 1, 1);
   }
   ctx.restore();
 }
 
-function drawWordmark(ctx: CanvasRenderingContext2D, theme: BeliefTheme): void {
-  const bottomY = CANVAS_H - SAFE_BOTTOM;
+function drawWordmark(ctx: CanvasRenderingContext2D, theme: BeliefTheme, h: number): void {
+  const bottomY = h - SAFE_BOTTOM;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
@@ -218,9 +230,48 @@ export async function renderCaptureBlob(
 ): Promise<Blob> {
   const { question, reply, theme, scale = 1 } = opts;
 
+  // Phase 1 — measurement on a throwaway context so we can compute the
+  // final canvas height BEFORE allocating the real canvas.
+  const mctx = document.createElement('canvas').getContext('2d');
+  if (!mctx) throw new Error('Canvas 2D context unavailable');
+
+  const maxTextWidth = CANVAS_W - SIDE_PADDING * 2;
+
+  // 1a) Measure the question block at base size. Shrink if it wraps past 3 lines.
+  let questionFont = QUESTION_FONT_BASE;
+  mctx.font = `italic 400 ${questionFont}px Outfit, system-ui, sans-serif`;
+  let questionLines = wrapLines(mctx, question, maxTextWidth);
+  while (questionLines.length > 3 && questionFont > QUESTION_FONT_MIN) {
+    questionFont -= 2;
+    mctx.font = `italic 400 ${questionFont}px Outfit, system-ui, sans-serif`;
+    questionLines = wrapLines(mctx, question, maxTextWidth);
+  }
+  const questionLineHeight = questionFont * 1.35;
+  const questionBlockHeight = questionLines.length * questionLineHeight;
+
+  // 1b) Compute the vertical budget for the reply at the base (9:16) height.
+  const replyBlockTop = SAFE_TOP + questionBlockHeight + QUESTION_TO_REPLY_GAP;
+  const replyBlockBottomBase = CANVAS_H_BASE - SAFE_BOTTOM - WORDMARK_GAP - 100;
+  const replyAvailableBase = replyBlockBottomBase - replyBlockTop;
+
+  // 1c) Fit the reply with binary search across [min, max].
+  const { fontPx: replyFont, lines: replyLines } = fitReplyToHeight(
+    mctx, reply, maxTextWidth, replyAvailableBase, REPLY_FONT_MIN, REPLY_FONT_MAX, 1.4
+  );
+  const replyLineHeight = replyFont * 1.4;
+  const replyTotalHeight = replyLines.length * replyLineHeight;
+
+  // 1d) If the reply STILL overflowed its budget at the min font, extend
+  // the canvas height rather than silently clipping the tail of the text.
+  // This is what "capture the full God response" means — the saved PNG
+  // may be taller than 9:16 in that rare case, but nothing is lost.
+  const overflow = Math.max(0, replyTotalHeight - replyAvailableBase);
+  const finalCanvasH = CANVAS_H_BASE + overflow;
+
+  // Phase 2 — allocate the real canvas at the computed height.
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_W * scale;
-  canvas.height = CANVAS_H * scale;
+  canvas.height = finalCanvasH * scale;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable');
   ctx.scale(scale, scale);
@@ -229,32 +280,7 @@ export async function renderCaptureBlob(
   ctx.textRendering = 'optimizeLegibility';
   ctx.imageSmoothingQuality = 'high';
 
-  drawBackground(ctx, theme);
-
-  const maxTextWidth = CANVAS_W - SIDE_PADDING * 2;
-
-  // 1) Measure the question block at base size. Shrink if it wraps past 3 lines.
-  let questionFont = QUESTION_FONT_BASE;
-  ctx.font = `italic 400 ${questionFont}px Outfit, system-ui, sans-serif`;
-  let questionLines = wrapLines(ctx, question, maxTextWidth);
-  while (questionLines.length > 3 && questionFont > QUESTION_FONT_MIN) {
-    questionFont -= 2;
-    ctx.font = `italic 400 ${questionFont}px Outfit, system-ui, sans-serif`;
-    questionLines = wrapLines(ctx, question, maxTextWidth);
-  }
-  const questionLineHeight = questionFont * 1.35;
-  const questionBlockHeight = questionLines.length * questionLineHeight;
-
-  // 2) Compute the vertical budget for the reply.
-  const replyBlockTop = SAFE_TOP + questionBlockHeight + QUESTION_TO_REPLY_GAP;
-  const replyBlockBottom = CANVAS_H - SAFE_BOTTOM - WORDMARK_GAP - 100; // wordmark + url
-  const replyAvailable = replyBlockBottom - replyBlockTop;
-
-  // 3) Fit the reply with binary search across [min, max].
-  const { fontPx: replyFont, lines: replyLines } = fitReplyToHeight(
-    ctx, reply, maxTextWidth, replyAvailable, REPLY_FONT_MIN, REPLY_FONT_MAX, 1.4
-  );
-  const replyLineHeight = replyFont * 1.4;
+  drawBackground(ctx, theme, finalCanvasH);
 
   // 4) Draw question (center-aligned, muted).
   ctx.textAlign = 'center';
@@ -270,20 +296,24 @@ export async function renderCaptureBlob(
   // 5) Draw reply (center-aligned, full strength, Cormorant 300).
   ctx.font = `300 ${replyFont}px 'Cormorant Garamond', Georgia, serif`;
   ctx.fillStyle = theme.primary;
-  // Center the reply block vertically inside its available space so
-  // short replies don't sit awkwardly at the top of a huge empty region.
-  const replyTotalHeight = replyLines.length * replyLineHeight;
-  const replyStartY = replyBlockTop + Math.max(0, (replyAvailable - replyTotalHeight) / 2);
+  // When the reply fits inside the base canvas, center it vertically in
+  // the available space so short replies don't sit at the top of a huge
+  // empty region. When we had to extend the canvas, draw from the top
+  // of the reply block and let the extension absorb the excess.
+  const replyStartY = overflow > 0
+    ? replyBlockTop
+    : replyBlockTop + Math.max(0, (replyAvailableBase - replyTotalHeight) / 2);
   replyLines.forEach((line, i) => {
     if (!line) return; // paragraph spacer
     ctx.fillText(line, CANVAS_W / 2, replyStartY + i * replyLineHeight);
   });
 
-  // 6) Wordmark + URL at bottom.
-  drawWordmark(ctx, theme);
+  // 6) Wordmark + URL at bottom of the final canvas (moves down with
+  // the extension so it's always pinned to the actual bottom).
+  drawWordmark(ctx, theme, finalCanvasH);
 
   // 7) Film grain last so it sits on top of everything.
-  drawGrain(ctx);
+  drawGrain(ctx, finalCanvasH);
 
   // Export.
   return new Promise<Blob>((resolve, reject) => {
