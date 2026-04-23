@@ -1688,7 +1688,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         className="conversation-bg"
         style={{
           backgroundImage: `url(${actualImagePath})`,
-          transform: 'scale(1.02)',
+          /* scale + translateY pushes the face out of the header/status-bar
+             zone down to ~45% of the viewport on iPhone 16. On 9:16 source
+             images cover-fit to 9:19.5 viewports would otherwise pin the
+             face to the top third. Transform-origin at center-top keeps the
+             top edge anchored so there's no visible gap above the image. */
+          transform: 'scale(1.18) translateY(8%)',
           transformOrigin: 'center top',
           filter: 'saturate(0.7) brightness(0.85)',
         }}
@@ -2036,11 +2041,35 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           safe-area bottom padding. When the iOS keyboard opens and
           100dvh shrinks, .conversation-messages (flex:1) absorbs the
           reduction and this sticky input rides up with the container's
-          new bottom edge — no JS math required. */}
+          new bottom edge — no JS math required.
+
+          Order inside (top → bottom): chevron (hide/show toggle) → mic
+          button → textarea. Previously the chevron was below the textarea
+          which pushed the textarea well above the safe-area bottom; on
+          iPhone that made the input feel "floating mid-screen." Keeping
+          chevron at the top means the textarea sits one safe-area-inset
+          above the home indicator with no other element between them. */}
       <div className="conversation-input">
+        {/* Chevron indicator — always visible at the TOP of the input
+            container. Tapping toggles the mic + textarea visibility. When
+            controls are hidden, only the chevron remains pinned at this
+            spot above the home-indicator safe area. */}
+        <button
+          onClick={toggleControls}
+          className="flex justify-center items-center w-full"
+          style={{
+            color: 'rgba(255, 255, 255, 0.2)',
+            paddingTop: '4px',
+            paddingBottom: '4px',
+          }}
+          aria-label={controlsHidden ? 'Show input controls' : 'Hide input controls'}
+        >
+          <ChevronIndicator pointsUp={controlsHidden} />
+        </button>
+
         <div
           style={{
-            maxHeight: controlsHidden ? '0' : '400px',
+            maxHeight: controlsHidden ? '0' : '260px',
             overflow: 'hidden',
             opacity: controlsHidden ? 0 : (isVisible ? 1 : 0),
             transition: 'max-height 0.35s ease, opacity 0.3s ease',
@@ -2068,7 +2097,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             </button>
           )}
 
-          <div style={{ paddingTop: '12px' }}>
+          <div style={{ paddingTop: '6px' }}>
             {/* Message counter */}
             {!user.isPremium && remainingMessages <= 3 && (
               <div
@@ -2076,8 +2105,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 style={{
                   fontSize: '10px',
                   color: 'rgba(255,255,255,0.25)',
-                  marginTop: '8px',
-                  marginBottom: '12px',
+                  marginTop: '4px',
+                  marginBottom: '6px',
                 }}
               >
                 {remainingMessages === 0 ? t('conversation.freeMessagesUsed', language) : `${remainingMessages} ${t('conversation.freeMessages', language)}`}
@@ -2088,8 +2117,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             <div
               className="flex justify-center"
               style={{
-                marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '12px',
-                marginBottom: '12px',
+                marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '4px',
+                marginBottom: '6px',
               }}
             >
               <MicButton
@@ -2155,22 +2184,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                 (see handleMicToggle). No inline error rendering here. */}
           </div>
         </div>
-
-        {/* Chevron indicator — always visible, inside the sticky input
-            container so it rides up with the keyboard together with the
-            textarea above it. Home-indicator safe-area inset is on the
-            .conversation-input class's padding-bottom. */}
-        <button
-          onClick={toggleControls}
-          className="flex justify-center items-center w-full"
-          style={{
-            color: 'rgba(255, 255, 255, 0.2)',
-            paddingTop: '8px',
-          }}
-          aria-label={controlsHidden ? 'Show input controls' : 'Hide input controls'}
-        >
-          <ChevronIndicator pointsUp={controlsHidden} />
-        </button>
       </div>
 
       {/* Subscription-unavailable modal — shown when a paid user taps

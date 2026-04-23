@@ -568,8 +568,14 @@ button:disabled {
 .conversation-input {
   position: sticky;
   bottom: 0;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-  padding-top: 16px;
+  /* Chevron + mic-wrapper + counter each contribute their own vertical
+     rhythm internally. The outer container only adds the home-indicator
+     safe-area cushion + a tiny (6px) air-gap so the textarea sits as
+     close as iOS allows to the physical bottom edge. Reducing the prior
+     16/16 padding to 0/6 was the "text box feels too high" fix on
+     2026-04-22 (supersedes the 2026-04-22 lock's 16/16 defaults). */
+  padding-top: 0;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
   z-index: 30;
   flex-shrink: 0;
 }
