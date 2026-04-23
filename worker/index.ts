@@ -1284,14 +1284,37 @@ export default {
           );
         }
 
-        const totalMs = Date.now() - reqStart;
-        console.log(`[TTS ${rid}] ok total=${totalMs}ms (worker overhead ${totalMs - headersMs}ms + inworld ${headersMs}ms)`);
+        // Inworld's REST TTS returns JSON, NOT raw audio bytes:
+        //   { "audioContent": "<base64 MP3>" }
+        // The previous implementation passed ttsResponse.body through
+        // as audio/mpeg, which meant the browser tried to decode JSON
+        // as MP3 and silently played nothing. Decode the base64 here
+        // and return the real audio bytes.
+        const inworldJson = await ttsResponse.json() as { audioContent?: string; error?: unknown };
+        const audioB64 = inworldJson.audioContent;
+        if (!audioB64 || typeof audioB64 !== 'string') {
+          console.error(`[TTS ${rid}] inworld returned 200 but no audioContent — body keys: ${Object.keys(inworldJson).join(',')}`);
+          return new Response(
+            JSON.stringify({ error: 'TTS returned no audio', rid, details: JSON.stringify(inworldJson).slice(0, 500) }),
+            { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-        // Inworld returns raw MP3 bytes. Pass through untouched.
-        return new Response(ttsResponse.body, {
+        // atob decodes to a binary string; convert to Uint8Array for the
+        // Response body. Cloudflare Workers' atob matches the browser's
+        // contract so this works identically in-worker and in-browser.
+        const binaryStr = atob(audioB64);
+        const audioBytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) audioBytes[i] = binaryStr.charCodeAt(i);
+
+        const totalMs = Date.now() - reqStart;
+        console.log(`[TTS ${rid}] ok total=${totalMs}ms inworld=${headersMs}ms audio_bytes=${audioBytes.length} (base64 ${audioB64.length} chars)`);
+
+        return new Response(audioBytes, {
           headers: {
             ...corsHeaders,
             'Content-Type': 'audio/mpeg',
+            'Content-Length': audioBytes.length.toString(),
             'Cache-Control': 'no-store',
             'X-AImighty-Tts-Rid': rid,
             'X-AImighty-Tts-Voice': voiceId,
