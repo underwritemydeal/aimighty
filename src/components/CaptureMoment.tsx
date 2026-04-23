@@ -293,7 +293,16 @@ export function CaptureMoment({ question, reply, beliefId, imagePath, onClose }:
         </div>
 
         {/* God's reply — flex-grows to fill the middle so the canvas render
-            math mirrors this visual composition. */}
+            math mirrors this visual composition.
+            Long-reply handling (Task D): a reply beyond ~140 chars
+            overflows the composition at the default 24-38px clamp, so
+            we step font-size down in three buckets. As a belt-and-
+            suspenders fallback, the inner container is overflow-y:auto
+            — if a multi-paragraph reply still exceeds the middle slot,
+            the user can scroll it in-place instead of having the tail
+            clipped silently. The saved canvas PNG is rendered by
+            utils/captureImage.ts with its own sizing math, so this only
+            affects the on-screen preview. */}
         <div
           style={{
             flex: 1,
@@ -302,6 +311,8 @@ export function CaptureMoment({ question, reply, beliefId, imagePath, onClose }:
             justifyContent: 'center',
             marginTop: '6vh',
             marginBottom: '6vh',
+            minHeight: 0, /* lets flex children shrink below content size */
+            overflow: 'hidden',
           }}
         >
           <div
@@ -309,11 +320,19 @@ export function CaptureMoment({ question, reply, beliefId, imagePath, onClose }:
               textAlign: 'center',
               fontFamily: "'Cormorant Garamond', Georgia, serif",
               fontWeight: 300,
-              fontSize: 'clamp(24px, 6.5vw, 38px)',
+              fontSize: reply.length > 240
+                ? 'clamp(16px, 4vw, 22px)'
+                : reply.length > 140
+                ? 'clamp(20px, 5vw, 28px)'
+                : 'clamp(24px, 6.5vw, 38px)',
               color: theme.primary,
-              lineHeight: 1.4,
+              lineHeight: reply.length > 140 ? 1.5 : 1.4,
               whiteSpace: 'pre-wrap',
               maxWidth: '100%',
+              maxHeight: '100%',
+              overflowY: 'auto',
+              paddingRight: '4px',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             {reply}
