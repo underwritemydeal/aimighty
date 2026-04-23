@@ -193,7 +193,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
               priceNote={billingCycle === 'annual' ? '/ year' : '/ month'}
               features={[
                 { t: '10 conversations per day', ok: true },
-                { t: 'Daily Prayer, Sacred Text, Reflection', ok: true },
+                { t: 'Daily Prayer, Sacred Text, Daily Belief Study', ok: true },
                 { t: 'Conversation streak tracking', ok: true },
                 { t: 'Text conversations (browser voice)', ok: true },
                 { t: 'No premium AI voice', ok: false },

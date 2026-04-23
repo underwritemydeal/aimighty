@@ -263,8 +263,8 @@ export function TermsScreen({ onBack }: TermsScreenProps) {
               </h3>
               <p>We offer the following subscription tiers, which may be modified from time to time:</p>
               <ul className="list-disc list-inside space-y-2 mt-4 ml-4">
-                <li><strong>Believer ($4.99/month or $39.99/year):</strong> 2 conversations per day, 10 exchanges per conversation, text responses with browser-based voice output, all 14 belief systems, Midjourney-generated image backgrounds.</li>
-                <li><strong>Divine ($14.99/month or $119.99/year):</strong> 2 conversations per day, 10 exchanges per conversation, premium AI voice output (OpenAI TTS), character voice selection (God, Jesus, Mary, and belief-specific equivalents), conversation history, content library access, all Believer features.</li>
+                <li><strong>Believer ($4.99/month or $47.00/year):</strong> 10 conversations per day, text responses with browser-based voice output, all 14 belief systems, Midjourney-generated image backgrounds, daily prayer, sacred text, and Daily Belief Study.</li>
+                <li><strong>Divine ($14.99/month or $119.00/year):</strong> 20 conversations per day, premium AI voice output, character voice selection (God, Jesus, Mary, and belief-specific equivalents), conversation history and memory, personal library of saved reflections, all Believer features.</li>
               </ul>
 
               <h3 className="mt-6 mb-3" style={{ fontSize: 'var(--text-base)', fontWeight: 600, color: 'rgba(255, 255, 255, 0.9)' }}>
