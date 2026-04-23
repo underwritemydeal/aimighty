@@ -1432,9 +1432,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     unlockMobileAudio();
     const message = inputText.trim();
     setInputText('');
-    // Reset textarea height after the value clears — without this, the
-    // textarea keeps the grown height from the previous long input.
-    if (inputRef.current) inputRef.current.style.height = '';
+    // Height resets automatically via the auto-grow useEffect below —
+    // it fires on every inputText change including this clear.
     sendToAI(message);
   }, [inputText, isInputEnabled, sendToAI]);
 
@@ -1717,6 +1716,19 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       }
     }, 300);
   }, []);
+
+  // Auto-grow the textarea on any value change — covers typing AND
+  // external sources (mic onResult, Stripe handoff, daily-prompt primer
+  // that sets inputText via setInputText). A plain onChange handler
+  // misses the mic path because React doesn't synthesize onChange for
+  // setState-driven value updates; relying on that was the source of the
+  // stale-height "distortion" bug after a voice-to-text dictation.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [inputText]);
 
   const handleInputBlur = useCallback(() => {
     isInputFocusedRef.current = false;
@@ -2218,16 +2230,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   ref={inputRef}
                   rows={1}
                   value={inputText}
-                  onChange={(e) => {
-                    setInputText(e.target.value);
-                    // Auto-grow: reset to min, then size to scrollHeight up
-                    // to the CSS max-height (120px). The CSS max-height +
-                    // overflow-y:auto makes the textarea scroll internally
-                    // once content exceeds 4 lines.
-                    const el = e.currentTarget;
-                    el.style.height = 'auto';
-                    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
-                  }}
+                  onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onFocus={handleInputFocus}
                   onBlur={handleInputBlur}
@@ -2239,6 +2242,18 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   style={{
                     paddingRight: inputText.trim() ? '50px' : '20px',
                     opacity: isInputEnabled ? 1 : 0.35,
+                    // touch-action: manipulation kills Safari's 300ms
+                    // double-tap-to-zoom gesture on the textarea, which
+                    // was the source of the visible distortion on first
+                    // tap. scrollMarginBottom gives iOS a bottom cushion
+                    // when scrollIntoView centers the field, so the
+                    // keyboard dismiss never clips the field.
+                    touchAction: 'manipulation',
+                    scrollMarginBottom: '20px',
+                    // Promote to its own compositor layer so the height
+                    // transition (auto-grow) doesn't force a reflow of
+                    // the message list above.
+                    transform: 'translateZ(0)',
                   }}
                 />
                 {inputText.trim() && isInputEnabled && (
