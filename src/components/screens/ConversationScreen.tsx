@@ -1805,11 +1805,26 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         />
       )}
 
-      {/* Gradient overlay - transparent top, dark bottom for text readability */}
+      {/* Gradient overlay.
+          Top: darkened so the header icons read cleanly and God's face
+          visually recedes behind them. Measurement on iPhone 16:
+          safe-area-inset-top ≈ 59px, then 12px padding, then 44px icon
+          row ⇒ header bottom ≈ 115px ≈ 13% of 852px viewport. A 0.65
+          darkening stop at 0% that fades through 0.25 at 12% gives the
+          header tonal separation without making the photo feel murky.
+          Bottom: unchanged — same ramp the input/text readability
+          relied on before. */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 40%, rgba(3,3,8,0.55) 70%, rgba(3,3,8,0.85) 100%)',
+          background:
+            'linear-gradient(to bottom, ' +
+            'rgba(3,3,8,0.65) 0%, ' +
+            'rgba(3,3,8,0.25) 12%, ' +
+            'rgba(0,0,0,0) 25%, ' +
+            'rgba(0,0,0,0.15) 55%, ' +
+            'rgba(3,3,8,0.55) 75%, ' +
+            'rgba(3,3,8,0.85) 100%)',
           zIndex: 1,
         }}
         aria-hidden="true"
