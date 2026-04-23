@@ -1068,6 +1068,11 @@ export default {
 
     // TTS endpoint — Smallest AI Lightning V3.1 + V2
     if (request.method === 'POST' && url.pathname === '/tts') {
+      // Request correlation id so every log line for a single TTS
+      // request can be stitched together in `wrangler tail`. Short
+      // base36 of ms+random keeps it readable.
+      const rid = `tts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const reqStart = Date.now();
       try {
         const body = await request.json() as {
           text: string;
@@ -1079,31 +1084,55 @@ export default {
         const { text, beliefSystem: rawBeliefSystem, language = 'en' } = body;
 
         if (!text || !rawBeliefSystem) {
+          console.warn(`[TTS ${rid}] reject=missing-fields has_text=${Boolean(text)} has_belief=${Boolean(rawBeliefSystem)}`);
           return new Response(
-            JSON.stringify({ error: 'Missing text or beliefSystem' }),
+            JSON.stringify({ error: 'Missing text or beliefSystem', rid }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
         if (!env.SMALLEST_AI_API_KEY) {
+          console.error(`[TTS ${rid}] reject=no-api-key — SMALLEST_AI_API_KEY secret not set on worker`);
           return new Response(
-            JSON.stringify({ error: 'Smallest AI not configured' }),
+            JSON.stringify({ error: 'Smallest AI not configured', rid }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         const beliefSystem = normalizeBeliefId(rawBeliefSystem);
-        const characterKey = BELIEF_CHARACTER_MAP[beliefSystem] || 'god';
+        // Log any belief that wasn't in BELIEF_CHARACTER_MAP — this is the
+        // silent failure mode where a new belief gets added to the frontend
+        // but never gets a voice mapping, and the user hears god/Robby's
+        // clone for e.g. Islam or Buddhism without knowing why.
+        let characterKey = BELIEF_CHARACTER_MAP[beliefSystem];
+        if (!characterKey) {
+          console.warn(`[TTS ${rid}] belief=${beliefSystem} not in BELIEF_CHARACTER_MAP — falling back to 'god'. Add to BELIEF_CHARACTER_MAP to fix.`);
+          characterKey = 'god';
+        }
         const voiceConfig = SMALLEST_AI_VOICES[characterKey];
+        if (!voiceConfig) {
+          console.error(`[TTS ${rid}] characterKey=${characterKey} not in SMALLEST_AI_VOICES — map is out of sync.`);
+          return new Response(
+            JSON.stringify({ error: 'Voice mapping out of sync', rid, characterKey }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         const smallestLang = SMALLEST_AI_LANGUAGE_MAP[language] || 'en';
+        if (language && !SMALLEST_AI_LANGUAGE_MAP[language]) {
+          console.warn(`[TTS ${rid}] lang=${language} unsupported by Smallest AI — falling back to 'en'. Supported: ${Object.keys(SMALLEST_AI_LANGUAGE_MAP).join(',')}`);
+        }
 
-        console.log('[TTS] Request - belief:', beliefSystem, 'character:', characterKey, 'voice:', voiceConfig.voice_id, 'model:', voiceConfig.endpoint, 'lang:', smallestLang, 'text_length:', text.length);
+        const endpointTag = voiceConfig.endpoint.includes('lightning-v3.1') ? 'v3.1' : voiceConfig.endpoint.includes('lightning-v2') ? 'v2' : 'unknown';
+        console.log(`[TTS ${rid}] route belief=${beliefSystem} character=${characterKey} voice_id=${voiceConfig.voice_id} model=${endpointTag} speed=${voiceConfig.speed} lang=${smallestLang} text_length=${text.length}`);
 
         // Prepare text and cap it
         const preparedText = prepareTextForSpeech(text);
         const spokenText = capTextForTTS(preparedText, 1500);
+        if (spokenText.length !== text.length) {
+          console.log(`[TTS ${rid}] text capped ${text.length}→${spokenText.length} chars`);
+        }
 
         // Cost logging — Smallest AI charges per character (~$0.005/1k chars, much cheaper than OpenAI)
-        console.log('[COST] TTS call - chars:', spokenText.length, 'est: $' + (spokenText.length / 1000 * 0.005).toFixed(5));
+        console.log(`[TTS ${rid}] cost chars=${spokenText.length} est=$${(spokenText.length / 1000 * 0.005).toFixed(5)}`);
 
         const t0 = Date.now();
         const ttsResponse = await fetch(voiceConfig.endpoint, {
@@ -1123,16 +1152,22 @@ export default {
           }),
         });
 
-        console.log(`[TTS-TIMING] worker→smallest headers t+${Date.now() - t0}ms status=${ttsResponse.status}`);
+        const headersMs = Date.now() - t0;
+        const smallestContentType = ttsResponse.headers.get('content-type') || '?';
+        const smallestContentLength = ttsResponse.headers.get('content-length') || '?';
+        console.log(`[TTS ${rid}] smallest headers t+${headersMs}ms status=${ttsResponse.status} content-type=${smallestContentType} content-length=${smallestContentLength}`);
 
         if (!ttsResponse.ok) {
           const errorText = await ttsResponse.text();
-          console.error('[TTS] Smallest AI error:', ttsResponse.status, errorText);
+          console.error(`[TTS ${rid}] smallest error status=${ttsResponse.status} voice_id=${voiceConfig.voice_id} model=${endpointTag} body=${errorText.slice(0, 500)}`);
           return new Response(
-            JSON.stringify({ error: 'TTS failed', details: errorText }),
+            JSON.stringify({ error: 'TTS failed', details: errorText, rid }),
             { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
+
+        const totalMs = Date.now() - reqStart;
+        console.log(`[TTS ${rid}] ok total=${totalMs}ms (worker overhead ${totalMs - headersMs}ms + smallest ${headersMs}ms)`);
 
         // Smallest AI returns raw audio bytes directly
         return new Response(ttsResponse.body, {
@@ -1140,12 +1175,19 @@ export default {
             ...corsHeaders,
             'Content-Type': 'audio/mpeg',
             'Cache-Control': 'no-store',
+            'X-AImighty-Tts-Rid': rid,
+            'X-AImighty-Tts-Voice': voiceConfig.voice_id,
+            'X-AImighty-Tts-Model': endpointTag,
           },
         });
       } catch (error) {
-        console.error('TTS error:', error);
+        const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        console.error(`[TTS ${rid}] internal error after t+${Date.now() - reqStart}ms — ${msg}`);
+        if (error instanceof Error && error.stack) {
+          console.error(`[TTS ${rid}] stack: ${error.stack}`);
+        }
         return new Response(
-          JSON.stringify({ error: 'TTS internal error' }),
+          JSON.stringify({ error: 'TTS internal error', rid }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
