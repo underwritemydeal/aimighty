@@ -5,7 +5,12 @@
 
 interface Env {
   ANTHROPIC_API_KEY: string;
-  SMALLEST_AI_API_KEY: string; // Smallest AI Lightning V3.1 + V2 (TTS)
+  // TTS — primary is Inworld TTS 1.5 Mini. SMALLEST_AI_API_KEY is kept as a
+  // fallback secret (the /tts endpoint currently calls Inworld only, but the
+  // Smallest AI voice map + endpoint constants remain in the file so we can
+  // flip back with a one-line change if Inworld regresses during validation).
+  INWORLD_API_KEY?: string; // Base64 `<client_id>:<client_secret>` — used as `Authorization: Basic ${INWORLD_API_KEY}`.
+  SMALLEST_AI_API_KEY?: string; // legacy fallback — scheduled for removal after iPhone validation of Inworld.
   OPENAI_API_KEY?: string; // legacy — kept for fallback only, no longer used by /tts
   ARTICLES?: KVNamespace; // For article generation history + email subscribers
   RESEND_API_KEY?: string; // For newsletter (Resend)
@@ -484,6 +489,81 @@ const BELIEF_CHARACTER_MAP: Record<string, keyof typeof SMALLEST_AI_VOICES> = {
   taoism: 'universe',
   pantheism: 'universe',
 };
+
+// ═══════════════════════════════════════════════════════════════
+// INWORLD TTS 1.5 MINI — VOICE MAP (primary TTS provider)
+// ═══════════════════════════════════════════════════════════════
+// Flat <belief>:<character> → { voice_id, speed } lookup so a future
+// provider swap is ONE LINE per entry. Character is the frontend's
+// Character type ('god' | 'jesus' | 'mary'). For non-Christian beliefs
+// only 'god' and 'mary' resolve; any 'jesus' request on a non-Christian
+// belief falls through to the belief's default 'god' entry.
+
+const INWORLD_API_URL = 'https://api.inworld.ai/tts/v1/voice';
+const INWORLD_MODEL_ID = 'inworld-tts-1.5-mini';
+
+interface InworldVoiceConfig {
+  voice_id: string;
+  speed: number;
+  description: string;
+}
+
+const INWORLD_VOICES: Record<string, InworldVoiceConfig> = {
+  // Christian — separate God / Jesus / Mary voices per sprint spec.
+  'protestant:god':         { voice_id: 'Hades',  speed: 0.9,  description: 'Protestant God the Father' },
+  'protestant:jesus':       { voice_id: 'Levi',   speed: 1.0,  description: 'Protestant Jesus' },
+  'protestant:mary':        { voice_id: 'Luna',   speed: 1.0,  description: 'Protestant Mary' },
+  'catholic:god':           { voice_id: 'Hades',  speed: 0.9,  description: 'Catholic God' },
+  'catholic:jesus':         { voice_id: 'Levi',   speed: 1.0,  description: 'Catholic Jesus' },
+  'catholic:mary':          { voice_id: 'Luna',   speed: 1.0,  description: 'Catholic Mary' },
+  'mormonism:god':          { voice_id: 'Hades',  speed: 0.9,  description: 'LDS Heavenly Father' },
+  'mormonism:jesus':        { voice_id: 'Levi',   speed: 1.0,  description: 'LDS Jesus' },
+  'mormonism:mary':         { voice_id: 'Luna',   speed: 1.0,  description: 'LDS Heavenly Mother' },
+
+  // Islam group (Jonah — dignified authority).
+  'islam:god':              { voice_id: 'Jonah',  speed: 0.9,  description: 'Islam Scholar' },
+  'hinduism:god':           { voice_id: 'Jonah',  speed: 1.0,  description: 'Hinduism Brahman' },
+  'sikhism:god':            { voice_id: 'Jonah',  speed: 0.95, description: 'Sikhism Waheguru' },
+
+  // Wise older (Elliot).
+  'judaism:god':            { voice_id: 'Elliot', speed: 1.0,  description: 'Judaism Rabbi' },
+  'buddhism:god':           { voice_id: 'Elliot', speed: 0.85, description: 'Buddhism Buddha' },
+  'taoism:god':             { voice_id: 'Elliot', speed: 0.85, description: 'Taoism Sage' },
+  'science:god':            { voice_id: 'Elliot', speed: 1.0,  description: 'Science Cosmos' },
+  'agnosticism:god':        { voice_id: 'Elliot', speed: 1.05, description: 'Agnosticism Inner Voice' },
+  'atheism-stoicism:god':   { voice_id: 'Elliot', speed: 0.95, description: 'Atheism/Stoicism Reason' },
+
+  // Feminine / universal (Luna).
+  'sbnr:god':               { voice_id: 'Luna',   speed: 0.95, description: 'SBNR Universe' },
+  'pantheism:god':          { voice_id: 'Luna',   speed: 0.95, description: 'Pantheism Gaia' },
+
+  // Divine Feminine (mary) for non-Christian beliefs — Luna across the
+  // board since the sprint only named Luna for the two spiritual beliefs
+  // but the CharacterSelector still offers "mary" on every tradition.
+  'islam:mary':             { voice_id: 'Luna',   speed: 1.0,  description: 'Maryam / divine feminine' },
+  'hinduism:mary':          { voice_id: 'Luna',   speed: 1.0,  description: 'Divine Mother' },
+  'sikhism:mary':           { voice_id: 'Luna',   speed: 1.0,  description: 'Divine Light' },
+  'judaism:mary':           { voice_id: 'Luna',   speed: 1.0,  description: 'Shekhinah' },
+  'buddhism:mary':          { voice_id: 'Luna',   speed: 1.0,  description: 'Kuan Yin' },
+  'taoism:mary':            { voice_id: 'Luna',   speed: 1.0,  description: 'Divine Feminine (Yin)' },
+  'science:mary':           { voice_id: 'Luna',   speed: 1.0,  description: 'Universe (nurturing)' },
+  'agnosticism:mary':       { voice_id: 'Luna',   speed: 1.0,  description: 'Inner Voice (compassion)' },
+  'atheism-stoicism:mary':  { voice_id: 'Luna',   speed: 1.0,  description: 'Wisdom (nurturing)' },
+  'sbnr:mary':              { voice_id: 'Luna',   speed: 1.0,  description: 'Source Energy' },
+  'pantheism:mary':         { voice_id: 'Luna',   speed: 1.0,  description: 'Gaia' },
+};
+
+function resolveInworldVoice(belief: string, character: string): InworldVoiceConfig {
+  const key = `${belief}:${character}`;
+  const exact = INWORLD_VOICES[key];
+  if (exact) return exact;
+  // 'jesus' requested on a non-Christian belief → fall back to belief's 'god'.
+  const godKey = `${belief}:god`;
+  const godFallback = INWORLD_VOICES[godKey];
+  if (godFallback) return godFallback;
+  // Final fallback: Elliot @ 1.0. Widely usable, neutral cadence.
+  return { voice_id: 'Elliot', speed: 1.0, description: 'fallback (unmapped belief)' };
+}
 
 // App language code → Smallest AI language code
 const SMALLEST_AI_LANGUAGE_MAP: Record<string, string> = {
@@ -1066,129 +1146,169 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // TTS endpoint — Smallest AI Lightning V3.1 + V2
+    // TTS endpoint — Inworld TTS 1.5 Mini (primary).
+    //
+    // Protocol: POST https://api.inworld.ai/tts/v1/voice
+    // Auth:     Authorization: Basic ${INWORLD_API_KEY} (NOT Bearer).
+    // Body:     { text, voice_id, model_id, audio_config: { audio_encoding,
+    //             sample_rate_hertz, speaking_rate } }
+    // Response: binary MP3, streamed back to the caller untouched.
+    //
+    // Smallest AI constants (SMALLEST_AI_VOICES, SMALLEST_V3_1, etc.) are
+    // intentionally retained above — the migration is staged so we can
+    // flip back in one line if Inworld regresses during iPhone validation.
     if (request.method === 'POST' && url.pathname === '/tts') {
-      // Request correlation id so every log line for a single TTS
-      // request can be stitched together in `wrangler tail`. Short
-      // base36 of ms+random keeps it readable.
       const rid = `tts_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const reqStart = Date.now();
       try {
+        // The frontend uses { text, beliefSystem, character, language }.
+        // Accept both { voiceId } + { speed } overrides for ad-hoc curl
+        // testing (the task deliverable prints a test curl that uses
+        // these top-level keys).
         const body = await request.json() as {
           text: string;
-          beliefSystem: string;
+          beliefSystem?: string;
           character?: string;
           language?: string;
+          voiceId?: string;
+          speed?: number;
         };
 
-        const { text, beliefSystem: rawBeliefSystem, language = 'en' } = body;
+        const { text, beliefSystem: rawBeliefSystem, character: rawCharacter = 'god' } = body;
 
-        if (!text || !rawBeliefSystem) {
-          console.warn(`[TTS ${rid}] reject=missing-fields has_text=${Boolean(text)} has_belief=${Boolean(rawBeliefSystem)}`);
+        if (!text) {
+          console.warn(`[TTS ${rid}] reject=missing-text`);
           return new Response(
-            JSON.stringify({ error: 'Missing text or beliefSystem', rid }),
+            JSON.stringify({ error: 'Missing text', rid }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        if (!env.SMALLEST_AI_API_KEY) {
-          console.error(`[TTS ${rid}] reject=no-api-key — SMALLEST_AI_API_KEY secret not set on worker`);
+        if (!env.INWORLD_API_KEY) {
+          console.error(`[TTS ${rid}] reject=no-api-key — INWORLD_API_KEY secret not set on worker (set via: wrangler secret put INWORLD_API_KEY)`);
           return new Response(
-            JSON.stringify({ error: 'Smallest AI not configured', rid }),
+            JSON.stringify({ error: 'Inworld not configured', rid }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
-        const beliefSystem = normalizeBeliefId(rawBeliefSystem);
-        // Log any belief that wasn't in BELIEF_CHARACTER_MAP — this is the
-        // silent failure mode where a new belief gets added to the frontend
-        // but never gets a voice mapping, and the user hears god/Robby's
-        // clone for e.g. Islam or Buddhism without knowing why.
-        let characterKey = BELIEF_CHARACTER_MAP[beliefSystem];
-        if (!characterKey) {
-          console.warn(`[TTS ${rid}] belief=${beliefSystem} not in BELIEF_CHARACTER_MAP — falling back to 'god'. Add to BELIEF_CHARACTER_MAP to fix.`);
-          characterKey = 'god';
-        }
-        const voiceConfig = SMALLEST_AI_VOICES[characterKey];
-        if (!voiceConfig) {
-          console.error(`[TTS ${rid}] characterKey=${characterKey} not in SMALLEST_AI_VOICES — map is out of sync.`);
+        // Resolve voice: explicit {voiceId, speed} override (curl testing)
+        // takes precedence; otherwise look up belief:character in the
+        // Inworld voice map.
+        let voiceId: string;
+        let speed: number;
+        let routeLabel: string;
+        if (body.voiceId) {
+          voiceId = body.voiceId;
+          speed = typeof body.speed === 'number' ? body.speed : 1.0;
+          routeLabel = `override voice=${voiceId} speed=${speed}`;
+        } else if (rawBeliefSystem) {
+          const belief = normalizeBeliefId(rawBeliefSystem);
+          const character = rawCharacter;
+          const config = resolveInworldVoice(belief, character);
+          voiceId = config.voice_id;
+          speed = config.speed;
+          routeLabel = `belief=${belief} character=${character} voice=${voiceId} speed=${speed} (${config.description})`;
+          // Warn on fallback so new beliefs without mappings are visible in tail.
+          const isExactMatch = Boolean(INWORLD_VOICES[`${belief}:${character}`]);
+          if (!isExactMatch) {
+            console.warn(`[TTS ${rid}] no exact mapping for ${belief}:${character} — fell back to ${voiceId}/${speed}. Add to INWORLD_VOICES to fix.`);
+          }
+        } else {
+          console.warn(`[TTS ${rid}] reject=missing-belief-and-voice (need either beliefSystem or voiceId)`);
           return new Response(
-            JSON.stringify({ error: 'Voice mapping out of sync', rid, characterKey }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ error: 'Must provide beliefSystem or voiceId', rid }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        const smallestLang = SMALLEST_AI_LANGUAGE_MAP[language] || 'en';
-        if (language && !SMALLEST_AI_LANGUAGE_MAP[language]) {
-          console.warn(`[TTS ${rid}] lang=${language} unsupported by Smallest AI — falling back to 'en'. Supported: ${Object.keys(SMALLEST_AI_LANGUAGE_MAP).join(',')}`);
-        }
 
-        const endpointTag = voiceConfig.endpoint.includes('lightning-v3.1') ? 'v3.1' : voiceConfig.endpoint.includes('lightning-v2') ? 'v2' : 'unknown';
-        console.log(`[TTS ${rid}] route belief=${beliefSystem} character=${characterKey} voice_id=${voiceConfig.voice_id} model=${endpointTag} speed=${voiceConfig.speed} lang=${smallestLang} text_length=${text.length}`);
+        console.log(`[tts ${rid}] provider=inworld voice=${voiceId} speed=${speed} chars=${text.length}`);
+        console.log(`[TTS ${rid}] route ${routeLabel} text_length=${text.length}`);
 
-        // Prepare text and cap it
+        // Prepare text and cap it (same prep as Smallest AI path — strips
+        // markdown, caps at 1500 chars).
         const preparedText = prepareTextForSpeech(text);
         const spokenText = capTextForTTS(preparedText, 1500);
         if (spokenText.length !== text.length) {
           console.log(`[TTS ${rid}] text capped ${text.length}→${spokenText.length} chars`);
         }
 
-        // Cost logging — Smallest AI charges per character (~$0.005/1k chars, much cheaper than OpenAI)
-        console.log(`[TTS ${rid}] cost chars=${spokenText.length} est=$${(spokenText.length / 1000 * 0.005).toFixed(5)}`);
+        // 30s time-to-headers budget. Inworld typically replies in <3s;
+        // anything beyond 30s is a network stall — let it fail cleanly
+        // so the caller can fall back to browser SpeechSynthesis.
+        const timeoutController = new AbortController();
+        const timeoutId = setTimeout(() => timeoutController.abort(), 30000);
 
         const t0 = Date.now();
-        const ttsResponse = await fetch(voiceConfig.endpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${env.SMALLEST_AI_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: spokenText,
-            voice_id: voiceConfig.voice_id,
-            sample_rate: 16000,
-            speed: voiceConfig.speed,
-            language: smallestLang,
-            output_format: 'mp3',
-            add_wav_header: false,
-          }),
-        });
+        let ttsResponse: Response;
+        try {
+          ttsResponse = await fetch(INWORLD_API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${env.INWORLD_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: spokenText,
+              voice_id: voiceId,
+              model_id: INWORLD_MODEL_ID,
+              audio_config: {
+                audio_encoding: 'MP3',
+                sample_rate_hertz: 22050,
+                speaking_rate: speed,
+              },
+            }),
+            signal: timeoutController.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         const headersMs = Date.now() - t0;
-        const smallestContentType = ttsResponse.headers.get('content-type') || '?';
-        const smallestContentLength = ttsResponse.headers.get('content-length') || '?';
-        console.log(`[TTS ${rid}] smallest headers t+${headersMs}ms status=${ttsResponse.status} content-type=${smallestContentType} content-length=${smallestContentLength}`);
+        const inworldContentType = ttsResponse.headers.get('content-type') || '?';
+        const inworldContentLength = ttsResponse.headers.get('content-length') || '?';
+        console.log(`[TTS ${rid}] inworld headers t+${headersMs}ms status=${ttsResponse.status} content-type=${inworldContentType} content-length=${inworldContentLength}`);
 
+        // 429 handling: Inworld rate-limits per workspace. Preserve the
+        // same behavior as the prior Smallest AI path — return 502 with
+        // the upstream body so the frontend can surface a friendly
+        // toast + the browser SpeechSynthesis fallback kicks in for
+        // Believer tier. Divine tier caller sees the error in the toast
+        // and can retry.
         if (!ttsResponse.ok) {
           const errorText = await ttsResponse.text();
-          console.error(`[TTS ${rid}] smallest error status=${ttsResponse.status} voice_id=${voiceConfig.voice_id} model=${endpointTag} body=${errorText.slice(0, 500)}`);
+          const level = ttsResponse.status === 429 ? 'warn' : 'error';
+          console[level](`[TTS ${rid}] inworld ${level} status=${ttsResponse.status} voice=${voiceId} body=${errorText.slice(0, 500)}`);
           return new Response(
-            JSON.stringify({ error: 'TTS failed', details: errorText, rid }),
+            JSON.stringify({ error: 'TTS failed', status: ttsResponse.status, details: errorText, rid }),
             { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
 
         const totalMs = Date.now() - reqStart;
-        console.log(`[TTS ${rid}] ok total=${totalMs}ms (worker overhead ${totalMs - headersMs}ms + smallest ${headersMs}ms)`);
+        console.log(`[TTS ${rid}] ok total=${totalMs}ms (worker overhead ${totalMs - headersMs}ms + inworld ${headersMs}ms)`);
 
-        // Smallest AI returns raw audio bytes directly
+        // Inworld returns raw MP3 bytes. Pass through untouched.
         return new Response(ttsResponse.body, {
           headers: {
             ...corsHeaders,
             'Content-Type': 'audio/mpeg',
             'Cache-Control': 'no-store',
             'X-AImighty-Tts-Rid': rid,
-            'X-AImighty-Tts-Voice': voiceConfig.voice_id,
-            'X-AImighty-Tts-Model': endpointTag,
+            'X-AImighty-Tts-Voice': voiceId,
+            'X-AImighty-Tts-Model': INWORLD_MODEL_ID,
+            'X-AImighty-Tts-Provider': 'inworld',
           },
         });
       } catch (error) {
         const msg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-        console.error(`[TTS ${rid}] internal error after t+${Date.now() - reqStart}ms — ${msg}`);
-        if (error instanceof Error && error.stack) {
+        const isAbort = error instanceof Error && error.name === 'AbortError';
+        console.error(`[TTS ${rid}] internal error after t+${Date.now() - reqStart}ms — ${isAbort ? 'timeout 30s' : msg}`);
+        if (error instanceof Error && error.stack && !isAbort) {
           console.error(`[TTS ${rid}] stack: ${error.stack}`);
         }
         return new Response(
-          JSON.stringify({ error: 'TTS internal error', rid }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ error: isAbort ? 'TTS timeout' : 'TTS internal error', rid }),
+          { status: isAbort ? 504 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
