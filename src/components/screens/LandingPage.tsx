@@ -607,7 +607,7 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               accentBorder
               features={[
                 { t: '10 conversations per day', ok: true },
-                { t: 'Daily Prayer, Sacred Text, Reflection', ok: true },
+                { t: 'Daily Prayer, Sacred Text, Daily Belief Study', ok: true },
                 { t: 'Streak tracking', ok: true },
                 { t: 'Browser voice', ok: true },
                 { t: 'Premium AI voice', ok: false },
@@ -626,11 +626,12 @@ export function LandingPage({ onEnterApp, onNavigate }: LandingPageProps) {
               features={[
                 { t: '20 conversations per day', ok: true },
                 { t: 'Everything in Believer', ok: true },
-                { t: 'Premium AI voice — warm, human', ok: true },
-                { t: 'God remembers you', ok: true },
+                { t: 'Premium AI voice', ok: true },
+                { t: 'Conversations remembered', ok: true },
                 { t: 'Personalized Daily Blessing', ok: true },
-                { t: 'Daily Belief Study — three questions for conversation', ok: true },
-                { t: 'Cinematic word-by-word text', ok: true },
+                { t: 'Daily Belief Study - Interactive', ok: true },
+                { t: 'Streak tracker', ok: true },
+                { t: 'Personal library — every article, prayer & reflection saved', ok: true },
               ]}
             />
           </div>

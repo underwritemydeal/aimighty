@@ -739,13 +739,13 @@ const SettingsDropdown = memo(function SettingsDropdown({
       >
         {/* Daily content. "Reflection" was removed and its role is now
             filled by Daily Belief Study (a live 3-question conversational
-            flow); the old single-prompt reflection screen dead-ended in
-            a button that just primed the input and kicked back to chat.
-            DBS is Divine-only — believer and free see the padlock + pay-
-            wall route. */}
+            flow). The LandingPage + PaywallScreen market DBS as a Believer
+            feature (Divine gets the "- Interactive" variant with memory
+            recall), so Believer tier has access here too — only free users
+            see the padlock. Marketing and product stay in sync. */}
         {item('Daily Prayer', onDailyPrayer)}
         {item('Sacred Text', onSacredText)}
-        {item('Daily Belief Study', onDailyBeliefStudy, tier !== 'divine')}
+        {item('Daily Belief Study', onDailyBeliefStudy)}
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
 

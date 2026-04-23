@@ -215,7 +215,7 @@ export function PaywallScreen({ onBack, language }: PaywallScreenProps) {
                 { t: 'Premium AI voice', ok: true },
                 { t: 'Conversations remembered', ok: true },
                 { t: 'Personalized Daily Blessing', ok: true },
-                { t: 'Daily Belief Study', ok: true },
+                { t: 'Daily Belief Study - Interactive', ok: true },
                 { t: 'Streak tracker', ok: true },
                 { t: 'Personal library — every article, prayer & reflection saved', ok: true },
               ]}
