@@ -2,14 +2,11 @@
  * BackgroundGallery — dev-only preview surface at /dev/backgrounds.
  *
  * Three modes:
- *   1. No params  → 3×7 grid of all Phase 1 variants, tap any to open.
+ *   1. No params  → 14×7 grid of all photoreal variants, tap any to open.
  *   2. ?belief=X  → 7 variants for a single belief, in full-width cards.
- *   3. ?belief=X&variant=N  → single variant, rendered in the real
+ *   3. ?belief=X&variant=N  → single variant rendered against the real
  *      ConversationScreen flex layout (100dvh, sticky input mock, tonal
  *      overlay) for on-device iPhone QA.
- *
- * This page is dev-only, unlinked from the app, and trivially removable
- * once all 14 beliefs are built in Phase 2.
  */
 import { useMemo } from 'react';
 import {
@@ -20,11 +17,32 @@ import {
 import { colors, fonts, fontWeights } from '../../styles/designSystem';
 import { normalizeBeliefId } from '../../config/beliefSystems';
 
-const PHASE_1_LABELS: Record<string, string> = {
-  protestant: 'Christianity',
+const BELIEF_LABELS: Record<string, string> = {
+  protestant: 'Christianity (Protestant)',
+  catholic: 'Christianity (Catholic)',
+  mormonism: 'Christianity (LDS)',
   islam: 'Islam',
+  judaism: 'Judaism',
+  hinduism: 'Hinduism',
   buddhism: 'Buddhism',
+  sikhism: 'Sikhism',
+  sbnr: 'Spiritual but not Religious',
+  taoism: 'Taoism',
+  pantheism: 'Pantheism',
+  science: 'Science / Cosmos',
+  agnosticism: 'Agnosticism',
+  'atheism-stoicism': 'Atheism / Stoicism',
 };
+
+const VARIANT_NAMES = [
+  'Centered Radial',
+  'Horizon-Grounded',
+  'High-Corner Accent',
+  'Diagonal Light Shaft',
+  'Overhead Dome',
+  'Low-Angle Ground',
+  'Atmospheric Mist',
+];
 
 interface BackgroundGalleryProps {
   belief: string | null;
@@ -53,10 +71,23 @@ export function BackgroundGallery({ belief, variant }: BackgroundGalleryProps) {
   return <GridPreview />;
 }
 
+// Group flat config list by beliefId → ordered variant indexes.
+function groupByBelief() {
+  const all = getAllBackgroundConfigs();
+  const grouped = new Map<string, number[]>();
+  for (const { beliefId, variantIndex } of all) {
+    const list = grouped.get(beliefId) ?? [];
+    list.push(variantIndex);
+    grouped.set(beliefId, list);
+  }
+  for (const list of grouped.values()) list.sort((a, b) => a - b);
+  return grouped;
+}
+
 // ──────────────────────────────────────────────────────────────
-// GRID MODE — 3 beliefs × 7 variants, each a 9:16 tap-through card.
+// GRID MODE — 14 beliefs × 7 variants, each a 9:16 tap-through card.
 function GridPreview() {
-  const configs = useMemo(() => getAllBackgroundConfigs(), []);
+  const grouped = useMemo(groupByBelief, []);
   return (
     <div
       style={{
@@ -81,13 +112,13 @@ function GridPreview() {
           <span style={{ opacity: 0.5, marginLeft: '16px' }}>/ dev / backgrounds</span>
         </div>
         <p style={{ marginTop: '12px', opacity: 0.65, fontSize: '0.9rem', lineHeight: 1.5 }}>
-          Phase 1 — per-belief sacred-geometry backgrounds. Three beliefs × seven daily
-          variants = 21 compositions. Tap any tile to open that variant in the real
+          Photoreal cinematic backgrounds. 14 beliefs × 7 daily variants = 98
+          compositions. Tap any tile to open that variant in the real
           ConversationScreen layout for on-device review.
         </p>
       </header>
       <div style={{ maxWidth: '1120px', margin: '0 auto' }}>
-        {configs.map(({ beliefId, config }) => (
+        {Array.from(grouped.entries()).map(([beliefId, indexes]) => (
           <section key={beliefId} style={{ marginBottom: '48px' }}>
             <h2
               style={{
@@ -101,7 +132,7 @@ function GridPreview() {
                 marginBottom: '16px',
               }}
             >
-              {PHASE_1_LABELS[beliefId] ?? beliefId}
+              {BELIEF_LABELS[beliefId] ?? beliefId}
             </h2>
             <div
               style={{
@@ -110,9 +141,9 @@ function GridPreview() {
                 gap: '16px',
               }}
             >
-              {config.variants.map((v, i) => (
+              {indexes.map((i) => (
                 <a
-                  key={v.id}
+                  key={`${beliefId}-${i}`}
                   href={`/dev/backgrounds?belief=${beliefId}&variant=${i}`}
                   style={{
                     position: 'relative',
@@ -134,7 +165,6 @@ function GridPreview() {
                   }}
                 >
                   <BeliefBackground beliefId={beliefId} forceVariant={i} />
-                  {/* Label strip along the bottom */}
                   <div
                     style={{
                       position: 'absolute',
@@ -170,7 +200,7 @@ function GridPreview() {
                         marginTop: '2px',
                       }}
                     >
-                      {v.name}
+                      {VARIANT_NAMES[i] ?? `Variant ${i + 1}`}
                     </div>
                   </div>
                 </a>
@@ -186,11 +216,8 @@ function GridPreview() {
 // ──────────────────────────────────────────────────────────────
 // PER-BELIEF MODE — all 7 for one belief, side-by-side on wider screens.
 function PerBeliefPreview({ beliefId }: { beliefId: string }) {
-  const config = useMemo(
-    () => getAllBackgroundConfigs().find((c) => c.beliefId === beliefId)?.config,
-    [beliefId],
-  );
-  if (!config) return <GridPreview />;
+  const indexes = useMemo(() => [0, 1, 2, 3, 4, 5, 6], []);
+  const beliefLabel = BELIEF_LABELS[beliefId] ?? beliefId;
   return (
     <div
       style={{
@@ -217,7 +244,7 @@ function PerBeliefPreview({ beliefId }: { beliefId: string }) {
             marginTop: '8px',
           }}
         >
-          {PHASE_1_LABELS[beliefId] ?? beliefId}
+          {beliefLabel}
         </h1>
       </header>
       <div
@@ -229,9 +256,9 @@ function PerBeliefPreview({ beliefId }: { beliefId: string }) {
           gap: '16px',
         }}
       >
-        {config.variants.map((v, i) => (
+        {indexes.map((i) => (
           <a
-            key={v.id}
+            key={`${beliefId}-${i}`}
             href={`/dev/backgrounds?belief=${beliefId}&variant=${i}`}
             style={{
               position: 'relative',
@@ -260,7 +287,9 @@ function PerBeliefPreview({ beliefId }: { beliefId: string }) {
               }}
             >
               <div style={{ fontSize: '0.72rem', color: colors.gold, letterSpacing: '0.06em', textTransform: 'uppercase' }}>V{i + 1}</div>
-              <div style={{ fontFamily: fonts.display, fontStyle: 'italic', fontSize: '1rem', marginTop: '2px' }}>{v.name}</div>
+              <div style={{ fontFamily: fonts.display, fontStyle: 'italic', fontSize: '1rem', marginTop: '2px' }}>
+                {VARIANT_NAMES[i] ?? `Variant ${i + 1}`}
+              </div>
             </div>
           </a>
         ))}
@@ -273,12 +302,8 @@ function PerBeliefPreview({ beliefId }: { beliefId: string }) {
 // SINGLE VARIANT — renders the actual ConversationScreen flex layout,
 // with the variant pinned via `forceVariant`. For real iPhone QA.
 function SingleVariantPreview({ beliefId, variantIndex }: { beliefId: string; variantIndex: number }) {
-  const config = useMemo(
-    () => getAllBackgroundConfigs().find((c) => c.beliefId === beliefId)?.config,
-    [beliefId],
-  );
-  const variantName = config?.variants[variantIndex]?.name ?? '';
-  const beliefLabel = PHASE_1_LABELS[beliefId] ?? beliefId;
+  const beliefLabel = BELIEF_LABELS[beliefId] ?? beliefId;
+  const variantName = VARIANT_NAMES[variantIndex] ?? `Variant ${variantIndex + 1}`;
 
   return (
     <div
@@ -318,116 +343,59 @@ function SingleVariantPreview({ beliefId, variantIndex }: { beliefId: string; va
           style={{
             color: colors.textPrimary,
             textDecoration: 'none',
-            fontSize: '0.85rem',
-            fontFamily: fonts.body,
-            opacity: 0.7,
+            fontSize: '0.95rem',
+            opacity: 0.8,
           }}
         >
-          ← gallery
+          ←
         </a>
         <div
           style={{
-            textAlign: 'center',
             fontFamily: fonts.display,
             fontStyle: 'italic',
-            fontWeight: fontWeights.light,
-            fontSize: '1.1rem',
+            fontSize: '1rem',
             color: colors.textPrimary,
+            opacity: 0.85,
           }}
         >
-          {beliefLabel}
+          {beliefLabel} · V{variantIndex + 1}
         </div>
-        <div
-          style={{
-            fontFamily: fonts.body,
-            fontSize: '0.7rem',
-            color: colors.gold,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-          }}
-        >
-          V{variantIndex + 1}
-        </div>
+        <div style={{ width: '24px' }} aria-hidden="true" />
       </header>
-      {/* Messages region — a single mock God line to judge legibility. */}
-      <section
-        className="conversation-messages"
-        style={{ padding: '48px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}
-      >
+      {/* Messages region (centered placeholder text) */}
+      <div className="conversation-messages flex items-center justify-center" style={{ padding: '0 24px' }}>
         <div
           style={{
-            maxWidth: '720px',
-            margin: '0 auto',
-            textAlign: 'center',
             fontFamily: fonts.display,
-            fontWeight: fontWeights.light,
             fontStyle: 'italic',
-            fontSize: 'clamp(1.25rem, 5vw, 1.75rem)',
-            lineHeight: 1.45,
-            color: colors.textPrimary,
-            textShadow: '0 2px 16px rgba(0,0,0,0.6)',
-          }}
-        >
-          Peace be with you. Come as you are, and we will talk.
-        </div>
-        <div
-          style={{
-            marginTop: '24px',
+            fontWeight: fontWeights.light,
+            fontSize: 'clamp(1.4rem, 5vw, 1.75rem)',
+            lineHeight: 1.4,
             textAlign: 'center',
-            fontFamily: fonts.body,
-            fontSize: '0.85rem',
-            color: colors.textSecondary,
-            letterSpacing: '0.05em',
+            color: colors.textPrimary,
+            textShadow: '0 2px 24px rgba(0,0,0,0.5)',
+            maxWidth: '420px',
           }}
         >
           {variantName}
         </div>
-      </section>
-      {/* Input — mock (no wiring) */}
-      <div
-        className="conversation-input"
-        style={{ paddingLeft: '16px', paddingRight: '16px' }}
-      >
+      </div>
+      {/* Input bar mock */}
+      <div className="conversation-input" aria-hidden="true">
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            background: 'rgba(3, 3, 8, 0.6)',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
+            margin: '0 16px 12px',
+            padding: '14px 18px',
+            borderRadius: '20px',
+            background: 'rgba(255,255,255,0.04)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
             border: `1px solid ${colors.goldBorder}`,
-            borderRadius: '24px',
-            padding: '10px 16px',
+            color: colors.textSecondary,
+            fontSize: '0.95rem',
           }}
         >
-          <div
-            style={{
-              flex: 1,
-              color: colors.textSecondary,
-              fontFamily: fonts.body,
-              fontSize: '1rem',
-              padding: '6px 0',
-            }}
-          >
-            Speak to God…
-          </div>
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              background: colors.gold,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#0a0a0f',
-              fontFamily: fonts.body,
-              fontWeight: fontWeights.semibold,
-            }}
-          >
-            ●
-          </div>
+          Speak or type your reflection…
         </div>
       </div>
     </div>

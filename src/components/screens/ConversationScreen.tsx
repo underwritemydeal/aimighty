@@ -56,27 +56,6 @@ type ConversationState =
  */
 type Character = 'god' | 'jesus' | 'mary';
 
-// Belief systems that can use Jesus character
-const CHRISTIAN_BELIEFS = ['protestant', 'catholic', 'mormonism'];
-
-// Character labels per belief system
-const CHARACTER_LABELS: Record<string, { god: string; jesus?: string; mary: string }> = {
-  protestant: { god: 'God', jesus: 'Jesus', mary: 'Mary' },
-  catholic: { god: 'God', jesus: 'Jesus', mary: 'Mary' },
-  mormonism: { god: 'God', jesus: 'Jesus', mary: 'Mary' },
-  islam: { god: 'Allah', mary: 'Divine Feminine' },
-  judaism: { god: 'Adonai', mary: 'Shekhinah' },
-  hinduism: { god: 'Brahman', mary: 'Divine Mother' },
-  buddhism: { god: 'The Buddha', mary: 'Kuan Yin' },
-  sikhism: { god: 'Waheguru', mary: 'Divine Light' },
-  taoism: { god: 'The Tao', mary: 'Divine Feminine' },
-  sbnr: { god: 'The Universe', mary: 'Source Energy' },
-  pantheism: { god: 'The Earth', mary: 'Gaia' },
-  science: { god: 'The Cosmos', mary: 'The Universe' },
-  agnosticism: { god: 'Wisdom', mary: 'Inner Voice' },
-  'atheism-stoicism': { god: 'Reason', mary: 'Wisdom' },
-};
-
 // Message with metadata for display
 interface DisplayMessage {
   id: string;
@@ -223,87 +202,6 @@ const ReplaySpeakerIcon = memo(function ReplaySpeakerIcon() {
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
     </svg>
-  );
-});
-
-// Character selector dropdown
-const CharacterSelector = memo(function CharacterSelector({
-  character,
-  onChange,
-  beliefId,
-  accentColor,
-}: {
-  character: Character;
-  onChange: (c: Character) => void;
-  beliefId: string;
-  accentColor: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const isChristian = CHRISTIAN_BELIEFS.includes(beliefId);
-  const beliefLabels = CHARACTER_LABELS[beliefId] || CHARACTER_LABELS.sbnr;
-
-  // Get label for current character
-  const getLabel = (char: Character): string => {
-    if (char === 'god') return beliefLabels.god;
-    if (char === 'jesus') return beliefLabels.jesus || 'Jesus';
-    return beliefLabels.mary;
-  };
-
-  const options: Character[] = isChristian
-    ? ['god', 'jesus', 'mary']
-    : ['god', 'mary'];
-
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 rounded-lg transition-colors hover:bg-white/5"
-        style={{
-          // WCAG 2.5.5: 44px minimum touch height. Glyph is unchanged.
-          minHeight: '44px',
-          color: 'rgba(255,255,255,0.5)',
-        }}
-        aria-label="Select voice character"
-      >
-        <span style={{ fontSize: '0.7rem', letterSpacing: '0.05em' }}>
-          {getLabel(character)}
-        </span>
-        <ChevronDownIcon />
-      </button>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 py-1"
-            style={{
-              background: 'rgba(20, 20, 25, 0.95)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '10px',
-              minWidth: '120px',
-              overflow: 'hidden',
-            }}
-          >
-            {options.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => { onChange(opt); setIsOpen(false); }}
-                className="w-full px-3 py-2 text-left transition-colors hover:bg-white/5"
-                style={{
-                  fontSize: '0.8rem',
-                  color: character === opt ? accentColor : 'var(--color-text-primary)',
-                  fontWeight: character === opt ? 500 : 400,
-                }}
-              >
-                {getLabel(opt)}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
   );
 });
 
