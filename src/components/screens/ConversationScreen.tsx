@@ -2068,31 +2068,21 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
               </div>
             )}
 
-            {/* Mic button */}
-            <div
-              className="flex justify-center"
-              style={{
-                marginTop: !user.isPremium && remainingMessages <= 3 ? '0' : '4px',
-                marginBottom: '6px',
-              }}
-            >
-              <MicButton
-                state={state}
-                accentColor={accentColor}
-                onToggle={handleMicToggle}
-                isDisabled={hasReachedFreeLimit() && !user.isPremium}
-              />
-            </div>
-
-            {/* Text input — auto-growing textarea. Grows from 1 to ~4 lines
-                (48px → 120px) with internal scroll after. 16px font-size is
-                REQUIRED on iOS to prevent auto-zoom on focus.
-                Enter = send, Shift+Enter = newline (see handleKeyDown).
-                Class renamed from .conversation-input → .conversation-textarea
-                on 2026-04-22 when the sticky input-bar container took over
-                the .conversation-input name. */}
-            <div className="w-full" style={{ padding: '0 20px' }}>
-              <div className="relative w-full max-w-md" style={{ margin: '0 auto' }}>
+            {/* Composer pill — single glass card on a flex row that
+                contains [mic | textarea | send] in left-to-right order.
+                Spec: .stitch/DESIGN.md §5.5. The .composer-card class
+                draws the glass + gold hairline; the textarea inside is
+                transparent and structural-only. font-size 16px on the
+                textarea is REQUIRED on iOS to prevent auto-zoom on
+                focus. Enter = send, Shift+Enter = newline. */}
+            <div className="w-full" style={{ padding: '0 16px', marginTop: '4px' }}>
+              <div className="composer-card">
+                <MicButton
+                  state={state}
+                  accentColor={accentColor}
+                  onToggle={handleMicToggle}
+                  isDisabled={hasReachedFreeLimit() && !user.isPremium}
+                />
                 <textarea
                   ref={inputRef}
                   rows={1}
@@ -2106,7 +2096,6 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   enterKeyHint="send"
                   className="conversation-textarea"
                   style={{
-                    paddingRight: inputText.trim() ? '50px' : '20px',
                     opacity: isInputEnabled ? 1 : 0.35,
                     // touch-action: manipulation kills Safari's 300ms
                     // double-tap-to-zoom gesture on the textarea, which
@@ -2122,16 +2111,14 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                     transform: 'translateZ(0)',
                   }}
                 />
-                {inputText.trim() && isInputEnabled && (
-                  <button
-                    onClick={handleSend}
-                    aria-label="Send message"
-                    className="send-button-ready absolute right-2 p-2 rounded-full"
-                    style={{ bottom: '6px' }}
-                  >
-                    <SendIcon />
-                  </button>
-                )}
+                <button
+                  onClick={inputText.trim() && isInputEnabled ? handleSend : undefined}
+                  aria-label="Send message"
+                  disabled={!(inputText.trim() && isInputEnabled)}
+                  className={`composer-send${inputText.trim() && isInputEnabled ? ' is-ready' : ''}`}
+                >
+                  <SendIcon />
+                </button>
               </div>
             </div>
 

@@ -499,9 +499,11 @@ button:disabled {
    ============================================ */
 .mic-button {
   position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+  /* DESIGN.md §5.5: 48×48 circular glass bead, lives inside .composer-card. */
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -938,18 +940,12 @@ button:disabled {
 }
 
 /* ============================================
-   CONVERSATION TEXTAREA (the actual <textarea>)
+   COMPOSER CARD (the unified glass pill that wraps mic + textarea + send)
    ============================================
-   Renamed from .conversation-input → .conversation-textarea on
-   2026-04-22 when the sticky input-bar container took over the
-   .conversation-input class name. */
-/* Composer textarea — premium glass card with all-around 1px champagne
-   gold hairline (replaces the previous bottom-line-only treatment).
-   Inset top highlight + cast shadow for floating-card depth without
-   neumorphism. Placeholder uses Cormorant italic per spec. font-size
-   16px MUST stay — iOS auto-zooms on focus below 16px. Spec:
-   .stitch/DESIGN.md §5.5. */
-.conversation-textarea {
+   Spec: .stitch/DESIGN.md §5.5. The card itself owns the glass treatment;
+   mic + textarea + send sit on a single flex row inside. The textarea no
+   longer has its own border/fill — the card draws the focus ring. */
+.composer-card {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
@@ -957,22 +953,49 @@ button:disabled {
   border-radius: 24px;
   box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
               0 20px 50px -12px rgba(0, 0, 0, 0.5);
+  padding: 6px 6px 6px 10px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  max-width: 28rem; /* matches the old max-w-md */
+  margin: 0 auto;
+  transition: border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Single composer-wide focus ring: when the inner textarea has focus, the
+   outer card brightens its hairline (one focus indicator across the
+   composer). DESIGN.md §5.5 + §8.3. */
+.composer-card:focus-within {
+  border-color: rgba(212, 184, 130, 0.35);
+}
+
+/* ============================================
+   CONVERSATION TEXTAREA (the actual <textarea> inside .composer-card)
+   ============================================
+   The textarea is structural-only — transparent fill, no border. The
+   .composer-card around it owns the glass + hairline. Spec:
+   .stitch/DESIGN.md §5.5. font-size 16px is REQUIRED on iOS to prevent
+   the browser from auto-zooming into the field on focus. */
+.conversation-textarea {
+  background: transparent;
+  border: none;
+  outline: none;
   /* Auto-grow textarea: 1 line at 48px, grows to ~4 lines (~120px),
-     then internal scroll. font-size 16px is REQUIRED on iOS to prevent
-     the browser from auto-zooming into the field on focus. */
+     then internal scroll. */
   min-height: 48px;
   max-height: 120px;
-  padding: 12px 20px;
+  padding: 12px 4px;
   color: rgba(255, 248, 240, 0.95);
   caret-color: #d4b882;
   font-family: var(--font-divine);
   font-size: 16px;
   line-height: 1.4;
   font-style: normal;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0; /* lets the textarea shrink inside the flex row */
   resize: none;
   overflow-y: auto;
-  transition: border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .conversation-textarea::placeholder {
@@ -984,7 +1007,40 @@ button:disabled {
 
 .conversation-textarea:focus {
   outline: none;
-  border-color: rgba(212, 184, 130, 0.35);
+}
+
+/* ============================================
+   COMPOSER SEND BUTTON (right-most icon in .composer-card)
+   ============================================
+   Spec §5.5: 44×44 hit target, 36×36 visual; idle = stroke-only ↑ chevron
+   in textTertiary; ready = gold-filled with a soft drop-shadow glow. The
+   .send-button-ready compound below is applied when the textarea has
+   characters. Both states share the same hit target. */
+.composer-send {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 248, 240, 0.4);
+  transition: color 180ms ease, transform 140ms ease, filter 180ms ease;
+  cursor: pointer;
+}
+
+.composer-send:hover {
+  color: rgba(255, 248, 240, 0.6);
+}
+
+.composer-send:active {
+  transform: scale(0.92);
+}
+
+.composer-send.is-ready {
+  color: #d4b882;
+  filter: drop-shadow(0 0 8px rgba(212, 184, 130, 0.4));
 }
 
 /* ============================================
