@@ -950,7 +950,15 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
     `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
   );
 
-  const isInputEnabled = state === 'idle';
+  // Allow typing in any state EXCEPT the brief 'sending' window where
+  // we're waiting for Claude's first token. Previously this was
+  // `state === 'idle'`, which blocked the textarea during 'streaming'
+  // and 'speaking' — meaning users couldn't queue their next message
+  // while God's reply was still being read out, and on iOS the
+  // textarea read as permanently disabled after the first send because
+  // 'speaking' can persist for the full TTS duration. Send is still
+  // gated separately (handleSend checks isSendingRef + state).
+  const isInputEnabled = state !== 'sending';
 
   // Keep ref updated so the unmount memory hook can access latest messages
   useEffect(() => {

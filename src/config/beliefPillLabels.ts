@@ -25,18 +25,29 @@ export const getBeliefPillLabel = (
       return 'God';
 
     case 'mormonism':
+      // The 'mary' character slot here renders as the LDS-specific
+      // feminine divine — Heavenly Mother — rather than the Catholic
+      // figure of Mary. Voice mapping still routes to the Coral
+      // feminine voice; only the user-visible label changes.
       if (character === 'jesus') return 'Jesus';
-      if (character === 'mary') return 'Mary';
+      if (character === 'mary') return 'Heavenly Mother';
       return 'Heavenly Father';
 
     case 'sbnr':
-      return character === 'mary' ? 'Mary' : 'The Universe';
+      // 'mary' character → "Source" for Spiritual But Not Religious
+      // (Mary is a Christian figure, not appropriate for SBNR).
+      return character === 'mary' ? 'Source' : 'The Universe';
 
     case 'taoism':
-      return character === 'mary' ? 'Mary' : 'The Tao';
+      // 'mary' character → "Divine Feminine" for Taoism (the yin
+      // principle has no proper-noun equivalent of Mary).
+      return character === 'mary' ? 'Divine Feminine' : 'The Tao';
 
     case 'pantheism':
-      return character === 'mary' ? 'Mary' : 'Gaia';
+      // For pantheism, Gaia IS the feminine earth divinity — pair
+      // 'mary' character with "Gaia" and 'god' character with the
+      // gender-neutral "The Earth".
+      return character === 'mary' ? 'Gaia' : 'The Earth';
 
     case 'islam':
       return 'Guidance';

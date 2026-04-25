@@ -6,7 +6,6 @@ import { LandingPage } from './components/screens/LandingPage';
 const BackgroundGallery = lazy(() => import('./components/backgrounds/BackgroundGallery').then(m => ({ default: m.BackgroundGallery })));
 const AuthScreen = lazy(() => import('./components/screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const BeliefSelector = lazy(() => import('./components/screens/BeliefSelector').then(m => ({ default: m.BeliefSelector })));
-const BeliefWelcomeScreen = lazy(() => import('./components/screens/BeliefWelcomeScreen').then(m => ({ default: m.BeliefWelcomeScreen })));
 const ConversationScreen = lazy(() => import('./components/screens/ConversationScreen').then(m => ({ default: m.ConversationScreen })));
 const PaywallScreen = lazy(() => import('./components/screens/PaywallScreen').then(m => ({ default: m.PaywallScreen })));
 const AboutScreen = lazy(() => import('./components/screens/AboutScreen').then(m => ({ default: m.AboutScreen })));
@@ -263,7 +262,12 @@ function App() {
     // Save belief to session for persistence + last-belief memory
     updateSessionBelief(belief.id);
     setLastBelief(belief.id);
-    transitionTo('belief-welcome');
+    // Skip the cinematic quote-overlay welcome screen — was showing
+    // an old background photo for ~5s before the conversation screen
+    // mounted, which read as a stale-image bug. Route directly into
+    // the conversation. (BeliefWelcomeScreen export is still present
+    // but unreachable; safe to remove later.)
+    transitionTo('conversation');
   };
 
   // Handle belief change from conversation screen (skip welcome screen)
@@ -335,10 +339,6 @@ function App() {
     setLastBelief(newBelief.id);
     transitionTo('conversation');
   }, [selectedBelief]);
-
-  const handleBeliefWelcomeComplete = () => {
-    transitionTo('conversation');
-  };
 
   const handleShowPaywall = () => {
     transitionTo('paywall');
@@ -543,15 +543,6 @@ function App() {
             onBack={handleSignOut}
             language={language}
             onSignOut={handleSignOut}
-          />
-        )}
-
-        {currentScreen === 'belief-welcome' && selectedBelief && (
-          <BeliefWelcomeScreen
-            belief={selectedBelief}
-            userName={user?.name}
-            onContinue={handleBeliefWelcomeComplete}
-            language={language}
           />
         )}
 
