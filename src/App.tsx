@@ -3,6 +3,7 @@ import { LandingPage } from './components/screens/LandingPage';
 // Route-level code splitting: keep LandingPage eager (most common entry,
 // LCP-critical); lazy-load everything else so the landing bundle stays small.
 // WelcomeScreen removed — routing now goes auth → belief-selector/conversation.
+const BackgroundGallery = lazy(() => import('./components/backgrounds/BackgroundGallery').then(m => ({ default: m.BackgroundGallery })));
 const AuthScreen = lazy(() => import('./components/screens/AuthScreen').then(m => ({ default: m.AuthScreen })));
 const BeliefSelector = lazy(() => import('./components/screens/BeliefSelector').then(m => ({ default: m.BeliefSelector })));
 const BeliefWelcomeScreen = lazy(() => import('./components/screens/BeliefWelcomeScreen').then(m => ({ default: m.BeliefWelcomeScreen })));
@@ -29,6 +30,25 @@ import type { Screen, BeliefSystem, User } from './types';
 const LANGUAGE_STORAGE_KEY = 'aimighty_language';
 
 function App() {
+  // Dev-only background gallery short-circuit.
+  // `/dev/backgrounds` completely bypasses the app state machine — no session
+  // restore, no auth, no belief selection. Unlinked from the rest of the app,
+  // used for on-device QA of Phase 1 backgrounds. Safe to remove once the
+  // system has shipped to all 14 beliefs.
+  const devBgRoute = (() => {
+    if (typeof window === 'undefined') return null;
+    if (window.location.pathname !== '/dev/backgrounds') return null;
+    const params = new URLSearchParams(window.location.search);
+    return { belief: params.get('belief'), variant: params.get('variant') };
+  })();
+  if (devBgRoute) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: '100dvh', background: '#030308' }} aria-hidden="true" />}>
+        <BackgroundGallery belief={devBgRoute.belief} variant={devBgRoute.variant} />
+      </Suspense>
+    );
+  }
+
   // Parse pathname to decide initial screen. Also detect `/[belief]/[slug]` article pages.
   const [articleRoute, setArticleRoute] = useState<{ belief: string; slug: string } | null>(() => {
     if (typeof window === 'undefined') return null;

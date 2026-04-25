@@ -397,11 +397,42 @@ button:disabled {
 /* ============================================
    TYPOGRAPHY UTILITIES
    ============================================ */
+/* Divine speech — Cormorant Garamond italic 400, 26-28px responsive,
+   line-height 1.35. The radial-gradient pseudo-element behind the text
+   is the legibility-critical "pocket of stillness" so divine speech
+   reads cleanly over any cathedral background luminance. Spec:
+   .stitch/DESIGN.md §2.3, §3.2, §5.4. */
 .text-divine {
+  position: relative;
   font-family: var(--font-divine);
-  font-weight: 300;
-  line-height: 1.8;
-  letter-spacing: 0.02em;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.625rem;
+  line-height: 1.35;
+  letter-spacing: 0;
+  color: rgba(255, 248, 240, 0.95);
+  z-index: 1;
+}
+
+@media (min-width: 390px) {
+  .text-divine {
+    font-size: 1.75rem;
+  }
+}
+
+.text-divine::before {
+  content: '';
+  position: absolute;
+  inset: -32px -16px;
+  background: radial-gradient(
+    ellipse 120% 60% at 50% 50%,
+    rgba(3, 3, 8, 0.55) 0%,
+    rgba(3, 3, 8, 0.25) 45%,
+    transparent 75%
+  );
+  filter: blur(8px);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .text-gold {
@@ -475,7 +506,30 @@ button:disabled {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid rgba(212, 184, 130, 0.20);
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset;
+  color: rgba(255, 248, 240, 0.95);
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mic-button:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(212, 184, 130, 0.35);
+}
+
+.mic-button:active {
+  transform: scale(0.95);
+}
+
+.mic-button.listening {
+  background: rgba(212, 184, 130, 0.10);
+  border-color: rgba(212, 184, 130, 0.80);
+  color: #d4b882;
 }
 
 .mic-button-ring {
@@ -557,6 +611,309 @@ button:disabled {
   position: relative;
 }
 
+/* Header scrim — feathers the UI chrome off the cathedral photograph so
+   header icons retain tonal separation regardless of which belief
+   background is active. Pseudo-element inside the header's stacking
+   context (z:30) sits at z:-1 behind header content but still above the
+   z:10 messages region. Extends 32px past the header's bottom edge so
+   the fade terminates in the top of the messages, not at a hard line.
+   Spec: .stitch/DESIGN.md §5.3. */
+.conversation-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% + 32px);
+  background: linear-gradient(
+    180deg,
+    rgba(3, 3, 8, 0.55) 0%,
+    rgba(3, 3, 8, 0.25) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Belief pill — the merged belief + figure display that lives at the
+   centre of .conversation-header. Tappable to open the switch-belief
+   modal. Two-line content: Outfit uppercase eyebrow + Cormorant figure
+   name with trailing down-chevron. Glass recipe with gold hairline at
+   0.20 default, 0.60 on press. Spec: .stitch/DESIGN.md §5.3. */
+.belief-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 14px 7px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(20px) saturate(130%);
+  -webkit-backdrop-filter: blur(20px) saturate(130%);
+  border: 1px solid rgba(212, 184, 130, 0.20);
+  border-radius: 999px;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.belief-pill:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(212, 184, 130, 0.35);
+}
+
+.belief-pill:active {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(212, 184, 130, 0.60);
+}
+
+.belief-pill-eyebrow {
+  font-family: var(--font-body, 'Outfit', -apple-system, sans-serif);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 248, 240, 0.6);
+  line-height: 1;
+}
+
+.belief-pill-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* --font-divine is the Cormorant Garamond stack. --font-display in
+     this codebase maps to Outfit, not a serif display face. */
+  font-family: var(--font-divine);
+  font-weight: 500;
+  font-size: 16px;
+  color: rgba(255, 248, 240, 0.95);
+  line-height: 1;
+}
+
+.belief-pill-name svg {
+  width: 10px;
+  height: 10px;
+  color: rgba(255, 248, 240, 0.6);
+  flex-shrink: 0;
+}
+
+/* Figure chip strip — appears at the top of the switch-belief modal
+   when the active belief has 2+ figure options. Section header eyebrow
+   in Outfit caps + a horizontal row of glass chips. Active chip carries
+   a champagne-gold hairline + tinted fill + ✓. Spec: §5.6. */
+.figure-strip-section {
+  flex-shrink: 0;
+}
+
+.figure-strip-eyebrow {
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 248, 240, 0.6);
+  padding: 16px 20px 8px;
+}
+
+.figure-strip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 20px 16px;
+}
+
+.figure-strip-divider {
+  height: 1px;
+  background: rgba(212, 184, 130, 0.20);
+  margin: 0 0 4px;
+}
+
+.figure-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 6px 14px 7px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border: 1px solid rgba(212, 184, 130, 0.20);
+  border-radius: 999px;
+  font-family: var(--font-body, 'Outfit', sans-serif);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 248, 240, 0.95);
+  cursor: pointer;
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.figure-chip:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(212, 184, 130, 0.35);
+}
+
+.figure-chip:active {
+  transform: scale(0.96);
+}
+
+.figure-chip-active {
+  background: rgba(212, 184, 130, 0.14);
+  border-color: rgba(212, 184, 130, 0.60);
+  color: #d4b882;
+}
+
+.figure-chip-active:hover {
+  background: rgba(212, 184, 130, 0.18);
+  border-color: rgba(212, 184, 130, 0.75);
+}
+
+.figure-chip-check {
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+/* Send button (ready state) — appears inside the composer textarea
+   wrapper when inputText.trim() is non-empty. Champagne-gold icon with
+   subtle gold drop-shadow glow. Press feedback via scale. Spec: §5.5. */
+.send-button-ready {
+  color: #d4b882;
+  filter: drop-shadow(0 0 8px rgba(212, 184, 130, 0.35));
+  transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1),
+              filter 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.send-button-ready:hover {
+  filter: drop-shadow(0 0 12px rgba(212, 184, 130, 0.50));
+}
+
+.send-button-ready:active {
+  transform: scale(0.92);
+}
+
+/* Scroll-to-bottom bead — 40×40 glass circle, right-aligned, floats
+   above the composer when the message list has been scrolled up.
+   Champagne-gold hairline at 0.30 + soft gold glow shadow. Spec: §5.4. */
+.scroll-bead {
+  position: absolute;
+  top: -52px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(212, 184, 130, 0.30);
+  border-radius: 999px;
+  box-shadow: 0 0 30px rgba(212, 184, 130, 0.15),
+              0 1px 0 0 rgba(255, 255, 255, 0.06) inset;
+  color: #d4b882;
+  cursor: pointer;
+  animation: scrollBeadEnter 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: background 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 160ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 100ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.scroll-bead:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(212, 184, 130, 0.50);
+}
+
+.scroll-bead:active {
+  transform: scale(0.94);
+}
+
+@keyframes scrollBeadEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* About-this-AI modal — opened from the hamburger menu's
+   "About this AI" item. Glass sheet with the same recipe as the
+   switch-belief modal but content-sized. Spec: §5.8. */
+.about-ai-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(3, 3, 8, 0.65);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  animation: aboutAiScrimIn 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.about-ai-sheet {
+  width: 100%;
+  max-width: 440px;
+  max-height: 70dvh;
+  overflow-y: auto;
+  background: rgba(14, 14, 22, 0.78);
+  backdrop-filter: blur(40px) saturate(160%);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  border: 1px solid rgba(212, 184, 130, 0.20);
+  border-radius: 24px;
+  padding: 24px 24px 28px;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+              0 30px 80px -20px rgba(0, 0, 0, 0.6);
+  animation: aboutAiSheetIn 340ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.about-ai-title {
+  font-family: var(--font-divine);
+  font-weight: 400;
+  font-size: 1.375rem;
+  color: rgba(255, 248, 240, 0.95);
+  margin: 0 0 14px;
+  line-height: 1.25;
+}
+
+.about-ai-body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 1.5;
+  color: rgba(255, 248, 240, 0.6);
+  margin: 0;
+}
+
+.about-ai-body + .about-ai-body {
+  margin-top: 12px;
+}
+
+@keyframes aboutAiScrimIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes aboutAiSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .conversation-messages {
   flex: 1;
   overflow-y: auto;
@@ -586,37 +943,48 @@ button:disabled {
    Renamed from .conversation-input → .conversation-textarea on
    2026-04-22 when the sticky input-bar container took over the
    .conversation-input class name. */
+/* Composer textarea — premium glass card with all-around 1px champagne
+   gold hairline (replaces the previous bottom-line-only treatment).
+   Inset top highlight + cast shadow for floating-card depth without
+   neumorphism. Placeholder uses Cormorant italic per spec. font-size
+   16px MUST stay — iOS auto-zooms on focus below 16px. Spec:
+   .stitch/DESIGN.md §5.5. */
 .conversation-textarea {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(212, 184, 130, 0.20);
+  border-radius: 24px;
+  box-shadow: 0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
+              0 20px 50px -12px rgba(0, 0, 0, 0.5);
   /* Auto-grow textarea: 1 line at 48px, grows to ~4 lines (~120px),
      then internal scroll. font-size 16px is REQUIRED on iOS to prevent
      the browser from auto-zooming into the field on focus. */
   min-height: 48px;
   max-height: 120px;
   padding: 12px 20px;
-  color: rgba(255, 255, 255, 0.9);
-  font-family: var(--font-body);
+  color: rgba(255, 248, 240, 0.95);
+  caret-color: #d4b882;
+  font-family: var(--font-divine);
   font-size: 16px;
   line-height: 1.4;
-  font-style: italic;
+  font-style: normal;
   width: 100%;
   resize: none;
   overflow-y: auto;
+  transition: border-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .conversation-textarea::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 248, 240, 0.6);
+  font-family: var(--font-divine);
   font-style: italic;
+  font-weight: 400;
 }
 
 .conversation-textarea:focus {
   outline: none;
-  border-bottom-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(212, 184, 130, 0.35);
 }
 
 /* ============================================

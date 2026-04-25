@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Stitch design artifacts (downloaded HTML + screenshots, project metadata)
+.stitch/

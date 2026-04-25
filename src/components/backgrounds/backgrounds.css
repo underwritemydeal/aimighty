@@ -1,0 +1,91 @@
+/* ============================================
+   BELIEF BACKGROUNDS — animation + layout
+   ============================================
+   Three stacked full-bleed layers, scoped to `.bb-root`:
+     1. .bb-gradient  — base radial gradient (per-belief)
+     2. .bb-symbol    — centered sacred-geometry SVG, slow rotation
+     3. .bb-particles — drifting particle field
+   All layers are `pointer-events: none`.
+   Respects `prefers-reduced-motion: reduce` via the .bb-reduced variant. */
+
+.bb-root {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.bb-gradient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.bb-symbol-wrap {
+  position: absolute;
+  /* Centered. 70vmin keeps symbol at ~70% on both portrait and landscape. */
+  top: 50%;
+  left: 50%;
+  width: 70vmin;
+  height: 70vmin;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  will-change: transform;
+}
+
+/* The inner rotation wrapper so centering transform on .bb-symbol-wrap
+   is not clobbered by the rotating element. */
+.bb-symbol-rotate {
+  width: 100%;
+  height: 100%;
+  animation: bb-rotate 90s linear infinite;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.bb-reduced .bb-symbol-rotate {
+  animation: none;
+}
+
+.bb-symbol-rotate > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+@keyframes bb-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.bb-particles {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.bb-particle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  animation: bb-drift linear infinite;
+  will-change: transform, opacity;
+}
+
+.bb-reduced .bb-particle {
+  animation: none;
+  /* Freeze a light static scatter in reduced-motion mode. */
+  opacity: 0.28;
+}
+
+@keyframes bb-drift {
+  0%   { transform: translate3d(0, 0, 0);          opacity: 0; }
+  12%  {                                            opacity: var(--bb-p-opacity, 0.35); }
+  88%  {                                            opacity: var(--bb-p-opacity, 0.35); }
+  100% { transform: translate3d(var(--bb-p-dx, 0), var(--bb-p-dy, -110vh), 0); opacity: 0; }
+}

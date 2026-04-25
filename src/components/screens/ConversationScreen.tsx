@@ -26,6 +26,7 @@ import {
 import { t, type LanguageCode } from '../../data/translations';
 import { type CategorizedBeliefSystem, beliefSystems, categoryLabels, type BeliefCategory } from '../../data/beliefSystems';
 import { normalizeBeliefId, getGreetingForBelief } from '../../config/beliefSystems';
+import { getBeliefPillLabel, getAvailableCharacters, hasMultipleCharacters } from '../../config/beliefPillLabels';
 import { getDescriptorForBelief } from '../../config/beliefDescriptors';
 import { getOpeningMessageForBelief } from '../../config/openingMessages';
 import { fetchWithTimeout } from '../../services/fetchWithTimeout';
@@ -34,6 +35,7 @@ import { CaptureMoment } from '../CaptureMoment';
 import { DailyBeliefStudy } from '../DailyBeliefStudy';
 import { track } from '../../utils/analytics';
 import { colors } from '../../styles/designSystem';
+import { BeliefBackground, isBeliefBackgroundSupported } from '../backgrounds/BeliefBackground';
 import type { BeliefSystem, User } from '../../types';
 
 /**
@@ -472,16 +474,22 @@ const BeliefSelectorModal = memo(function BeliefSelectorModal({
   onClose,
   onSelect,
   currentBeliefId,
+  currentCharacter,
+  onSelectCharacter,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (belief: CategorizedBeliefSystem) => void;
   currentBeliefId: string;
+  currentCharacter: Character;
+  onSelectCharacter: (character: Character) => void;
 }) {
   if (!isOpen) return null;
 
   const categories: BeliefCategory[] = ['religious', 'spiritual', 'philosophical'];
   const canonicalId = normalizeBeliefId(currentBeliefId);
+  const availableCharacters = getAvailableCharacters(canonicalId);
+  const showFigureStrip = hasMultipleCharacters(canonicalId);
 
   return (
     <div
@@ -519,14 +527,15 @@ const BeliefSelectorModal = memo(function BeliefSelectorModal({
           <h2
             style={{
               margin: 0,
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.1rem',
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              fontSize: '1.375rem',
               fontWeight: 400,
               color: 'rgba(255, 248, 240, 0.95)',
-              letterSpacing: '0.03em',
+              letterSpacing: '0',
+              lineHeight: 1.25,
             }}
           >
-            Switch belief system
+            Who do you want to talk to?
           </h2>
           <button
             onClick={onClose}
@@ -540,6 +549,40 @@ const BeliefSelectorModal = memo(function BeliefSelectorModal({
             </svg>
           </button>
         </div>
+
+        {/* Figure chip strip — primary action when the active belief
+            supports 2+ figures (Christian beliefs + spiritual traditions
+            with Mary). For single-figure beliefs the strip is omitted
+            and the modal opens straight to the belief list. Spec:
+            .stitch/DESIGN.md §5.6. */}
+        {showFigureStrip && (
+          <div className="figure-strip-section">
+            <div className="figure-strip-eyebrow">Currently speaking with</div>
+            <div className="figure-strip-row">
+              {availableCharacters.map((char) => {
+                const isActive = char === currentCharacter;
+                const label = getBeliefPillLabel(canonicalId, char);
+                return (
+                  <button
+                    key={char}
+                    onClick={() => { onSelectCharacter(char); onClose(); }}
+                    className={`figure-chip${isActive ? ' figure-chip-active' : ''}`}
+                    aria-pressed={isActive}
+                    aria-label={`Speak with ${label}`}
+                  >
+                    {label}
+                    {isActive && (
+                      <svg className="figure-chip-check" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="figure-strip-divider" aria-hidden="true" />
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto" style={{ padding: '8px 12px 24px 12px' }}>
           {categories.map((category, catIdx) => {
@@ -655,6 +698,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onSignOut,
   onNavigate,
   onManageSubscription,
+  onAboutAI,
   tier,
   streakDays,
   onUpgrade,
@@ -668,6 +712,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
   onSignOut: () => void;
   onNavigate?: (screen: 'terms' | 'privacy') => void;
   onManageSubscription: () => void;
+  onAboutAI: () => void;
   tier: 'free' | 'believer' | 'divine';
   streakDays: number;
   onUpgrade: () => void;
@@ -726,15 +771,17 @@ const SettingsDropdown = memo(function SettingsDropdown({
       <div
         className="absolute right-0 top-full mt-2 z-50"
         style={{
-          background: 'rgba(8, 8, 16, 0.96)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(212, 184, 130, 0.25)',
-          borderRadius: '16px',
-          minWidth: '220px',
+          background: 'rgba(14, 14, 22, 0.78)',
+          backdropFilter: 'blur(40px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(160%)',
+          border: '1px solid rgba(212, 184, 130, 0.20)',
+          borderRadius: '18px',
+          minWidth: '240px',
           padding: '8px 0',
           overflow: 'hidden',
-          boxShadow: '0 8px 40px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 1px 0 0 rgba(255, 255, 255, 0.06) inset, 0 20px 60px -20px rgba(0, 0, 0, 0.6)',
+          transformOrigin: 'top right',
+          animation: 'menuDropdownEnter 180ms cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         {/* Daily content. "Reflection" was removed and its role is now
@@ -825,10 +872,29 @@ const SettingsDropdown = memo(function SettingsDropdown({
             fontSize: '13px',
             color: 'rgba(255,255,255,0.5)',
             paddingTop: '10px',
-            paddingBottom: '14px',
+            paddingBottom: '10px',
           }}
         >
           Privacy Policy
+        </button>
+
+        {/* About this AI — relocated from the conversation view per
+            DESIGN.md §5.8. Opens a glass modal explaining the AI nature
+            of the experience without breaking the reverent atmosphere
+            of the active conversation. */}
+        <button
+          onClick={() => { onAboutAI(); onClose(); }}
+          className="menu-item"
+          style={{
+            ...baseItemStyle,
+            fontWeight: 300,
+            fontSize: '13px',
+            color: 'rgba(255,255,255,0.5)',
+            paddingTop: '10px',
+            paddingBottom: '14px',
+          }}
+        >
+          About this AI
         </button>
 
         <div style={{ height: '1px', margin: '8px 16px', background: 'rgba(212, 184, 130, 0.2)' }} />
@@ -838,7 +904,7 @@ const SettingsDropdown = memo(function SettingsDropdown({
           className="menu-item"
           style={{
             ...baseItemStyle,
-            color: 'rgba(220, 60, 60, 0.85)',
+            color: '#ef4444',
           }}
         >
           Sign Out
@@ -846,8 +912,21 @@ const SettingsDropdown = memo(function SettingsDropdown({
 
         <style>{`
           .menu-item:hover {
-            background: rgba(212, 184, 130, 0.08) !important;
-            border-left-color: #d4b882 !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-left-color: transparent !important;
+          }
+          .menu-item:active {
+            background: rgba(255, 255, 255, 0.09) !important;
+          }
+          @keyframes menuDropdownEnter {
+            from {
+              opacity: 0;
+              transform: translateY(-4px) scale(0.96);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
           }
         `}</style>
       </div>
@@ -908,6 +987,11 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
   // "Invalid request body" iOS system alert that used to appear when
   // openBillingPortal was called against an unconfigured worker.
   const [showSubscriptionUnavailable, setShowSubscriptionUnavailable] = useState(false);
+
+  // About-this-AI modal — opened from the hamburger menu's "About this AI"
+  // item. Replaces the per-conversation AI disclosure line that used to
+  // run under the divine greeting. Spec: .stitch/DESIGN.md §5.8.
+  const [showAboutAI, setShowAboutAI] = useState(false);
   interface DailyContent {
     belief: string;
     date: string;
@@ -1681,24 +1765,34 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
       onClick={handleScreenTap}
       onTouchStart={handleScreenTap}
     >
-      {/* Layer 0 — background image, full-bleed behind iOS chrome.
-          position:fixed with 100vh (not 100dvh) so the image extends
-          behind the status bar and home indicator = no black bars. */}
-      <div
-        className="conversation-bg"
-        style={{
-          backgroundImage: `url(${actualImagePath})`,
-          /* scale + translateY pushes the face out of the header/status-bar
-             zone down to ~45% of the viewport on iPhone 16. On 9:16 source
-             images cover-fit to 9:19.5 viewports would otherwise pin the
-             face to the top third. Transform-origin at center-top keeps the
-             top edge anchored so there's no visible gap above the image. */
-          transform: 'scale(1.18) translateY(8%)',
-          transformOrigin: 'center top',
-          filter: 'saturate(0.7) brightness(0.85)',
-        }}
-        aria-hidden="true"
-      />
+      {/* Layer 0 — background.
+          Phase 1 (2026-04-23): supported beliefs (christianity/islam/buddhism)
+          render the per-belief sacred-geometry `<BeliefBackground>` system
+          inside `.conversation-bg`. All other beliefs retain the existing
+          figure-image background until Phase 2 extends the system to them.
+          `.conversation-bg` itself stays `position:fixed; inset:0; z:0` —
+          layout is untouched; only what paints inside it changes. */}
+      {isBeliefBackgroundSupported(normalizeBeliefId(belief.id)) ? (
+        <div className="conversation-bg" aria-hidden="true">
+          <BeliefBackground beliefId={normalizeBeliefId(belief.id)} />
+        </div>
+      ) : (
+        <div
+          className="conversation-bg"
+          style={{
+            backgroundImage: `url(${actualImagePath})`,
+            /* scale + translateY pushes the face out of the header/status-bar
+               zone down to ~45% of the viewport on iPhone 16. On 9:16 source
+               images cover-fit to 9:19.5 viewports would otherwise pin the
+               face to the top third. Transform-origin at center-top keeps the
+               top edge anchored so there's no visible gap above the image. */
+            transform: 'scale(1.18) translateY(8%)',
+            transformOrigin: 'center top',
+            filter: 'saturate(0.7) brightness(0.85)',
+          }}
+          aria-hidden="true"
+        />
+      )}
       {!isMobile && (
         <img
           src={imagePath}
@@ -1760,36 +1854,22 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
             <BackIcon />
           </button>
 
-          {/* Center: Belief name + Character selector */}
-          <div className="flex items-center gap-2">
-            {/* Tappable belief name */}
-            <button
-              onClick={() => setShowBeliefModal(true)}
-              className="flex items-center gap-1.5 px-3 rounded-full transition-colors hover:bg-white/5"
-              style={{
-                // WCAG 2.5.5: 44px minimum height for touch. Horizontal
-                // padding already comfortable via px-3.
-                minHeight: '44px',
-                color: 'rgba(255,255,255,0.5)',
-              }}
-            >
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', fontWeight: 300, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
-                {belief.name}
-              </span>
+          {/* Center: Merged belief pill (figure-aware). Tap opens the
+              switch-belief modal. Figure switching via the modal's chip
+              strip arrives in Step 5 — until then, figure changes require
+              switching belief. Label mapping in beliefPillLabels.ts.
+              Spec: .stitch/DESIGN.md §5.3. */}
+          <button
+            onClick={() => setShowBeliefModal(true)}
+            className="belief-pill"
+            aria-label={`Switch belief. Currently speaking with ${getBeliefPillLabel(belief.id, character)}`}
+          >
+            <span className="belief-pill-eyebrow">Talking to</span>
+            <span className="belief-pill-name">
+              {getBeliefPillLabel(belief.id, character)}
               <ChevronDownIcon />
-            </button>
-
-            {/* Divider */}
-            <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.15)' }} />
-
-            {/* Character selector */}
-            <CharacterSelector
-              character={character}
-              onChange={setCharacter}
-              beliefId={belief.id}
-              accentColor={accentColor}
-            />
-          </div>
+            </span>
+          </button>
 
           {/* Right controls — share + mute + menu icons, generous gap */}
           <div className="flex items-center" style={{ gap: '16px' }}>
@@ -1859,6 +1939,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   }
                   void openBillingPortal(user.id);
                 }}
+                onAboutAI={() => setShowAboutAI(true)}
                 tier={tier}
                 streakDays={streak.currentStreak}
                 onUpgrade={onPaywall}
@@ -1953,11 +2034,7 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   <div
                     className="text-divine relative group"
                     style={{
-                      maxWidth: isMobile ? '90%' : '65%',
-                      fontSize: isMobile ? 'clamp(1.15rem, 3.2vw, 1.5rem)' : 'clamp(1.3rem, 2.5vw, 1.8rem)',
-                      color: 'rgba(255, 248, 240, 0.95)',
-                      textShadow: `0 0 20px ${accentColor}20, 0 0 40px ${accentColor}10`,
-                      lineHeight: isMobile ? 1.8 : 1.9,
+                      maxWidth: isMobile ? 'calc(100% - 24px)' : '65%',
                       textAlign: 'center',
                       marginLeft: 'auto',
                       marginRight: 'auto',
@@ -2015,26 +2092,12 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           </div>
         </div>
 
-        {/* AI disclosure — lives in flex flow above the input section so it
-            rides the keyboard exactly like the input does. Fades out after
-            the first user message. */}
-        {displayMessages.length === 1 && displayMessages[0].role === 'greeting' && !controlsHidden && (
-          <div
-            className="shrink-0 text-center"
-            style={{
-              padding: '2px 20px 6px',
-              fontFamily: 'var(--font-body, Outfit)',
-              fontSize: '11px',
-              fontWeight: 200,
-              color: 'rgba(255,255,255,0.35)',
-              letterSpacing: '0.05em',
-              pointerEvents: 'none',
-              animation: 'fadeInUp 0.8s ease 0.5s both',
-            }}
-          >
-            Powered by AI — with deep respect for your tradition
-          </div>
-        )}
+        {/* AI disclosure removed from the conversation view 2026-04-24 —
+            relocated to hamburger menu "About this AI" item per
+            .stitch/DESIGN.md §5.8. Repeating disclosure on every session
+            broke the reverent atmosphere. Users see disclosure on
+            LandingPage, BeliefWelcomeScreen onboarding, and PaywallScreen
+            footer; the menu item is the persistent in-app reference. */}
 
       {/* Input bar — sticky bottom of the flex column.
           Class .conversation-input handles position:sticky, z-index,
@@ -2084,14 +2147,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
           {showScrollButton && (
             <button
               onClick={() => scrollToBottom()}
-              className="absolute left-1/2 -translate-x-1/2 p-2 rounded-full transition-all"
-              style={{
-                top: '-48px',
-                background: 'rgba(0, 0, 0, 0.7)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'rgba(255, 255, 255, 0.6)',
-              }}
-              aria-label="Scroll to bottom"
+              className="scroll-bead"
+              aria-label="Scroll to latest message"
             >
               <ArrowDownIcon />
             </button>
@@ -2171,8 +2228,8 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
                   <button
                     onClick={handleSend}
                     aria-label="Send message"
-                    className="absolute right-3 p-2 rounded-full transition-colors"
-                    style={{ color: accentColor, bottom: '6px' }}
+                    className="send-button-ready absolute right-2 p-2 rounded-full"
+                    style={{ bottom: '6px' }}
                   >
                     <SendIcon />
                   </button>
@@ -2539,13 +2596,43 @@ export function ConversationScreen({ belief, user, onBack, onPaywall, onChangeBe
         />
       )}
 
-      {/* Belief selector modal */}
+      {/* Belief / figure selector modal — pill tap opens this. Figure
+          chip strip is the primary action when the active belief has
+          2+ figure options; belief list below is the secondary action.
+          Spec: .stitch/DESIGN.md §5.6. */}
       <BeliefSelectorModal
         isOpen={showBeliefModal}
         onClose={() => setShowBeliefModal(false)}
         onSelect={handleBeliefChange}
         currentBeliefId={belief.id}
+        currentCharacter={character}
+        onSelectCharacter={setCharacter}
       />
+
+      {/* About this AI — opened from hamburger menu. Replaces the per-
+          conversation AI disclosure line. Spec: .stitch/DESIGN.md §5.8. */}
+      {showAboutAI && (
+        <div
+          className="about-ai-scrim"
+          onClick={() => setShowAboutAI(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="about-ai-title"
+        >
+          <div
+            className="about-ai-sheet"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="about-ai-title" className="about-ai-title">About this AI</h2>
+            <p className="about-ai-body">
+              AImighty is an AI-powered spiritual companion. It is not affiliated with any religious institution and does not claim divine authority. The responses are generated by a large language model trained on public text — including sacred texts, theological writing, and philosophical works — with deep respect for every tradition it speaks from.
+            </p>
+            <p className="about-ai-body">
+              If you ever ask directly whether you're talking to God or AI, the voice will answer honestly.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* CSS for animations */}
       <style>{`
